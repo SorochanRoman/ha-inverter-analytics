@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import {
+  coverageWarning,
+  describeError,
+  formatDuration,
+  formatPercent,
+  formatPower,
+  precisionLabel,
+} from "./format";
+
+describe("formatPower", () => {
+  it("shows watts below a kilowatt", () => {
+    expect(formatPower(950, "en")).toBe("950 Вт");
+  });
+
+  it("switches to kilowatts above a kilowatt", () => {
+    expect(formatPower(6800, "en")).toBe("6.8 кВт");
+  });
+
+  it("renders a dash for missing values", () => {
+    expect(formatPower(null, "en")).toBe("—");
+  });
+});
+
+describe("formatPercent", () => {
+  it("renders a fraction as a percentage", () => {
+    expect(formatPercent(0.024, "en")).toBe("2.4%");
+  });
+
+  it("renders a dash for missing values", () => {
+    expect(formatPercent(null, "en")).toBe("—");
+  });
+});
+
+describe("formatDuration", () => {
+  it("renders minutes below an hour", () => {
+    expect(formatDuration(420)).toBe("7 хв");
+  });
+
+  it("renders hours and minutes above an hour", () => {
+    expect(formatDuration(3900)).toBe("1 год 5 хв");
+  });
+
+  it("renders seconds below a minute", () => {
+    expect(formatDuration(45)).toBe("45 с");
+  });
+});
+
+describe("describeError", () => {
+  it("extracts the message from an HA-shaped error object", () => {
+    expect(describeError({ code: "invalid_window", message: "Кінець вікна має бути пізніше за початок" })).toBe(
+      "Кінець вікна має бути пізніше за початок",
+    );
+  });
+
+  it("extracts the message from a plain Error", () => {
+    expect(describeError(new Error("boom"))).toContain("boom");
+  });
+
+  it("passes a bare string through", () => {
+    expect(describeError("щось пішло не так")).toBe("щось пішло не так");
+  });
+
+  it("falls back to String() for an object without a message", () => {
+    expect(describeError({ code: "not_found" })).toBe(String({ code: "not_found" }));
+  });
+});
+
+describe("precisionLabel", () => {
+  it("labels raw precision", () => {
+    expect(precisionLabel("raw", null, "en")).toBe("Точні дані");
+  });
+
+  it("labels lts precision", () => {
+    expect(precisionLabel("lts", null, "en")).toBe("Погодинні середні");
+  });
+
+  it("labels mixed precision with the boundary date", () => {
+    expect(precisionLabel("mixed", "2026-08-01T00:00:00Z", "en")).toBe(
+      `Змішано з ${new Date("2026-08-01T00:00:00Z").toLocaleDateString("en")}`,
+    );
+  });
+
+  it("labels mixed precision without a boundary", () => {
+    expect(precisionLabel("mixed", null, "en")).toBe("Змішано");
+  });
+});
+
+describe("coverageWarning", () => {
+  it("stays silent when coverage is good", () => {
+    expect(coverageWarning(0.99, "uk")).toBeNull();
+  });
+
+  it("says data exists rather than how much is missing", () => {
+    const text = coverageWarning(0.4, "uk");
+    expect(text).toContain("40%");
+    expect(text).not.toContain("відсутн");
+  });
+
+  it("avoids a bogus 100% when a sliver of data exists", () => {
+    // 30-денне вікно з двома хвилинами історії: раніше писало «відсутні 100%»
+    // поруч із заповненими KPI.
+    expect(coverageWarning(0.00005, "uk")).toBe("Дані є менш ніж за 1% періоду");
+  });
+
+  it("says plainly when there is no data at all", () => {
+    expect(coverageWarning(0, "uk")).toBe("Даних за цей період немає");
+  });
+});

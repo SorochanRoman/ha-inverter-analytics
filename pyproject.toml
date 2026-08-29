@@ -1,0 +1,26 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+# Логи від залежностей (sqlalchemy, homeassistant.recorder) глушить хук
+# у tests/conftest.py. log_cli = false вимкнено явно, щоб запобігти їх
+# витоку, якщо налаштування буде скасовано глобально.
+log_cli = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# ruff format переформатовує Python-блоки всередині Markdown. Плани й
+# специфікації в docs/ — це verbatim-джерело брифів для наступних задач,
+# тож форматувальник не має їх торкатися. Стосується format, не check.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# Кодова база коментується українською; RUF001-003 хибно спрацьовують на
+# кирилицю як на "неоднозначні" символи, плутаючи її з латиницею.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
