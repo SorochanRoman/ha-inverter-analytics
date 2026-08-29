@@ -1,0 +1,26 @@
+"""Інтеграція Inverter Analytics."""
+
+from __future__ import annotations
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
+from .const import DOMAIN
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Налаштувати config entry."""
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Вивантажити config entry."""
+    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Перезавантажити запис після зміни опцій."""
+    await hass.config_entries.async_reload(entry.entry_id)
