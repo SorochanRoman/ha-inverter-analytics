@@ -74,8 +74,15 @@ def test_the_duplicated_blocks_stay_identical():
     still read identically, and the extra keys must be exactly those two —
     otherwise a field could go missing from the wizard and pass as an extra.
     """
-    manual, init = _step("manual"), _step("init")
+    manual, init, confirm = _step("manual"), _step("init"), _step("confirm")
     advanced_only = _schema_keys(advanced=True) - _schema_keys()
     for block in ("data", "data_description"):
         assert set(init[block]) - set(manual[block]) == advanced_only
         assert {key: init[block][key] for key in manual[block]} == manual[block]
+        # confirm renders the same schema with one question substituted in, so
+        # its own extra key is that question and everything else must match.
+        assert set(confirm[block]) - set(manual[block]) == {CT_CHOICE}
+        shared = set(confirm[block]) & set(manual[block])
+        assert {key: confirm[block][key] for key in shared} == {
+            key: manual[block][key] for key in shared
+        }

@@ -3,9 +3,12 @@ import { customElement, property, state } from "lit/decorators.js";
 import { fetchConfig } from "./api";
 import { describeError } from "./format";
 import { singleFlight } from "./single-flight";
+import { buildLocation, parseLocation } from "./location";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
 import "./tabs/load-tab";
+
+const BASE_PATH = "/inverter-analytics";
 
 const TABS = [
   { id: "load", label: "Load" },
@@ -52,20 +55,34 @@ export class InverterAnalyticsPanel extends LitElement {
   }
 
   private readLocation = (): void => {
-    const path = window.location.pathname.split("/").filter(Boolean);
-    const tab = path[1];
-    if (tab && TABS.some((item) => item.id === tab)) {
-      this.tab = tab;
-    }
-    const range = new URLSearchParams(window.location.search).get("range");
-    if (range && (RANGE_KEYS as readonly string[]).includes(range)) {
-      this.range = range as RangeKey;
-    }
+    const next = parseLocation(
+      window.location.pathname,
+      window.location.search,
+      TABS.map((item) => item.id),
+      { tab: this.tab, range: this.range, entryId: this.entryId },
+    );
+    this.tab = next.tab;
+    this.range = next.range;
+    this.entryId = next.entryId;
   };
 
-  private writeLocation(): void {
-    const url = `/inverter-analytics/${this.tab}?range=${this.range}`;
-    window.history.replaceState(null, "", url);
+  /**
+   * Changing tab is a navigation, so it goes on the history stack and the
+   * Back button undoes it. Changing the period or the inverter refines the
+   * same view, and pushing those would make Back walk through every click of
+   * a filter before leaving the page.
+   */
+  private writeLocation(push = false): void {
+    const url = buildLocation(BASE_PATH, {
+      tab: this.tab,
+      range: this.range,
+      entryId: this.entryId,
+    });
+    if (push) {
+      window.history.pushState(null, "", url);
+    } else {
+      window.history.replaceState(null, "", url);
+    }
   }
 
   // The connected guard and willUpdate both fire on an ordinary mount, so
@@ -75,7 +92,13 @@ export class InverterAnalyticsPanel extends LitElement {
   private async requestConfig(): Promise<void> {
     try {
       this.config = await fetchConfig(this.hass);
-      this.entryId ??= this.config.entries[0]?.entry_id;
+      // A URL naming an inverter that no longer exists must not leave the
+      // panel asking the backend for it on every range change.
+      const known = this.config.entries.some((entry) => entry.entry_id === this.entryId);
+      if (!known) {
+        this.entryId = this.config.entries[0]?.entry_id;
+      }
+      this.writeLocation();
     } catch (err) {
       this.error = describeError(err);
     }
@@ -83,11 +106,16 @@ export class InverterAnalyticsPanel extends LitElement {
 
   private selectTab(tab: string): void {
     this.tab = tab;
-    this.writeLocation();
+    this.writeLocation(true);
   }
 
   private selectRange(range: RangeKey): void {
     this.range = range;
+    this.writeLocation();
+  }
+
+  private selectEntry(entryId: string): void {
+    this.entryId = entryId;
     this.writeLocation();
   }
 
@@ -113,9 +141,12 @@ export class InverterAnalyticsPanel extends LitElement {
       <div class="header">
         <h1>Inverter Analytics</h1>
         ${this.config.entries.length > 1
-          ? html`<select @change=${(event: Event) => {
-              this.entryId = (event.target as HTMLSelectElement).value;
-            }}>
+          ? html`<select
+              .value=${this.entryId ?? ""}
+              @change=${(event: Event) => {
+                this.selectEntry((event.target as HTMLSelectElement).value);
+              }}
+            >
               ${this.config.entries.map(
                 (entry) => html`<option value=${entry.entry_id}>${entry.title}</option>`,
               )}
