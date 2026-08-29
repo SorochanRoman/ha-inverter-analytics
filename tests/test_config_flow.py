@@ -1,14 +1,19 @@
 """Tests for the setup wizard."""
 
+from unittest.mock import patch
+
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.inverter_analytics.config_flow import CT_CHOICE, pack, unpack
+from custom_components.inverter_analytics.config_flow import pack, unpack
 from custom_components.inverter_analytics.const import DOMAIN
+from custom_components.inverter_analytics.detect import CT_CHOICE, Ambiguity, Detection
 from custom_components.inverter_analytics.roles import EntryConfig
+
+MODULE = "custom_components.inverter_analytics.config_flow"
 
 
 def test_pack_splits_flat_form_into_entities_numbers_and_inverted():
@@ -393,3 +398,167 @@ async def test_the_grid_power_phase_picker_is_absent_when_a_ct_question_covers_i
     field_names = {str(getattr(key, "schema", key)) for key in result["data_schema"].schema}
     assert "grid_power_phase" not in field_names
     assert CT_CHOICE in field_names
+
+
+def _power_states(hass, entity_ids):
+    for entity_id in entity_ids:
+        hass.states.async_set(
+            entity_id,
+            "100",
+            {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+        )
+
+
+async def test_two_questions_do_not_overwrite_each_other(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """One field per question, one answer per role.
+
+    A single shared field would bind the second question over the first and
+    then apply one answer to both roles. Only one ambiguity exists today, so
+    both faults are latent until a second question is ever added — which is
+    exactly when nobody would think to check.
+    """
+    # Five sensors: a name prefix is only a guess, so a smaller group does not
+    # clear the floor and the wizard would skip straight to manual mapping.
+    _power_states(
+        hass,
+        ["sensor.solarman_total_load_power"]
+        + [f"sensor.solarman_load_l{phase}_power" for phase in (1, 2, 3)]
+        + ["sensor.solarman_pv1_power"],
+    )
+    await hass.async_block_till_done()
+
+    detection = Detection(
+        mapping={"load_power": ("sensor.solarman_total_load_power",)},
+        ambiguities=(
+            Ambiguity(
+                key="ct_choice",
+                role="grid_power_phase",
+                question="Which CTs?",
+                options={"external_ct": ("sensor.ext_l1",), "internal_ct": ("sensor.int_l1",)},
+            ),
+            Ambiguity(
+                key="string_choice",
+                role="pv_power_string",
+                question="Which strings?",
+                options={"roof": ("sensor.roof_1",), "garage": ("sensor.garage_1",)},
+            ),
+        ),
+        without_statistics=(),
+        cluster_key="solarman",
+        cluster_label="Solarman",
+    )
+
+    with patch(f"{MODULE}.classify", return_value=detection):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"source": "solarman"}
+        )
+        field_names = {str(getattr(key, "schema", key)) for key in result["data_schema"].schema}
+        assert {"ct_choice", "string_choice"} <= field_names
+        assert "grid_power_phase" not in field_names
+        assert "pv_power_string" not in field_names
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "Deye",
+                "rated_power": 12000,
+                "load_power": "sensor.solarman_total_load_power",
+                "ct_choice": "internal_ct",
+                "string_choice": "roof",
+            },
+        )
+    await hass.async_block_till_done()
+
+    entities = result["result"].data["entities"]
+    assert entities["grid_power_phase"] == ["sensor.int_l1"]
+    assert entities["pv_power_string"] == ["sensor.roof_1"]
+
+
+async def test_a_question_sits_where_its_picker_was(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Appending it instead would strand the role's invert checkbox.
+
+    The checkbox still applies to whatever the answer assigns, so it is correct
+    to render it — but a checkbox reading "invert grid power per phase" with no
+    such field anywhere above it reads as a bug.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    entity_ids += [
+        f"sensor.solarman_{kind}_l{phase}_power"
+        for kind in ("external_ct", "internal_ct")
+        for phase in (1, 2, 3)
+    ]
+    _power_states(hass, entity_ids)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+
+    names = [str(getattr(key, "schema", key)) for key in result["data_schema"].schema]
+    assert names.index(CT_CHOICE) < names.index("invert_grid_power_phase")
+
+
+async def test_the_ct_options_say_how_many_sensors_each_set_has(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """An incomplete clamp set still raises the question.
+
+    Picking it silently carries only the phases that exist, so the count is the
+    one thing that tells the two options apart.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    entity_ids += [f"sensor.solarman_external_ct_l{phase}_power" for phase in (1, 2, 3)]
+    entity_ids += ["sensor.solarman_internal_ct_l1_power"]
+    _power_states(hass, entity_ids)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+
+    field = next(
+        value
+        for key, value in result["data_schema"].schema.items()
+        if str(getattr(key, "schema", key)) == CT_CHOICE
+    )
+    labels = [option["label"] for option in field.config["options"]]
+    assert any("(3 sensors)" in label for label in labels)
+    assert any("(1 sensors)" in label for label in labels)
+
+
+async def test_a_cluster_with_no_load_sensor_says_so_in_its_label(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Five battery sensors clear the prefix floor on their own.
+
+    Setup cannot be completed from that group, because the load sensor is
+    required and is not in it, so the option must not read like a recognised
+    inverter.
+    """
+    for name in ("soc", "voltage", "current", "temperature", "power"):
+        hass.states.async_set(
+            f"sensor.deye2_battery_{name}",
+            "50",
+            {"device_class": "battery", "state_class": "measurement"},
+        )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    field = next(iter(result["data_schema"].schema.values()))
+    labels = [option["label"] for option in field.config["options"]]
+    assert any("no load sensor found" in label for label in labels)

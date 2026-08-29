@@ -30,6 +30,9 @@ MIN_PREFIX_CLUSTER_SIZE = 5
 
 _RELEVANT_DEVICE_CLASSES = frozenset({"power", "energy", "battery"})
 
+# The form field the current-transformer question is asked through.
+CT_CHOICE = "ct_choice"
+
 
 @dataclass(frozen=True, slots=True)
 class SensorInfo:
@@ -147,8 +150,15 @@ def collect_sensors(hass: HomeAssistant) -> list[SensorInfo]:
 
 @dataclass(frozen=True, slots=True)
 class Ambiguity:
-    """A mapping the data cannot settle, to be put to the user."""
+    """A mapping the data cannot settle, to be put to the user.
 
+    key is the form field this question is asked through. It belongs to the
+    question rather than being a single module-level constant: the confirm step
+    binds one field per ambiguity, and sharing one key across two of them would
+    silently apply the second answer to both roles.
+    """
+
+    key: str
     role: str
     question: str
     options: Mapping[str, tuple[str, ...]]
@@ -161,6 +171,21 @@ class Detection:
     mapping: Mapping[str, tuple[str, ...]]
     ambiguities: tuple[Ambiguity, ...]
     without_statistics: tuple[str, ...]
+    # Which cluster this came from. Without it nothing downstream can say which
+    # inverter a detection describes, and the only remaining answer would be
+    # the entry title the user has not typed yet.
+    cluster_key: str = ""
+    cluster_label: str = ""
+
+    @property
+    def is_complete(self) -> bool:
+        """Whether the required roles were all found.
+
+        A cluster that cannot fill them is still worth offering — the user can
+        finish the mapping by hand — but it must not be presented as if it were
+        a recognised inverter.
+        """
+        return all(self.mapping.get(key) for key in ("load_power",))
 
 
 def classify(cluster: Cluster) -> Detection:
@@ -172,7 +197,10 @@ def classify(cluster: Cluster) -> Detection:
     for sensor in cluster.sensors:
         object_id = _object_id(sensor.entity_id)
 
-        if sensor.state_class is None and sensor.device_class in {"power", "energy"}:
+        # Battery is in here too: a state-of-charge sensor without a
+        # state_class feeds the dip analysis the setup text advertises, and
+        # warning about power and energy alone left that case silent.
+        if sensor.state_class is None and sensor.device_class in _RELEVANT_DEVICE_CLASSES:
             without_statistics.append(sensor.entity_id)
 
         ct_match = re.match(presets.CT_PATTERN, object_id)
@@ -196,6 +224,7 @@ def classify(cluster: Cluster) -> Detection:
     if len(ct_sets) > 1:
         ambiguities.append(
             Ambiguity(
+                key=CT_CHOICE,
                 role="grid_power_phase",
                 question="Which current transformers measure the grid connection?",
                 options={
@@ -214,4 +243,6 @@ def classify(cluster: Cluster) -> Detection:
         mapping=mapping,
         ambiguities=tuple(ambiguities),
         without_statistics=tuple(sorted(without_statistics)),
+        cluster_key=cluster.key,
+        cluster_label=cluster.label,
     )

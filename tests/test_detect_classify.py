@@ -1,12 +1,23 @@
 """Tests for turning a cluster of sensors into a role mapping."""
 
 from custom_components.inverter_analytics.detect import (
+    CT_CHOICE,
     Cluster,
     SensorInfo,
     classify,
     cluster_sensors,
 )
 from tests.fixtures.solarman_entities import SOLARMAN_SENSORS
+
+
+def sensor(entity_id: str, device_class: str = "power", state_class: str | None = "measurement"):
+    return SensorInfo(
+        entity_id=entity_id,
+        device_class=device_class,
+        unit="W",
+        state_class=state_class,
+        device_id=None,
+    )
 
 
 def _solarman():
@@ -106,3 +117,63 @@ def test_an_unfamiliar_profile_yields_only_the_roles_that_genuinely_match():
     deye = next(c for c in cluster_sensors(SOLARMAN_SENSORS) if c.key == "deye12_sun12k")
     detection = classify(deye)
     assert set(detection.mapping) == {"grid_import_total", "grid_export_total"}
+
+
+def test_a_detection_knows_which_cluster_it_came_from():
+    cluster = Cluster(
+        key="solarman",
+        label="Solarman",
+        sensors=(sensor("sensor.solarman_total_load_power"),),
+    )
+    detection = classify(cluster)
+    assert detection.cluster_key == "solarman"
+    assert detection.cluster_label == "Solarman"
+
+
+def test_a_cluster_without_a_load_sensor_is_not_complete():
+    incomplete = Cluster(
+        key="deye2",
+        label="Deye2 Battery",
+        sensors=tuple(
+            sensor(f"sensor.deye2_battery_{name}", device_class="battery")
+            for name in ("soc", "voltage", "current", "temperature", "power")
+        ),
+    )
+    assert classify(incomplete).is_complete is False
+    complete = Cluster(
+        key="solarman",
+        label="Solarman",
+        sensors=(sensor("sensor.solarman_total_load_power"),),
+    )
+    assert classify(complete).is_complete is True
+
+
+def test_a_battery_sensor_without_statistics_is_warned_about_too():
+    """The setup text advertises the dip analysis a state-of-charge sensor feeds.
+
+    Warning about power and energy alone left exactly that case silent.
+    """
+    cluster = Cluster(
+        key="solarman",
+        label="Solarman",
+        sensors=(
+            sensor("sensor.solarman_total_load_power"),
+            sensor("sensor.solarman_battery_soc", device_class="battery", state_class=None),
+        ),
+    )
+    assert classify(cluster).without_statistics == ("sensor.solarman_battery_soc",)
+
+
+def test_the_ct_question_carries_the_field_it_is_asked_through():
+    cluster = Cluster(
+        key="solarman",
+        label="Solarman",
+        sensors=tuple(
+            sensor(f"sensor.solarman_{kind}_l{phase}_power")
+            for kind in ("external_ct", "internal_ct")
+            for phase in (1, 2, 3)
+        ),
+    )
+    ambiguity = classify(cluster).ambiguities[0]
+    assert ambiguity.key == CT_CHOICE
+    assert ambiguity.role == "grid_power_phase"

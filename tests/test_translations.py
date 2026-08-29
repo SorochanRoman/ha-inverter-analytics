@@ -7,7 +7,8 @@ is checked rather than remembered.
 import json
 import pathlib
 
-from custom_components.inverter_analytics.config_flow import CT_CHOICE, build_schema
+from custom_components.inverter_analytics.config_flow import build_schema
+from custom_components.inverter_analytics.detect import CT_CHOICE
 
 TRANSLATIONS = pathlib.Path("custom_components/inverter_analytics/translations/en.json")
 

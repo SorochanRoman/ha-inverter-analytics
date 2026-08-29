@@ -18,14 +18,20 @@ from .const import (
     DEFAULT_IMBALANCE_THRESHOLD_PCT,
     DOMAIN,
 )
-from .detect import Detection, classify, cluster_sensors, collect_sensors
+from .detect import (
+    Ambiguity,
+    Cluster,
+    Detection,
+    classify,
+    cluster_sensors,
+    collect_sensors,
+)
 from .presets import CT_CHOICES
 from .roles import ROLES_BY_KEY, RoleKind, entity_roles, normalise_entity_ids, number_roles
 
 CONF_NAME = "name"
 INVERT_PREFIX = "invert_"
 CONF_SOURCE = "source"
-CT_CHOICE = "ct_choice"
 MANUAL = "manual"
 
 # Shown pre-filled so the options form states the value actually in force,
@@ -55,6 +61,40 @@ def _describe_missing_statistics(entity_ids: Sequence[str]) -> str:
     return (
         "These sensors have no state_class, so Home Assistant keeps no long-term "
         f"statistics for them and long periods will show no data: {listed}."
+    )
+
+
+def _cluster_label(cluster: Cluster) -> str:
+    """Describe a candidate honestly enough that a bad one is recognisable.
+
+    A shared name prefix can group a fraction of an installation — five battery
+    sensors of a Deye whose other entities are named differently clear the
+    floor on their own and read as "Deye2 Battery, 5 sensors". Setup cannot be
+    completed from that group, because the load sensor is required and is not
+    in it, so the label says as much rather than letting the option look like a
+    recognised inverter.
+    """
+    suffix = "" if classify(cluster).is_complete else " — no load sensor found"
+    return f"{cluster.label} — {len(cluster.sensors)} sensors{suffix}"
+
+
+def _ambiguity_selector(ambiguity: Ambiguity) -> selector.SelectSelector:
+    """The picker for one question the data could not settle.
+
+    The number of sensors is part of the label: an incomplete clamp set still
+    raises the question, and the option that carries two phases where the other
+    carries three is otherwise indistinguishable from it.
+    """
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                selector.SelectOptionDict(
+                    value=key,
+                    label=f"{CT_CHOICES.get(key, key)} ({len(entities)} sensors)",
+                )
+                for key, entities in ambiguity.options.items()
+            ]
+        )
     )
 
 
@@ -205,9 +245,7 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_confirm()
 
         options = [
-            selector.SelectOptionDict(
-                value=cluster.key, label=f"{cluster.label} — {len(cluster.sensors)} sensors"
-            )
+            selector.SelectOptionDict(value=cluster.key, label=_cluster_label(cluster))
             for cluster in clusters
         ]
         options.append(selector.SelectOptionDict(value=MANUAL, label="Map sensors manually"))
@@ -234,9 +272,9 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             packed = pack(user_input)
-            choice = user_input.get(CT_CHOICE)
-            if choice:
-                for ambiguity in detection.ambiguities:
+            for ambiguity in detection.ambiguities:
+                choice = user_input.get(ambiguity.key)
+                if choice:
                     packed[CONF_ENTITIES][ambiguity.role] = list(ambiguity.options[choice])
             return self.async_create_entry(title=user_input[CONF_NAME], data=packed)
 
@@ -244,23 +282,19 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
         for role_key, ids in detection.mapping.items():
             defaults[role_key] = list(ids) if ROLES_BY_KEY[role_key].multiple else ids[0]
 
-        ambiguous_roles = {ambiguity.role for ambiguity in detection.ambiguities}
-        fields = {
-            key: value
-            for key, value in build_schema(defaults).schema.items()
+        by_role = {ambiguity.role: ambiguity for ambiguity in detection.ambiguities}
+        fields: dict[Any, Any] = {}
+        for key, value in build_schema(defaults).schema.items():
+            role_key = str(getattr(key, "schema", key))
+            ambiguity = by_role.get(role_key)
+            if ambiguity is None:
+                fields[key] = value
+                continue
             # A role settled by a question must not also get a picker: whatever
-            # the user typed there would be overwritten by the answer.
-            if str(getattr(key, "schema", key)) not in ambiguous_roles
-        }
-        for ambiguity in detection.ambiguities:
-            fields[vol.Required(CT_CHOICE)] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[
-                        selector.SelectOptionDict(value=key, label=CT_CHOICES[key])
-                        for key in ambiguity.options
-                    ]
-                )
-            )
+            # the user typed there would be overwritten by the answer. The
+            # question takes the picker's place rather than being appended, so
+            # the role's invert checkbox still sits next to a visible field.
+            fields[vol.Required(ambiguity.key)] = _ambiguity_selector(ambiguity)
 
         return self.async_show_form(
             step_id="confirm",
