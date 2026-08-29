@@ -33,9 +33,23 @@ export function formatCoverage(value: number | null, locale: string): string {
   return formatPercent(value, locale);
 }
 
+/** Below this, the seconds are shown: rounding them away misstates a short span. */
+const SECONDS_SHOWN_BELOW = 10 * 60;
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)} s`;
-  const minutes = Math.round(seconds / 60);
+
+  const whole = Math.round(seconds);
+  if (whole < SECONDS_SHOWN_BELOW) {
+    // An imbalance episode cannot be shorter than a minute, so the shortest
+    // ones sit right at the boundary where rounding to whole minutes hurts
+    // most: 100 seconds shown as "2 min" overstates it by a fifth.
+    const rest = whole % 60;
+    const minutes = (whole - rest) / 60;
+    return rest === 0 ? `${minutes} min` : `${minutes} min ${rest} s`;
+  }
+
+  const minutes = Math.round(whole / 60);
   if (minutes < 60) return `${minutes} min`;
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }

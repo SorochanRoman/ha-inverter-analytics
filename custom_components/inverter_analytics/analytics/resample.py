@@ -114,7 +114,47 @@ class AlignedInterval:
         return (self.end - self.start).total_seconds()
 
 
-def align(series_list: Sequence[Series]) -> list[AlignedInterval]:
+# Home Assistant writes one entity's state at a time, so three phases updated
+# from the same reading land microseconds apart. Between the first write and the
+# last, the aligned timeline holds one new value beside two stale ones — a state
+# the hardware never had. Treating changes this close together as simultaneous
+# removes that seam. Kept well below any real reporting interval: at half a
+# second, a source polling once a second still has every genuine change of its
+# own honoured.
+DEFAULT_SETTLING_SECONDS = 0.5
+
+
+def _settle(boundaries: Sequence[datetime], settling_seconds: float) -> list[datetime]:
+    """Collapse each burst of near-simultaneous cuts down to its last moment.
+
+    The last, not the first: the previous values hold until every series has
+    been written, so the interval that ends the burst is the one carrying a
+    settled reading.
+    """
+    if settling_seconds <= 0 or len(boundaries) < 2:
+        return list(boundaries)
+
+    kept: list[datetime] = []
+    index = 0
+    while index < len(boundaries):
+        anchor = boundaries[index]
+        last = index
+        while (
+            last + 1 < len(boundaries)
+            and (boundaries[last + 1] - anchor).total_seconds() < settling_seconds
+        ):
+            last += 1
+        kept.append(boundaries[last])
+        index = last + 1
+
+    # A window shorter than the settling time collapses to a single moment,
+    # which describes no interval at all; fall back to its own bounds.
+    return kept if len(kept) >= 2 else [boundaries[0], boundaries[-1]]
+
+
+def align(
+    series_list: Sequence[Series], settling_seconds: float = DEFAULT_SETTLING_SECONDS
+) -> list[AlignedInterval]:
     """Merge several step functions onto one timeline.
 
     Phases are separate entities that change state at their own moments, so
@@ -151,7 +191,7 @@ def align(series_list: Sequence[Series]) -> list[AlignedInterval]:
                 edges.add(interval.start)
             if start < interval.end < end:
                 edges.add(interval.end)
-    boundaries = sorted(edges)
+    boundaries = _settle(sorted(edges), settling_seconds)
 
     # Every interval boundary is a cut, so within a segment each series either
     # covers it completely or does not overlap it at all — which is what lets a

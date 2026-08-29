@@ -20,6 +20,12 @@ switching period refetches and the precision badge changes from "Mixed since
 confirm step arrived pre-filled with the total load, all three phases *in
 order*, both PV strings and the battery state of charge, with no manual typing.
 
+**Imbalance episodes and the load floor.** A history built for it — 100 s of
+heavy imbalance, a balanced stretch, 60 s of standby, then 80 s of moderate
+imbalance — produced two episodes with their per-phase values, and 60 s
+correctly excluded as below the load floor. Both had only ever been exercised
+by unit tests against hand-built data.
+
 **Phase and string analytics.** The payload carries `load_l1`/`load_l2`/
 `load_l3` and `pv_s1`/`pv_s2` with their own coverage; the per-phase shares sum
 to one; the Phases section renders the cards, the derived-rating note, the
@@ -57,7 +63,21 @@ the defect was only visible on screen.
    assigns properties before the children exist, so `.value` on a `<select>`
    landed on an empty element and the browser fell back to the first entry: one
    inverter's data under another's name. Bound with `?selected` on the option.
-8. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
+8. **An episode reported a state the hardware never had.** Home Assistant
+   writes one entity at a time, so a reading arriving after a very different
+   one passes through a mixed state for a few milliseconds — 4000/5/5 between
+   10/5/5 and 4000/2500/2500. The mean and p95 are time-weighted and shrugged
+   it off; `peak_imbalance` is a maximum over instants and reported it, with
+   the phase values printed beside it. align() now treats changes inside a
+   settling window as simultaneous.
+9. **A 100-second episode displayed as "2 min".** Episodes start at exactly
+   sixty seconds, which is where rounding to whole minutes is worst.
+10. **The panel bundle had no cache-busting.** Its URL never changed, so after
+    an upgrade a browser holding the old file kept running the previous
+    release's panel — no error, no hint that a reload would help. Found while
+    trying to see a fix take effect and failing, twice, including after a hard
+    reload. The URL now carries the manifest version.
+11. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
    ignores an option whose component was not registered, so the string
    comparison drew two unlabelled colours — while a unit test asserted
    `legend.data` was present and passed. Every option builder is now checked
@@ -76,11 +96,6 @@ the defect was only visible on screen.
   has never run against genuine hourly data. Per-entity precision is proven by
   unit test with the recorder mocked, not by a real sensor lacking a
   `state_class`.
-- **Imbalance episodes and the load floor, on screen.** Both are covered by
-  unit tests with hand-built data, and the live run produced neither: its
-  samples were four seconds apart, below the sixty-second episode floor, and
-  every value was above the load floor. The episode table has only ever
-  rendered its empty state.
 - **Whether a typical load sensor carries `state_class` at all.** Without it
   there is no LTS, and a 30-day window on a 10-day recorder will honestly
   report roughly 33% coverage — which a user is likely to read as a bug.
