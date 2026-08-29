@@ -84,7 +84,11 @@ def test_hour_buckets_split_an_interval_across_local_hours():
     intervals = [Interval(BASE, BASE + timedelta(hours=3), 100.0)]
     totals = hour_of_day_durations(intervals, KYIV)
     assert sum(totals) == 3 * 3600
-    assert len([value for value in totals if value > 0]) == 3
+    # BASE — це 2026-01-01T00:00Z, тобто 02:00 за київським часом узимку.
+    assert totals[2] == 3600.0
+    assert totals[3] == 3600.0
+    assert totals[4] == 3600.0
+    assert [value for index, value in enumerate(totals) if index not in (2, 3, 4)] == [0.0] * 21
 
 
 def test_hour_buckets_skip_the_hour_lost_to_spring_dst():

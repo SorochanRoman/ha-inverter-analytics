@@ -241,20 +241,13 @@ def _contiguous_runs(intervals: Sequence[Interval]) -> Iterator[list[Interval]]:
 def _matching_runs(
     intervals: Sequence[Interval], predicate: Callable[[float], bool]
 ) -> Iterator[list[Interval]]:
-    """Серії суміжних інтервалів, що задовольняють умову."""
-    run: list[Interval] = []
-    for interval in intervals:
-        if not predicate(interval.value):
-            if run:
-                yield run
-                run = []
-            continue
-        if run and interval.start != run[-1].end:
-            yield run
-            run = []
-        run.append(interval)
-    if run:
-        yield run
+    """Серії суміжних інтервалів, що задовольняють умову.
+
+    Відсіювання за умовою до перевірки суміжності дає ті самі межі серій:
+    і розрив у даних, і інтервал, що умову не задовольняє, однаково
+    розривають ланцюг.
+    """
+    yield from _contiguous_runs([i for i in intervals if predicate(i.value)])
 
 
 def _to_episode(run: Sequence[Interval], extreme: Callable[[Iterable[float]], float]) -> Episode:
