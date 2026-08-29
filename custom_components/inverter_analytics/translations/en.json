@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Inverter Analytics",
+        "description": "Map your inverter sensors. Only load power and rated power are required.",
+        "data": {
+          "name": "Name",
+          "rated_power": "Inverter rated power",
+          "battery_capacity": "Battery capacity",
+          "load_power": "Load power",
+          "pv_power": "PV power",
+          "battery_power": "Battery power",
+          "grid_power": "Grid power",
+          "battery_soc": "Battery state of charge",
+          "grid_connected": "Grid connected",
+          "pv_energy_total": "PV energy total",
+          "load_energy_total": "Load energy total",
+          "battery_charge_total": "Battery charge energy total",
+          "battery_discharge_total": "Battery discharge energy total",
+          "grid_import_total": "Grid import total",
+          "grid_export_total": "Grid export total",
+          "invert_battery_power": "Invert battery power sign",
+          "invert_grid_power": "Invert grid power sign"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Inverter Analytics",
+        "description": "Change sensor mapping and inverter parameters.",
+        "data": {
+          "name": "Name",
+          "rated_power": "Inverter rated power",
+          "battery_capacity": "Battery capacity",
+          "load_power": "Load power",
+          "pv_power": "PV power",
+          "battery_power": "Battery power",
+          "grid_power": "Grid power",
+          "battery_soc": "Battery state of charge",
+          "grid_connected": "Grid connected",
+          "pv_energy_total": "PV energy total",
+          "load_energy_total": "Load energy total",
+          "battery_charge_total": "Battery charge energy total",
+          "battery_discharge_total": "Battery discharge energy total",
+          "grid_import_total": "Grid import total",
+          "grid_export_total": "Grid export total",
+          "invert_battery_power": "Invert battery power sign",
+          "invert_grid_power": "Invert grid power sign"
+        }
+      }
+    }
+  }
+}
