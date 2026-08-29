@@ -1197,7 +1197,8 @@ def test_unavailable_states_are_excluded_and_reduce_coverage():
 def test_single_sample_covers_the_whole_window():
     series = hour_series(Sample(at(0), 42.0))
     intervals = to_intervals(series)
-    assert intervals == [intervals[0]]
+    assert len(intervals) == 1
+    assert intervals[0].value == 42.0
     assert intervals[0].seconds == 3600.0
     assert coverage(series) == 1.0
 
@@ -3076,6 +3077,7 @@ git commit -m "feat: WebSocket API для конфігурації та анал
 **Files:**
 - Create: `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`
 - Create: `frontend/src/types.ts`, `frontend/src/api.ts`, `frontend/src/range.ts`, `frontend/src/theme.ts`, `frontend/src/panel.ts`
+- Create: `frontend/src/tabs/load-tab.ts` (заглушка, повністю переписується в Task 13)
 - Create: `frontend/src/range.test.ts`
 - Modify: `.github/workflows/ci.yml`
 - Modify: `custom_components/inverter_analytics/frontend/dist/inverter-analytics-panel.js` (перезаписується збіркою)
@@ -3554,9 +3556,46 @@ declare global {
 }
 ```
 
-Файл імпортує `./tabs/load-tab`, який створюється в Task 13 — до нього збірка не пройде. Це навмисно: Task 12 і Task 13 разом дають першу робочу вкладку, а розділені вони тому, що каркас із роутингом і аналітичні графіки перевіряються різними тестами.
+- [ ] **Step 7: Створити тимчасову заглушку вкладки**
 
-- [ ] **Step 7: Додати збірку фронтенду в CI**
+`panel.ts` імпортує `./tabs/load-tab`, справжня реалізація якого — Task 13. Щоб Task 12 залишався незалежно зібраним і перевіреним, створити заглушку, яку Task 13 повністю перепише.
+
+`frontend/src/tabs/load-tab.ts`:
+
+```typescript
+import { LitElement, css, html } from "lit";
+import { customElement, property } from "lit/decorators.js";
+import type { HomeAssistant } from "../types";
+import type { RangeKey } from "../range";
+
+/** Заглушка: повна реалізація вкладки — Task 13. */
+@customElement("ia-load-tab")
+export class IaLoadTab extends LitElement {
+  @property({ attribute: false }) public hass!: HomeAssistant;
+  @property({ type: String }) public entryId?: string;
+  @property({ type: String }) public range: RangeKey = "30d";
+
+  protected render() {
+    return html`<div class="notice">
+      Вкладка «Навантаження»: період ${this.range}, інвертор ${this.entryId ?? "—"}.
+    </div>`;
+  }
+
+  static styles = css`
+    .notice { padding: 24px; color: var(--secondary-text-color); }
+  `;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ia-load-tab": IaLoadTab;
+  }
+}
+```
+
+Після цього `npm run typecheck && npm run test && npm run build` мають бути зеленими, а панель у живому Home Assistant — відкриватися з робочими вкладками й перемиканням періодів.
+
+- [ ] **Step 8: Додати збірку фронтенду в CI**
 
 Дописати в `.github/workflows/ci.yml` нову джобу:
 
@@ -3577,7 +3616,7 @@ declare global {
       - run: npm run build
 ```
 
-- [ ] **Step 8: Коміт**
+- [ ] **Step 9: Коміт**
 
 ```bash
 git add frontend .github/workflows/ci.yml
@@ -3592,7 +3631,7 @@ git commit -m "feat: каркас фронтенду — збірка, шапк�
 - Create: `frontend/src/format.ts`, `frontend/src/format.test.ts`
 - Create: `frontend/src/charts/options.ts`, `frontend/src/charts/options.test.ts`
 - Create: `frontend/src/charts/echart.ts`
-- Create: `frontend/src/tabs/load-tab.ts`
+- Rewrite: `frontend/src/tabs/load-tab.ts` (замінює заглушку з Task 12 повністю)
 
 **Interfaces:**
 - Consumes: `types.LoadPayload`, `api.fetchLoad`, `range.resolveRange`, `theme.SERIES`, `theme.chartBaseOption`.
@@ -3921,7 +3960,7 @@ declare global {
 }
 ```
 
-- [ ] **Step 7: Реалізувати вкладку**
+- [ ] **Step 7: Замінити заглушку вкладки повною реалізацією**
 
 `frontend/src/tabs/load-tab.ts`:
 
