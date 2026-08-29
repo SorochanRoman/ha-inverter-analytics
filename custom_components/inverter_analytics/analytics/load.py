@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -44,13 +45,29 @@ HIGH_LOAD_SHARE = 0.8
 DURATION_CURVE_POINTS = 60
 
 
-def _seconds_between(intervals: Sequence[Interval], low: float, high: float | None) -> float:
-    """Total duration for which the value was within [low, high)."""
-    return sum(
-        interval.seconds
-        for interval in intervals
-        if interval.value >= low and (high is None or interval.value < high)
-    )
+# The lower edge of each band, as a share of rated power. Kept next to BANDS
+# rather than derived at each call so the two cannot drift.
+_BAND_EDGES: tuple[float, ...] = tuple(low for _, low, _ in BANDS)
+
+
+def _band_seconds(intervals: Sequence[Interval], rated_power: float) -> tuple[list[float], float]:
+    """Seconds in each band, and seconds above the high-load share.
+
+    One pass rather than one scan per band. The lowest band also catches
+    negative values — the same way the histogram clamps them into bucket zero.
+    Otherwise they would vanish from the numerators while staying in the
+    denominator, and the fractions would stop summing to one.
+    histogram.clipped_low_seconds shows exactly how much time was below zero.
+    """
+    seconds = [0.0] * len(BANDS)
+    high_seconds = 0.0
+    for interval in intervals:
+        share = interval.value / rated_power
+        index = max(bisect_right(_BAND_EDGES, share) - 1, 0)
+        seconds[index] += interval.seconds
+        if share >= HIGH_LOAD_SHARE:
+            high_seconds += interval.seconds
+    return seconds, high_seconds
 
 
 def build_load_payload(
@@ -67,26 +84,18 @@ def build_load_payload(
     observed_min = min((interval.value for interval in intervals), default=None)
     observed_max = max((interval.value for interval in intervals), default=None)
 
-    bands = []
-    for index, (key, low_share, high_share) in enumerate(BANDS):
-        # The lowest band also catches negative values — the same way the histogram
-        # clamps them into bucket zero. Otherwise they'd vanish from the numerators
-        # while staying in the denominator, and the fractions would stop summing to
-        # one. histogram.clipped_low_seconds shows exactly how much time was below zero.
-        low = float("-inf") if index == 0 else low_share * rated_power
-        high = None if high_share is None else high_share * rated_power
-        seconds = _seconds_between(intervals, low, high)
-        bands.append(
-            {
-                "key": key,
-                "from": low_share,
-                "to": high_share,
-                "seconds": seconds,
-                "fraction": (seconds / total_seconds) if total_seconds > 0 else 0.0,
-            }
-        )
+    band_seconds, high_seconds = _band_seconds(intervals, rated_power)
+    bands = [
+        {
+            "key": key,
+            "from": low_share,
+            "to": high_share,
+            "seconds": seconds,
+            "fraction": (seconds / total_seconds) if total_seconds > 0 else 0.0,
+        }
+        for (key, low_share, high_share), seconds in zip(BANDS, band_seconds, strict=True)
+    ]
 
-    high_seconds = _seconds_between(intervals, HIGH_LOAD_SHARE * rated_power, None)
     overloads = episodes_above(intervals, threshold=rated_power, min_seconds=OVERLOAD_MIN_SECONDS)
 
     return {

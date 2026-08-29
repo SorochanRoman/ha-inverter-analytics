@@ -200,3 +200,15 @@ def test_pv_strings_are_named_from_their_own_convention():
     identities = part_identities("pv_power_string", ["sensor.x_pv1_power", "sensor.x_pv2_power"])
     assert [item.key for item in identities] == ["pv_s1", "pv_s2"]
     assert [item.label for item in identities] == ["PV1", "PV2"]
+
+
+def test_an_unknown_role_names_itself_in_the_error():
+    config = EntryConfig.from_dict({})
+    with pytest.raises(KeyError, match="load_powr"):
+        config.has("load_powr")
+
+
+def test_a_stored_number_that_is_not_a_number_names_its_role():
+    """A stored entry can hold whatever a past version wrote."""
+    with pytest.raises(ValueError, match="rated_power"):
+        EntryConfig.from_dict({"numbers": {"rated_power": "twelve"}})

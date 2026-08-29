@@ -207,8 +207,15 @@ class EntryConfig:
         for key, value in (data.get(CONF_NUMBERS) or {}).items():
             if key not in ROLES_BY_KEY:
                 raise KeyError(f"Unknown role: {key}")
-            if value is not None:
+            if value is None:
+                continue
+            try:
                 numbers[key] = float(value)
+            except (TypeError, ValueError) as err:
+                # A stored entry can hold anything a past version wrote. Saying
+                # which role is unreadable beats a bare "could not convert
+                # string to float" from four frames down.
+                raise ValueError(f"Role {key} holds a non-numeric value: {value!r}") from err
 
         inverted = frozenset(data.get(CONF_INVERTED) or ())
         unknown = inverted - set(ROLES_BY_KEY)
@@ -244,7 +251,15 @@ class EntryConfig:
         return -1.0 if role_key in self.inverted else 1.0
 
     def has(self, *role_keys: str) -> bool:
-        """Whether all listed roles are configured."""
+        """Whether all listed roles are configured.
+
+        An unknown key is a programming error rather than an unconfigured
+        role, so it raises — but with the name of the role, not the bare
+        KeyError that a dict lookup would produce.
+        """
+        for key in role_keys:
+            if key not in ROLES_BY_KEY:
+                raise KeyError(f"Unknown role: {key}")
         return all(
             (key in self.numbers)
             if ROLES_BY_KEY[key].kind is RoleKind.NUMBER

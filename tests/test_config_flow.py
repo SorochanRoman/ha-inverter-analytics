@@ -7,9 +7,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.inverter_analytics.config_flow import pack, unpack
-from custom_components.inverter_analytics.const import DOMAIN
+from custom_components.inverter_analytics.const import DEFAULT_IMBALANCE_FLOOR_PCT, DOMAIN
 from custom_components.inverter_analytics.detect import CT_CHOICE, Ambiguity, Detection
 from custom_components.inverter_analytics.roles import EntryConfig
 
@@ -598,3 +599,76 @@ async def test_renaming_an_inverter_reloads_it_once(
 
     assert entry.title == "New name"
     assert reload.call_count == 1
+
+
+async def test_an_inverted_role_survives_the_wizard_end_to_end(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """The checkbox is packed, stored and read back as a sign of -1.
+
+    Every part of that chain was tested on its own; nothing checked that a box
+    ticked in the form actually flips the sign the analytics uses.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["step_id"] == "manual"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "name": "Deye",
+            "rated_power": 8000,
+            "load_power": "sensor.load",
+            "battery_power": "sensor.battery",
+            "invert_battery_power": True,
+        },
+    )
+    await hass.async_block_till_done()
+
+    config = EntryConfig.from_entry(result["result"])
+    assert config.sign("battery_power") == -1.0
+    assert config.sign("load_power") == 1.0
+
+
+async def test_the_options_form_arrives_filled_in_with_what_is_stored(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """An empty form would read as "nothing configured" and invite retyping."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye",
+        data={
+            "entities": {
+                "load_power": ["sensor.load"],
+                "load_power_phase": ["sensor.l1", "sensor.l2"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": ["battery_power"],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    suggested = {
+        str(getattr(key, "schema", key)): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+        if getattr(key, "description", None)
+    }
+    # A marker with no default carries the UNDEFINED sentinel, not None, and
+    # calling it raises rather than returning nothing.
+    defaults = {
+        str(getattr(key, "schema", key)): key.default()
+        for key in result["data_schema"].schema
+        if getattr(key, "default", vol.UNDEFINED) is not vol.UNDEFINED
+    }
+
+    assert suggested["load_power"] == "sensor.load"
+    assert suggested["load_power_phase"] == ["sensor.l1", "sensor.l2"]
+    assert suggested["rated_power"] == 8000.0
+    assert defaults["name"] == "Deye"
+    assert defaults["invert_battery_power"] is True
+    # The tuning thresholds are pre-filled with the value actually in force.
+    assert suggested["imbalance_floor_pct"] == DEFAULT_IMBALANCE_FLOOR_PCT

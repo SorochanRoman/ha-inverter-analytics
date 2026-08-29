@@ -43,6 +43,31 @@ class Series:
     end: datetime
     samples: tuple[Sample, ...]
 
+    def __post_init__(self) -> None:
+        """Enforce what every reader here assumes.
+
+        to_intervals reads each sample's successor as the moment the value
+        stopped holding, so an unsorted series silently produces negative and
+        overlapping intervals rather than failing. Series.of sorts, but nothing
+        stopped a caller from using the constructor directly and getting a
+        quietly wrong answer — the check costs one pass over data that was just
+        built in n log n.
+
+        Naive datetimes are rejected for the same reason: arithmetic mixing
+        them with aware ones raises deep inside the maths, where the message
+        says nothing about which series was at fault.
+        """
+        for moment in (self.start, self.end):
+            if moment.tzinfo is None or moment.tzinfo.utcoffset(moment) is None:
+                raise ValueError("Series bounds must be timezone-aware")
+        previous: datetime | None = None
+        for sample in self.samples:
+            if sample.ts.tzinfo is None or sample.ts.tzinfo.utcoffset(sample.ts) is None:
+                raise ValueError("Sample timestamps must be timezone-aware")
+            if previous is not None and sample.ts < previous:
+                raise ValueError("Series samples must be ordered by time")
+            previous = sample.ts
+
     @classmethod
     def of(cls, start: datetime, end: datetime, samples: Iterable[Sample]) -> Series:
         """Build a series, ordering the samples by time."""
@@ -266,6 +291,27 @@ def duration_histogram(
     )
 
 
+def _percentile_of(
+    buckets: Sequence[Bucket], total: float, bucket_width: float, top_edge: float, q: float
+) -> float:
+    """Percentile over buckets that have already been expanded."""
+    target = q * total
+    cumulative = 0.0
+    for bucket in buckets:
+        if bucket.seconds <= 0:
+            continue
+        if cumulative + bucket.seconds >= target:
+            share = (target - cumulative) / bucket.seconds
+            return bucket.start + share * bucket_width
+        cumulative += bucket.seconds
+
+    # Reached only when the running sum falls short of the target through
+    # accumulated floating-point error, since the last non-empty bucket
+    # otherwise satisfies the test for any q up to 1. The top edge is the
+    # correct answer in that case, not an arbitrary fallback.
+    return top_edge
+
+
 def percentile(hist: Histogram, q: float) -> float | None:
     """Duration-weighted percentile, linearly interpolated within a bucket."""
     if not 0.0 <= q <= 1.0:
@@ -274,17 +320,10 @@ def percentile(hist: Histogram, q: float) -> float | None:
     total = hist.total_seconds
     if total <= 0:
         return None
+    return _percentile_of(hist.buckets(), total, hist.bucket_width, _top_edge(hist), q)
 
-    target = q * total
-    cumulative = 0.0
-    for bucket in hist.buckets():
-        if bucket.seconds <= 0:
-            continue
-        if cumulative + bucket.seconds >= target:
-            share = (target - cumulative) / bucket.seconds
-            return bucket.start + share * hist.bucket_width
-        cumulative += bucket.seconds
 
+def _top_edge(hist: Histogram) -> float:
     return hist.offset + len(hist.seconds) * hist.bucket_width
 
 
@@ -315,15 +354,20 @@ def percentile_in_range(
 
 def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]:
     """Load duration curve: the value exceeded for a given fraction of time."""
-    if points < 2 or hist.total_seconds <= 0:
+    total = hist.total_seconds
+    if points < 2 or total <= 0:
         return []
-    result: list[tuple[float, float]] = []
-    for index in range(points):
-        fraction = index / (points - 1)
-        value = percentile(hist, 1.0 - fraction)
-        if value is not None:
-            result.append((fraction, value))
-    return result
+    # Expanded once: percentile() would rebuild every bucket on each of the
+    # sixty points the payload asks for.
+    buckets = hist.buckets()
+    top_edge = _top_edge(hist)
+    return [
+        (
+            index / (points - 1),
+            _percentile_of(buckets, total, hist.bucket_width, top_edge, 1.0 - index / (points - 1)),
+        )
+        for index in range(points)
+    ]
 
 
 @dataclass(frozen=True, slots=True)
