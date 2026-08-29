@@ -88,9 +88,13 @@ async def ws_load(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
     """Повернути аналітику навантаження за вікно."""
+    domain_data = hass.data.get(DOMAIN, {})
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
-    if entry is None or entry.domain != DOMAIN:
-        connection.send_error(msg["id"], "not_found", "Невідомий entry_id")
+    # async_get_entry повертає запис у будь-якому стані, включно з вимкненим
+    # вручну в UI — зникає лише запис, який повністю видалили. Належність до
+    # domain_data — це саме умова, за якої існує кеш, який читає цей обробник.
+    if entry is None or entry.domain != DOMAIN or entry.entry_id not in domain_data:
+        connection.send_error(msg["id"], "not_found", "Інвертор не знайдено або вимкнений")
         return
 
     start = dt_util.as_utc(msg["start"])

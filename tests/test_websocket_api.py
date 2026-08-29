@@ -1,6 +1,7 @@
 """Тести WebSocket API."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -9,6 +10,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
+from custom_components.inverter_analytics.analytics.load import async_load_analytics
 from custom_components.inverter_analytics.const import DOMAIN
 from custom_components.inverter_analytics.websocket_api import MAX_WINDOW_DAYS, clamp_window
 
@@ -119,6 +121,34 @@ async def test_load_command_rejects_unknown_entry(
     assert response["error"]["code"] == "not_found"
 
 
+async def test_load_command_reports_not_found_for_an_unloaded_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Вимкнений в UI інвертор існує як запис, але обслуговувати його нічим."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    now = dt_util.utcnow()
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "inverter_analytics/load",
+            "entry_id": entry.entry_id,
+            "start": (now - timedelta(hours=1)).isoformat(),
+            "end": now.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "not_found"
+
+
 async def test_load_command_rejects_inverted_window(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
@@ -162,12 +192,18 @@ async def test_second_identical_request_is_served_from_cache(
         "start": (now - timedelta(hours=1)).isoformat(),
         "end": now.isoformat(),
     }
-    client = await hass_ws_client(hass)
-    await client.send_json({"id": 1, **payload})
-    first = await client.receive_json()
-    await client.send_json({"id": 2, **payload})
-    second = await client.receive_json()
+    with patch(
+        "custom_components.inverter_analytics.websocket_api.async_load_analytics",
+        wraps=async_load_analytics,
+    ) as computed:
+        client = await hass_ws_client(hass)
+        await client.send_json({"id": 1, **payload})
+        first = await client.receive_json()
+        await client.send_json({"id": 2, **payload})
+        second = await client.receive_json()
 
     assert first["result"] == second["result"]
+    # Головне: друга відповідь не коштувала жодного перерахунку.
+    assert computed.call_count == 1
     cache = hass.data[DOMAIN][entry.entry_id]["cache"]
     assert cache.size == 1
