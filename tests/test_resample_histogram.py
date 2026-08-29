@@ -1,4 +1,4 @@
-"""Тести гістограм тривалості та перцентилів."""
+"""Tests for duration histograms and percentiles."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -19,7 +19,7 @@ def interval(start_min: float, end_min: float, value: float) -> Interval:
 
 
 def two_bucket_histogram():
-    """Годину на 50 Вт, годину на 150 Вт; корзини по 100 Вт."""
+    """An hour at 50 W, an hour at 150 W; buckets 100 W wide."""
     intervals = [interval(0, 60, 50.0), interval(60, 120, 150.0)]
     return duration_histogram(intervals, bucket_width=100.0)
 
@@ -91,7 +91,7 @@ def test_zero_bucket_width_is_rejected():
 
 
 def test_clipped_time_is_reported_separately():
-    """Значення поза діапазоном мають лишати слід, а не зникати в крайніх корзинах."""
+    """Out-of-range values must leave a trace, not vanish into the edge buckets."""
     intervals = [interval(0, 30, -50.0), interval(30, 60, 10_000.0)]
     hist = duration_histogram(intervals, bucket_width=100.0, max_buckets=10)
     assert hist.clipped_low_seconds == 1800.0
@@ -105,7 +105,7 @@ def test_values_in_range_report_no_clipping():
 
 
 def test_clipped_time_still_counts_toward_bucket_totals():
-    """Час не губиться: частки корзин лишаються в сумі 1.0."""
+    """Time is never lost: the bucket fractions still sum to 1.0."""
     intervals = [interval(0, 30, 10_000.0), interval(30, 60, 50.0)]
     hist = duration_histogram(intervals, bucket_width=100.0, max_buckets=10)
     assert hist.total_seconds == 3600.0

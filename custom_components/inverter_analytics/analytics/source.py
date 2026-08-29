@@ -1,4 +1,4 @@
-"""Доступ до історичних даних Home Assistant з вибором точності."""
+"""Access to Home Assistant historical data with automatic precision selection."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ _GAP_STATES = {"unavailable", "unknown", "none", ""}
 
 
 class Precision(StrEnum):
-    """Звідки взяті дані вікна."""
+    """Where a window's data was sourced from."""
 
     RAW = "raw"
     LTS = "lts"
@@ -29,37 +29,37 @@ class Precision(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Window:
-    """Часове вікно запиту."""
+    """A query's time window."""
 
     start: datetime
     end: datetime
 
     @property
     def seconds(self) -> float:
-        """Довжина вікна в секундах."""
+        """Window length in seconds."""
         return max((self.end - self.start).total_seconds(), 0.0)
 
 
 @dataclass(frozen=True, slots=True)
 class PrecisionPlan:
-    """Рішення про джерело даних. boundary — мить, з якої доступні сирі стани."""
+    """The data-source decision. boundary is the moment raw states become available."""
 
     precision: Precision
     boundary: datetime | None
 
 
 def raw_available_from(hass: HomeAssistant) -> datetime:
-    """Найраніша мить, для якої recorder ще тримає сирі стани."""
+    """The earliest moment for which the recorder still holds raw states."""
     return dt_util.utcnow() - timedelta(days=get_instance(hass).keep_days)
 
 
 def plan_precision(hass: HomeAssistant, window: Window) -> PrecisionPlan:
-    """Обрати джерело даних для вікна."""
+    """Choose a data source for the window."""
     boundary = raw_available_from(hass)
     if window.start >= boundary:
-        # boundary має сенс лише для змішаного вікна: це мить, де читач
-        # переходить із погодинних середніх на сирі стани. Для однорідних
-        # вікон межі немає, і UI не має малювати позначку.
+        # boundary only matters for a mixed window: it's the moment the reader
+        # switches from hourly averages to raw states. A uniform window has no
+        # such boundary, and the UI must not draw a marker for it.
         return PrecisionPlan(Precision.RAW, None)
     if window.end <= boundary:
         return PrecisionPlan(Precision.LTS, None)
@@ -67,7 +67,7 @@ def plan_precision(hass: HomeAssistant, window: Window) -> PrecisionPlan:
 
 
 def states_to_samples(states: Iterable[State], sign: float) -> list[Sample]:
-    """Перетворити стани на семпли; нечислові стани стають розривами."""
+    """Convert states into samples; non-numeric states become gaps."""
     samples: list[Sample] = []
     for state in states:
         raw = state.state
@@ -84,7 +84,7 @@ def states_to_samples(states: Iterable[State], sign: float) -> list[Sample]:
 
 
 def statistic_rows_to_samples(rows: Iterable[Mapping[str, Any]], sign: float) -> list[Sample]:
-    """Перетворити погодинні рядки статистики на семпли зі значенням mean."""
+    """Convert hourly statistics rows into samples using the mean value."""
     samples: list[Sample] = []
     for row in rows:
         start = row.get("start")
@@ -99,7 +99,7 @@ def statistic_rows_to_samples(rows: Iterable[Mapping[str, Any]], sign: float) ->
 async def _async_raw_samples(
     hass: HomeAssistant, entity_id: str, window: Window, sign: float
 ) -> list[Sample]:
-    """Прочитати сирі стани з recorder."""
+    """Read raw states from the recorder."""
     recorder = get_instance(hass)
     result = await recorder.async_add_executor_job(
         partial(
@@ -118,7 +118,7 @@ async def _async_raw_samples(
 async def _async_lts_samples(
     hass: HomeAssistant, entity_id: str, window: Window, sign: float
 ) -> list[Sample]:
-    """Прочитати погодинну довгострокову статистику."""
+    """Read hourly long-term statistics."""
     recorder = get_instance(hass)
     result = await recorder.async_add_executor_job(
         partial(
@@ -138,7 +138,7 @@ async def _async_lts_samples(
 async def async_series(
     hass: HomeAssistant, entity_id: str, window: Window, sign: float = 1.0
 ) -> Series:
-    """Побудувати серію станів за вікно, автоматично обравши джерело."""
+    """Build a series of states for a window, automatically choosing the source."""
     plan = plan_precision(hass, window)
     samples: list[Sample] = []
 

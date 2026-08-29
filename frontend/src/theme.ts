@@ -1,4 +1,4 @@
-/** Фіксована палітра серій: однакові кольори в усіх вкладках. */
+/** Fixed series palette: identical colours across all tabs. */
 export const SERIES = {
   load: "#2f7ed8",
   pv: "#f7b32b",
@@ -9,16 +9,17 @@ export const SERIES = {
 } as const;
 
 /**
- * Спільна основа опцій ECharts: прозорий фон і кольори з теми Home Assistant.
- * Повертає base і axis окремо, бо кожен графік задає власні осі, а стилі
- * осей мають до них домішуватись, а не затиратись.
+ * Shared base for ECharts options: transparent background and colours taken
+ * from the Home Assistant theme. Returns base and axis separately because
+ * each chart defines its own axes, and the axis styles need to be merged
+ * into them rather than overwriting them.
  */
 export function chartBaseOption(): {
   base: Record<string, unknown>;
   axis: Record<string, unknown>;
 } {
-  // Тести побудовників опцій ідуть у node-середовищі без DOM, тому читання
-  // змінних теми має бути необов'язковим, а не падати.
+  // Option-builder tests run in a Node environment without a DOM, so reading
+  // theme variables must be optional rather than throwing.
   const style =
     typeof document === "undefined" ? null : getComputedStyle(document.documentElement);
   const text = style?.getPropertyValue("--primary-text-color").trim() || "#212121";

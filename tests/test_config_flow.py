@@ -1,4 +1,4 @@
-"""Тести майстра налаштування."""
+"""Tests for the setup wizard."""
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -43,7 +43,7 @@ def test_unpack_restores_entities_numbers_and_set_inversions():
 
 
 def test_pack_drops_unset_inversion_flags():
-    """False дорівнює відсутності: build_schema все одно підставляє False."""
+    """False is equivalent to absence: build_schema supplies False anyway."""
     packed = pack({"load_power": "sensor.load", "invert_battery_power": False})
     assert packed["inverted"] == []
     assert "invert_battery_power" not in unpack(packed)
@@ -77,11 +77,10 @@ async def test_options_flow_overrides_data(
         domain=DOMAIN,
         title="Deye",
         data={
-            # "legacy_role" імітує роль, знята з ROLES у пізнішій версії:
-            # build_schema() будує поля лише з поточних відомих ролей, тож
-            # options flow органічно ніколи не міг би повторно надіслати
-            # це значення — воно не існує ні як дефолт форми, ні в
-            # відправленому user_input.
+            # "legacy_role" simulates a role removed from ROLES in a later version:
+            # build_schema() only builds fields for the currently known roles, so
+            # the options flow could never organically resubmit this value — it
+            # exists neither as a form default nor in the submitted user_input.
             "entities": {"load_power": "sensor.old", "legacy_role": "sensor.retired"},
             "numbers": {"rated_power": 8000.0},
             "inverted": [],
@@ -104,20 +103,20 @@ async def test_options_flow_overrides_data(
     assert entry.options["entities"] == {"load_power": "sensor.new"}
     assert entry.options["numbers"] == {"rated_power": 12000.0}
 
-    # Форма попередньо заповнює назву поточним title і запрошує її
-    # редагувати — редаговане ім'я має потрапити в title запису, а не
-    # загубитися (pack() свідомо відкидає CONF_NAME з даних).
+    # The form pre-fills the name with the current title and invites editing
+    # it — the edited name must end up in the entry's title, not get lost
+    # (pack() deliberately drops CONF_NAME from the data).
     assert entry.title == "Deye 8kW"
 
-    # Контракт EntryConfig: непорожні options повністю перекривають data,
-    # а не зливаються з ними. "legacy_role" був у data, але схема форми
-    # не знає такої ролі, тож options ніколи не міг отримати цей ключ.
-    # EntryConfig.from_entry() читає лише entry.options (бо вони непорожні)
-    # і не торкається entry.data — інакше EntryConfig.from_dict() впав би
-    # з KeyError на невідомій ролі "legacy_role" ще до того, як тест
-    # встиг би щось перевірити. Саме відсутність винятку тут і є доказом,
-    # що data не зливається (навіть на рівні вкладеного entities-словника)
-    # в options.
+    # EntryConfig's contract: non-empty options fully override data, they
+    # are not merged with it. "legacy_role" was in data, but the form schema
+    # has no such role, so options could never receive that key.
+    # EntryConfig.from_entry() reads only entry.options (because they're
+    # non-empty) and never touches entry.data — otherwise
+    # EntryConfig.from_dict() would raise KeyError on the unknown
+    # "legacy_role" role before the test got a chance to assert anything.
+    # The very absence of that exception here is the proof that data is not
+    # merged into options — not even at the level of the nested entities dict.
     config = EntryConfig.from_entry(entry)
     assert config.entity_id("load_power") == "sensor.new"
     assert config.number("rated_power") == 12000.0

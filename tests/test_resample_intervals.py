@@ -1,4 +1,4 @@
-"""Тести перетворення станів на інтервали та зважених середніх."""
+"""Tests for converting states into intervals and for time-weighted means."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -30,7 +30,7 @@ def test_two_states_split_the_window_by_duration():
 
 
 def test_uneven_durations_are_weighted_not_averaged():
-    """Наївне середнє дало б 150, правильне — 175."""
+    """A naive average would give 150; the correct, time-weighted one gives 175."""
     series = hour_series(Sample(at(0), 100.0), Sample(at(15), 200.0))
     intervals = to_intervals(series)
     assert time_weighted_mean(intervals) == 175.0

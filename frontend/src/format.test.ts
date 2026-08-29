@@ -98,8 +98,8 @@ describe("coverageWarning", () => {
   });
 
   it("avoids a bogus 100% when a sliver of data exists", () => {
-    // 30-денне вікно з двома хвилинами історії: раніше писало «відсутні 100%»
-    // поруч із заповненими KPI.
+    // A 30-day window with two minutes of history: it used to say "100%
+    // missing" right next to populated KPIs.
     expect(coverageWarning(0.00005, "uk")).toBe("Data covers less than 1% of the period");
   });
 

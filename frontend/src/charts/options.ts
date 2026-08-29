@@ -60,7 +60,7 @@ export function durationCurveOption(payload: LoadPayload): Record<string, unknow
 }
 
 export function bandsOption(payload: LoadPayload): Record<string, unknown> {
-  // ECharts малює категорії осі Y знизу вгору, тому порядок смуг перевернутий.
+  // ECharts draws Y-axis categories bottom-up, so the band order is reversed.
   const { base, axis } = chartBaseOption();
   const bands = [...payload.bands].reverse();
   return {

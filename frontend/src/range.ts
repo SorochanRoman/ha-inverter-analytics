@@ -13,9 +13,9 @@ const DAY_MS = 24 * 3600 * 1000;
 const MINUTE_MS = 60 * 1000;
 
 export function resolveRange(key: RangeKey, now: Date): { start: Date; end: Date } {
-  // Округлення до хвилини — умова того, щоб кеш на сервері взагалі міг
-  // влучити: ключ кешу будується з меж вікна, а мілісекунди роблять
-  // кожен запит унікальним.
+  // Rounding to the minute is what lets the server-side cache hit at all:
+  // the cache key is built from the window bounds, and millisecond precision
+  // would make every request unique.
   const end = new Date(Math.floor(now.getTime() / MINUTE_MS) * MINUTE_MS);
   switch (key) {
     case "24h":

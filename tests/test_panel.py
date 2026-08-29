@@ -1,4 +1,4 @@
-"""Тести реєстрації панелі."""
+"""Tests for panel registration."""
 
 from homeassistant.components import frontend
 from homeassistant.core import HomeAssistant

@@ -1,4 +1,4 @@
-"""Тести епізодів, стійкого навантаження та бакетизації по годинах доби."""
+"""Tests for episodes, sustained load, and bucketing by hour of day."""
 
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -33,7 +33,7 @@ def test_adjacent_intervals_merge_into_one_episode():
 
 
 def test_intervals_split_by_a_gap_do_not_merge():
-    """Розрив у даних розриває епізод — інакше ми вигадаємо просадку, якої не було."""
+    """A gap in the data breaks the episode — otherwise we'd invent a dip that never happened."""
     intervals = [interval(0, 10, 5.0), interval(20, 30, 5.0)]
     episodes = episodes_below(intervals, threshold=20.0)
     assert len(episodes) == 2
@@ -59,7 +59,7 @@ def test_no_episodes_when_threshold_is_never_crossed():
 
 
 def test_max_sustained_mean_finds_the_worst_window_across_boundaries():
-    """Пік 6000 Вт триває 5 хв — 15-хвилинне стійке навантаження нижче за пік."""
+    """The 6000 W peak lasts 5 min — the 15-minute sustained load is below the peak."""
     intervals = [interval(0, 10, 1000.0), interval(10, 15, 6000.0), interval(15, 60, 1000.0)]
     result = max_sustained_mean(intervals, window_seconds=900.0)
     assert result == pytest.approx((1000 * 600 + 6000 * 300) / 900)
@@ -84,7 +84,7 @@ def test_hour_buckets_split_an_interval_across_local_hours():
     intervals = [Interval(BASE, BASE + timedelta(hours=3), 100.0)]
     totals = hour_of_day_durations(intervals, KYIV)
     assert sum(totals) == 3 * 3600
-    # BASE — це 2026-01-01T00:00Z, тобто 02:00 за київським часом узимку.
+    # BASE is 2026-01-01T00:00Z, i.e. 02:00 Kyiv time in winter.
     assert totals[2] == 3600.0
     assert totals[3] == 3600.0
     assert totals[4] == 3600.0
@@ -92,7 +92,7 @@ def test_hour_buckets_split_an_interval_across_local_hours():
 
 
 def test_hour_buckets_skip_the_hour_lost_to_spring_dst():
-    """У Києві 2025-03-30 година 03:00 не існує — доба має 23 години."""
+    """In Kyiv, 2025-03-30 has no 03:00 hour — that day has 23 hours."""
     start = datetime(2025, 3, 30, tzinfo=KYIV).astimezone(UTC)
     end = datetime(2025, 3, 31, tzinfo=KYIV).astimezone(UTC)
     totals = hour_of_day_durations([Interval(start, end, 100.0)], KYIV)
@@ -103,7 +103,7 @@ def test_hour_buckets_skip_the_hour_lost_to_spring_dst():
 
 
 def test_hour_buckets_double_the_hour_repeated_by_autumn_dst():
-    """У Києві 2025-10-26 година 03:00 повторюється — доба має 25 годин."""
+    """In Kyiv, 2025-10-26 repeats the 03:00 hour — that day has 25 hours."""
     start = datetime(2025, 10, 26, tzinfo=KYIV).astimezone(UTC)
     end = datetime(2025, 10, 27, tzinfo=KYIV).astimezone(UTC)
     totals = hour_of_day_durations([Interval(start, end, 100.0)], KYIV)

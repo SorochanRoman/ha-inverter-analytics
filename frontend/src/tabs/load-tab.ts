@@ -31,10 +31,10 @@ export class IaLoadTab extends LitElement {
 
   public connectedCallback(): void {
     super.connectedCallback();
-    // Home Assistant застосовує тему, переписуючи CSS-змінні на <html>.
-    // Опції графіків тримають кольори, зчитані в момент побудови, тож без
-    // перебудови підписи осей лишаються від попередньої теми: після
-    // перемикання на світлу вони стають світло-сірими на білому й зникають.
+    // Home Assistant applies a theme by rewriting CSS variables on <html>.
+    // Chart options bake in the colours read at build time, so without a
+    // rebuild the axis labels stay stuck with the previous theme: after
+    // switching to a light theme they turn light grey on white and vanish.
     this.themeObserver = new MutationObserver(() => this.requestUpdate());
     this.themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -56,8 +56,9 @@ export class IaLoadTab extends LitElement {
 
   private async load(): Promise<void> {
     if (!this.entryId) return;
-    // Кожен запит отримує номер. Поки він летить, користувач міг уже
-    // перемкнути період — тоді відповідь застаріла й показувати її не можна.
+    // Each request gets a number. While it's in flight, the user may have
+    // already switched periods — in that case the response is stale and
+    // must not be shown.
     const requestId = ++this.requestId;
     this.loading = true;
     this.error = undefined;

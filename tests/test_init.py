@@ -1,4 +1,4 @@
-"""Тести життєвого циклу config entry."""
+"""Tests for the config entry lifecycle."""
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant

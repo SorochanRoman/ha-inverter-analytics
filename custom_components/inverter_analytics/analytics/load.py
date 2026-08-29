@@ -1,4 +1,4 @@
-"""Аналітика навантаження інвертора."""
+"""Inverter load analytics."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ DURATION_CURVE_POINTS = 60
 
 
 def _seconds_between(intervals: Sequence[Interval], low: float, high: float | None) -> float:
-    """Сумарна тривалість, коли значення було в межах [low, high)."""
+    """Total duration for which the value was within [low, high)."""
     return sum(
         interval.seconds
         for interval in intervals
@@ -48,7 +48,7 @@ def _seconds_between(intervals: Sequence[Interval], low: float, high: float | No
 
 
 def _clamp(value: float, low: float | None, high: float | None) -> float:
-    """Притиснути значення до спостереженого діапазону."""
+    """Clamp a value to the observed range."""
     if high is not None:
         value = min(value, high)
     if low is not None:
@@ -59,11 +59,12 @@ def _clamp(value: float, low: float | None, high: float | None) -> float:
 def _clamped_percentile(
     histogram: Histogram, q: float, low: float | None, high: float | None
 ) -> float | None:
-    """Перцентиль, притиснутий до спостереженого діапазону.
+    """Percentile clamped to the observed range.
 
-    Гістограма втрачає розподіл усередині корзини, тому percentile інтерполює
-    до її межі й може повернути значення вище справжнього максимуму. На екрані
-    це давало медіану 9.1 кВт поруч із піком 9.0 кВт — самозаперечні числа.
+    The histogram loses the distribution within a bucket, so percentile
+    interpolates up to its edge and can return a value above the true
+    maximum. On screen this produced a median of 9.1 kW next to a peak of
+    9.0 kW — self-contradicting numbers.
     """
     value = percentile(histogram, q)
     if value is None:
@@ -74,7 +75,7 @@ def _clamped_percentile(
 def build_load_payload(
     series: Series, rated_power: float, bucket_count: int = 40
 ) -> dict[str, Any]:
-    """Порахувати всю аналітику навантаження з готової серії."""
+    """Compute the full load analytics from a ready-made series."""
     if rated_power <= 0:
         raise ValueError("rated_power must be positive")
 
@@ -87,10 +88,10 @@ def build_load_payload(
 
     bands = []
     for index, (key, low_share, high_share) in enumerate(BANDS):
-        # Найнижча смуга ловить і від'ємні значення — так само, як гістограма
-        # втискає їх у нульову корзину. Інакше вони зникають із чисельників,
-        # лишаючись у знаменнику, і частки перестають давати одиницю.
-        # Скільки саме часу було нижче нуля, показує histogram.clipped_low_seconds.
+        # The lowest band also catches negative values — the same way the histogram
+        # clamps them into bucket zero. Otherwise they'd vanish from the numerators
+        # while staying in the denominator, and the fractions would stop summing to
+        # one. histogram.clipped_low_seconds shows exactly how much time was below zero.
         low = float("-inf") if index == 0 else low_share * rated_power
         high = None if high_share is None else high_share * rated_power
         seconds = _seconds_between(intervals, low, high)
@@ -120,9 +121,9 @@ def build_load_payload(
         },
         "histogram": {
             "bucket_width": bucket_width,
-            # Час поза діапазоном гістограми втискається в крайні корзини й
-            # підписується їхніми межами. Ці лічильники кажуть, скільки саме
-            # часу підписано неправдиво — UI має це показати, а не мовчати.
+            # Time outside the histogram's range gets clamped into the edge buckets
+            # and labeled with their bounds. These counters say exactly how much
+            # time is mislabeled — the UI must surface this, not stay silent about it.
             "clipped_low_seconds": histogram.clipped_low_seconds,
             "clipped_high_seconds": histogram.clipped_high_seconds,
             "buckets": [
@@ -135,9 +136,9 @@ def build_load_payload(
                 for bucket in histogram.buckets()
             ],
         },
-        # Крива будується з тих самих перцентилів, що й KPI, тож притискаємо
-        # її так само: інакше найлівіша точка малює пік вище за картку «Пік»
-        # на тому ж екрані.
+        # The curve is built from the same percentiles as the KPIs, so we clamp
+        # it the same way: otherwise its leftmost point would draw a peak higher
+        # than the "Peak" card on the same screen.
         "duration_curve": [
             {"fraction": fraction, "value": _clamp(value, observed_min, observed_max)}
             for fraction, value in duration_curve(histogram, points=DURATION_CURVE_POINTS)
@@ -158,7 +159,7 @@ def build_load_payload(
 async def async_load_analytics(
     hass: HomeAssistant, config: EntryConfig, window: Window
 ) -> dict[str, Any]:
-    """Прочитати дані й порахувати аналітику навантаження."""
+    """Read the data and compute the load analytics."""
     entity_id = config.entity_id("load_power")
     rated_power = config.number("rated_power")
     if entity_id is None or rated_power is None:

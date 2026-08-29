@@ -1,4 +1,4 @@
-"""Майстер налаштування Inverter Analytics."""
+"""Inverter Analytics setup wizard."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _DEVICE_CLASS_BY_KIND = {
 
 
 def _entity_selector(kind: RoleKind) -> selector.EntitySelector:
-    """Пікер entity, звужений за device_class там, де це доречно."""
+    """Entity picker, narrowed by device_class where that makes sense."""
     if kind is RoleKind.BINARY:
         return selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
     return selector.EntitySelector(
@@ -33,11 +33,11 @@ def _entity_selector(kind: RoleKind) -> selector.EntitySelector:
 
 
 def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
-    """Побудувати плоску схему форми маппінгу."""
+    """Build the flat mapping-form schema."""
     defaults = defaults or {}
     fields: dict[Any, Any] = {
         vol.Required(
-            CONF_NAME, default=defaults.get(CONF_NAME, "Інвертор")
+            CONF_NAME, default=defaults.get(CONF_NAME, "Inverter")
         ): selector.TextSelector()
     }
 
@@ -78,7 +78,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
 
 
 def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
-    """Перетворити плоску форму у вкладений формат ConfigEntry.data."""
+    """Convert the flat form into the nested ConfigEntry.data format."""
     entities: dict[str, str] = {}
     numbers: dict[str, float] = {}
     inverted: list[str] = []
@@ -102,7 +102,7 @@ def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Перетворити вкладений формат назад у плоску форму."""
+    """Convert the nested format back into the flat form."""
     flat: dict[str, Any] = {}
     flat.update(config.get(CONF_ENTITIES) or {})
     flat.update(config.get(CONF_NUMBERS) or {})
@@ -112,12 +112,12 @@ def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Майстер додавання інвертора."""
+    """Wizard for adding an inverter."""
 
     VERSION = 1
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Крок ручного маппінгу."""
+        """Manual mapping step."""
         if user_input is not None:
             return self.async_create_entry(title=user_input[CONF_NAME], data=pack(user_input))
         return self.async_show_form(step_id="user", data_schema=build_schema())
@@ -125,15 +125,15 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        """Повернути options flow."""
+        """Return the options flow."""
         return InverterAnalyticsOptionsFlow()
 
 
 class InverterAnalyticsOptionsFlow(OptionsFlow):
-    """Переналаштування маппінгу без перевстановлення."""
+    """Reconfigure the mapping without reinstalling."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Показати форму з поточними значеннями."""
+        """Show the form pre-filled with current values."""
         if user_input is not None:
             name = user_input[CONF_NAME]
             if name != self.config_entry.title:

@@ -76,7 +76,7 @@ describe("bandsOption", () => {
 
   it("paints the overload band in the overload colour", () => {
     const option = bandsOption(payload) as any;
-    // Після реверсу нульовий індекс — це "100+".
+    // After the reversal, index zero is "100+".
     expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
     expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
   });

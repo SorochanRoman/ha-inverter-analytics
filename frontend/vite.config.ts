@@ -1,12 +1,12 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  // Vite у library mode навмисно НЕ підставляє process.env.NODE_ENV: він
-  // очікує, що це зробить бандлер споживача. Home Assistant вантажить наш
-  // файл як є, тож без підстановки ECharts падає з
-  // "ReferenceError: process is not defined" ще до першого рендеру, і панель
-  // лишається порожньою. Жоден тест цього не ловить: vitest працює в Node,
-  // де process існує, а typecheck і збірка проходять успішно.
+  // Vite in library mode deliberately does NOT substitute process.env.NODE_ENV:
+  // it expects the consuming bundler to do that. Home Assistant loads our
+  // file as-is, so without the substitution ECharts throws
+  // "ReferenceError: process is not defined" before the first render, and
+  // the panel stays empty. No test catches this: vitest runs in Node, where
+  // process exists, so typecheck and the build both stay green.
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
   },

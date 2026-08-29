@@ -1,4 +1,4 @@
-"""Інтеграція Inverter Analytics."""
+"""The Inverter Analytics integration."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .websocket_api import async_register
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Налаштувати config entry."""
+    """Set up a config entry."""
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_CACHE: ResultCache()}
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     async_register(hass)
@@ -21,7 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Вивантажити config entry."""
+    """Unload a config entry."""
     domain_data = hass.data.get(DOMAIN, {})
     domain_data.pop(entry.entry_id, None)
     if not _has_remaining_entries(hass):
@@ -30,11 +30,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _has_remaining_entries(hass: HomeAssistant) -> bool:
-    """Чи лишилися завантажені записи цієї інтеграції."""
+    """Whether any loaded entries of this integration remain."""
     domain_data = hass.data.get(DOMAIN, {})
     return any(entry.entry_id in domain_data for entry in hass.config_entries.async_entries(DOMAIN))
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Перезавантажити запис після зміни опцій."""
+    """Reload the entry after its options change."""
     await hass.config_entries.async_reload(entry.entry_id)

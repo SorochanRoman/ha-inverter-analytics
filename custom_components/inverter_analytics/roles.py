@@ -1,4 +1,4 @@
-"""Канонічні ролі сенсорів і модель конфігурації запису."""
+"""Canonical sensor roles and the entry configuration model."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS
 
 
 class RoleKind(StrEnum):
-    """Тип значення, яке несе роль."""
+    """The kind of value a role carries."""
 
     POWER = "power"
     PERCENT = "percent"
@@ -24,7 +24,7 @@ class RoleKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Role:
-    """Опис однієї ролі."""
+    """Description of a single role."""
 
     key: str
     kind: RoleKind
@@ -54,23 +54,23 @@ ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
 
 
 def entity_roles() -> tuple[Role, ...]:
-    """Ролі, які мапляться на entity."""
+    """Roles that map to an entity."""
     return tuple(role for role in ROLES if role.kind is not RoleKind.NUMBER)
 
 
 def number_roles() -> tuple[Role, ...]:
-    """Ролі, які задаються числом у конфігурації."""
+    """Roles that are set as a number in the configuration."""
     return tuple(role for role in ROLES if role.kind is RoleKind.NUMBER)
 
 
 def required_role_keys() -> frozenset[str]:
-    """Ключі обов'язкових ролей."""
+    """Keys of the required roles."""
     return frozenset(role.key for role in ROLES if role.required)
 
 
 @dataclass(frozen=True, slots=True)
 class EntryConfig:
-    """Розібрана конфігурація одного інвертора."""
+    """Parsed configuration for a single inverter."""
 
     entities: Mapping[str, str]
     numbers: Mapping[str, float]
@@ -78,7 +78,7 @@ class EntryConfig:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EntryConfig:
-        """Побудувати конфіг зі словника у форматі ConfigEntry.data."""
+        """Build a config from a dict in the ConfigEntry.data format."""
         entities: dict[str, str] = {}
         for key, value in (data.get(CONF_ENTITIES) or {}).items():
             if key not in ROLES_BY_KEY:
@@ -102,23 +102,23 @@ class EntryConfig:
 
     @classmethod
     def from_entry(cls, entry: ConfigEntry) -> EntryConfig:
-        """Побудувати конфіг із config entry; options перекривають data."""
+        """Build a config from a config entry; options override data."""
         return cls.from_dict(entry.options or entry.data)
 
     def entity_id(self, role_key: str) -> str | None:
-        """entity_id для ролі або None."""
+        """entity_id for the role, or None."""
         return self.entities.get(role_key)
 
     def number(self, role_key: str) -> float | None:
-        """Числове значення ролі або None."""
+        """Numeric value for the role, or None."""
         return self.numbers.get(role_key)
 
     def sign(self, role_key: str) -> float:
-        """Множник знаку для ролі: -1.0, якщо інверсія увімкнена."""
+        """Sign multiplier for the role: -1.0 if inversion is enabled."""
         return -1.0 if role_key in self.inverted else 1.0
 
     def has(self, *role_keys: str) -> bool:
-        """Чи задані всі перелічені ролі."""
+        """Whether all listed roles are configured."""
         return all(
             (key in self.numbers)
             if ROLES_BY_KEY[key].kind is RoleKind.NUMBER

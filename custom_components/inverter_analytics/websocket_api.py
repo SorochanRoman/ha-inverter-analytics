@@ -1,4 +1,4 @@
-"""WebSocket API інтеграції Inverter Analytics."""
+"""WebSocket API for the Inverter Analytics integration."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _DATA_WS_REGISTERED = "ws_registered"
 
 
 def clamp_window(start: datetime, end: datetime) -> tuple[Window, bool]:
-    """Обрізати надто довге вікно. Повертає вікно й ознаку обрізання."""
+    """Clamp an overly long window. Returns the window and whether it was clamped."""
     limit = timedelta(days=MAX_WINDOW_DAYS)
     if end - start > limit:
         return Window(end - limit, end), True
@@ -33,7 +33,7 @@ def clamp_window(start: datetime, end: datetime) -> tuple[Window, bool]:
 
 
 def _ttl_for(window: Window) -> float:
-    """Свіжі вікна кешуються ненадовго, закриті історичні — на добу."""
+    """Fresh windows are cached briefly; closed historical ones for a full day."""
     if window.end >= dt_util.utcnow() - FRESH_MARGIN:
         return FRESH_TTL
     return HISTORICAL_TTL
@@ -41,7 +41,7 @@ def _ttl_for(window: Window) -> float:
 
 @callback
 def async_register(hass: HomeAssistant) -> None:
-    """Зареєструвати команди один раз на весь Home Assistant."""
+    """Register the commands once for the whole Home Assistant instance."""
     domain_data = hass.data.setdefault(DOMAIN, {})
     if domain_data.get(_DATA_WS_REGISTERED):
         return
@@ -55,7 +55,7 @@ def async_register(hass: HomeAssistant) -> None:
 def ws_config(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Повернути маппінг усіх налаштованих інверторів."""
+    """Return the mapping for all configured inverters."""
     entries = []
     for entry in hass.config_entries.async_entries(DOMAIN):
         config = EntryConfig.from_entry(entry)
@@ -87,12 +87,13 @@ def ws_config(
 async def ws_load(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Повернути аналітику навантаження за вікно."""
+    """Return the load analytics for a window."""
     domain_data = hass.data.get(DOMAIN, {})
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
-    # async_get_entry повертає запис у будь-якому стані, включно з вимкненим
-    # вручну в UI — зникає лише запис, який повністю видалили. Належність до
-    # domain_data — це саме умова, за якої існує кеш, який читає цей обробник.
+    # async_get_entry returns the entry in any state, including one disabled
+    # manually in the UI — only a fully removed entry disappears. Membership in
+    # domain_data is exactly the condition under which the cache this handler
+    # reads actually exists.
     if entry is None or entry.domain != DOMAIN or entry.entry_id not in domain_data:
         connection.send_error(msg["id"], "not_found", "Inverter not found or disabled")
         return

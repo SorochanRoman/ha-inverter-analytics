@@ -2,24 +2,21 @@
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
-# Логи від залежностей (sqlalchemy, homeassistant.recorder) глушить хук
-# у tests/conftest.py. log_cli = false вимкнено явно, щоб запобігти їх
-# витоку, якщо налаштування буде скасовано глобально.
+# Logs from dependencies (sqlalchemy, homeassistant.recorder) are silenced by a
+# hook in tests/conftest.py. log_cli = false is set explicitly here to keep them
+# from leaking through if that setting is ever overridden globally.
 log_cli = false
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-# ruff format переформатовує Python-блоки всередині Markdown. Плани й
-# специфікації в docs/ — це verbatim-джерело брифів для наступних задач,
-# тож форматувальник не має їх торкатися. Стосується format, не check.
+# ruff format reformats Python code blocks inside Markdown. The plans and
+# specs under docs/ are the verbatim source of briefs for future tasks,
+# so the formatter must not touch them. This applies to format, not check.
 extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-# Кодова база коментується українською; RUF001-003 хибно спрацьовують на
-# кирилицю як на "неоднозначні" символи, плутаючи її з латиницею.
-ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true

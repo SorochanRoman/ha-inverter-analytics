@@ -23,7 +23,7 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-/** Помилка від Home Assistant приходить об'єктом {code, message}, не рядком. */
+/** An error from Home Assistant arrives as an object {code, message}, not a string. */
 export function describeError(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
     const message = (error as { message?: unknown }).message;
@@ -46,12 +46,13 @@ export function precisionLabel(
 }
 
 /**
- * Попередження про неповноту даних.
+ * Warning about incomplete data.
  *
- * Формулюємо через те, скільки даних Є, а не скільки бракує: у 30-денному вікні
- * з двома хвилинами історії «бракує 100% часу» округлялось до сотні й читалось
- * як «даних немає» — поруч із заповненими KPI. Нижче одного відсотка кажемо
- * «менш ніж 1%», бо точна цифра там уже нічого не додає.
+ * We phrase this in terms of how much data there IS, not how much is
+ * missing: in a 30-day window with two minutes of history, "missing 100% of
+ * the time" rounded up to a flat hundred and read as "no data" — right next
+ * to populated KPIs. Below one percent we say "less than 1%", because the
+ * exact figure adds nothing at that point.
  */
 export function coverageWarning(coverage: number, locale: string): string | null {
   if (coverage >= 0.95) return null;

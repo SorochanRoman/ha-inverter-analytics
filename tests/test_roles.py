@@ -1,4 +1,4 @@
-"""Тести канонічних ролей і моделі конфігурації."""
+"""Tests for the canonical roles and the configuration model."""
 
 import pytest
 

@@ -1,12 +1,13 @@
-# pytest-homeassistant-custom-component сам пінить точну сумісну версію
-# homeassistant і тягне pytest та pytest-asyncio. Не додавай сюди окремий
-# рядок homeassistant: два джерела правди про версію HA відправляють
-# резолвер pip у багатохвилинний backtracking.
+# pytest-homeassistant-custom-component itself pins the exact compatible
+# version of homeassistant and pulls in pytest and pytest-asyncio. Do not add
+# a separate homeassistant line here: two sources of truth for the HA version
+# send pip's resolver into multi-minute backtracking.
 pytest-homeassistant-custom-component>=0.13.140
 ruff>=0.6.0
 
-# Компоненти frontend і recorder, від яких залежить інтеграція, тягнуть ці
-# пакети у рантаймі. PHACC їх не встановлює, тому в CI вони потрібні явно.
+# The frontend and recorder components the integration depends on pull in
+# these packages at runtime. PHACC does not install them, so CI needs them
+# listed explicitly.
 home-assistant-frontend
 fnv-hash-fast
 psutil-home-assistant

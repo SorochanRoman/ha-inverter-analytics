@@ -40,11 +40,11 @@ export class InverterAnalyticsPanel extends LitElement {
   }
 
   protected willUpdate(changed: Map<string, unknown>): void {
-    // Home Assistant може призначити hass вже після приєднання елемента —
-    // тоді connectedCallback запустив би fetchConfig(undefined). Чекаємо
-    // на перше значення hass і пробуємо ще раз, якщо конфіг ще не
-    // завантажено (і попередня спроба не завершилась помилкою, яку
-    // користувач може повторити кнопкою).
+    // Home Assistant may assign hass only after the element has connected —
+    // in that case connectedCallback would have called fetchConfig(undefined).
+    // Wait for the first hass value and try again if the config hasn't
+    // loaded yet (and the previous attempt didn't fail with an error the
+    // user can retry via the button).
     if (changed.has("hass") && this.hass && !this.config && !this.error) {
       void this.loadConfig();
     }

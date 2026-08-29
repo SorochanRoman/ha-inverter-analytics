@@ -1,46 +1,46 @@
-# Inverter Analytics — дизайн-специфікація
+# Inverter Analytics — Design Spec
 
-**Дата:** 2026-08-29
-**Статус:** затверджено, готове до планування реалізації
+**Date:** 2026-08-29
+**Status:** approved, ready for implementation planning
 
-## 1. Мета
+## 1. Goal
 
-Плагін для Home Assistant, який додає окрему сторінку з аналітикою роботи гібридного інвертора та акумулятора. Відповідає на питання, на які штатні графіки HA не відповідають:
+A Home Assistant plugin that adds a dedicated analytics page for a hybrid inverter and battery. It answers questions the stock HA graphs don't:
 
-- Яке реальне середнє навантаження на інверторі та який його розподіл?
-- Скільки відсотків часу інвертор працює на кожному рівні потужності (у ватах і у % від номіналу)?
-- Як ці значення змінюються залежно від місяця року, дня тижня, години доби?
-- Як використовується акумулятор: розподіл SoC, як часто й наскільки глибоко він просідає, скільки циклів пройшов?
-- Куди йде енергія: самоспоживання, автаркія, відключення мережі?
+- What is the real average inverter load, and what does its distribution look like?
+- What percentage of time does the inverter run at each power level (in watts and as % of rated power)?
+- How do these values change by month, day of week, hour of day?
+- How is the battery being used: SoC distribution, how often and how deeply it dips, how many cycles has it done?
+- Where does the energy go: self-consumption, self-sufficiency, grid outages?
 
-## 2. Форма поставки
+## 2. Delivery form
 
-HACS-інтеграція `inverter_analytics`: Python-бекенд + власна панель у бічному меню з вбудованим JS-фронтендом.
+HACS integration `inverter_analytics`: a Python backend + a custom sidebar panel with a bundled JS frontend.
 
-Розглянуті альтернативи:
+Alternatives considered:
 
-| Варіант | Чому відхилено |
+| Option | Why rejected |
 |---|---|
-| Тільки фронтенд (`panel_custom`, без Python) | Налаштування руками в YAML; ~80k сирих точок на сенсор довелося б тягнути в браузер; немає config flow з пресетами |
-| Гібрид (Python лише для конфігу, розрахунки в браузері) | Зберігає головний мінус — важкі обчислення й великий трафік на кожне відкриття сторінки |
+| Frontend only (`panel_custom`, no Python) | Manual YAML configuration; ~80k raw data points per sensor would have to be pulled into the browser; no config flow with presets |
+| Hybrid (Python only for config, calculations in the browser) | Keeps the main downside — heavy computation and large traffic on every page load |
 
-Обраний варіант тримає обчислення на сервері, віддає назовні лише агрегати (кілобайти), дає нормальний UI налаштування і встановлюється одним пакетом.
+The chosen option keeps computation on the server and exposes only aggregates (kilobytes) to the outside world, provides a proper setup UI, and installs as a single package.
 
-## 3. Структура пакета
+## 3. Package structure
 
 ```
 custom_components/inverter_analytics/
-  __init__.py          # setup entry, реєстрація панелі + WS API
+  __init__.py          # setup entry, panel registration + WS API
   manifest.json
   const.py
-  config_flow.py       # пресети, маппінг entity, options flow
-  presets.py           # патерни entity_id по брендах
-  roles.py             # канонічний список ролей + валідація
-  websocket_api.py     # WS-команди
+  config_flow.py       # presets, entity mapping, options flow
+  presets.py           # entity_id patterns by brand
+  roles.py             # canonical list of roles + validation
+  websocket_api.py     # WS commands
   analytics/
     __init__.py
-    source.py          # доступ до даних: raw states vs LTS
-    resample.py        # time-weighted математика
+    source.py          # data access: raw states vs LTS
+    resample.py        # time-weighted math
     load.py
     battery.py
     seasonal.py
@@ -48,208 +48,208 @@ custom_components/inverter_analytics/
     cache.py
   frontend/dist/inverter-analytics-panel.js
   translations/{en,uk}.json
-frontend/               # вихідники панелі (Lit + TypeScript), збірка Vite
+frontend/               # panel source (Lit + TypeScript), built with Vite
 docs/superpowers/specs/
 ```
 
-Вихідники панелі лежать у `frontend/` в корені репозиторію; Vite збирає їх у єдиний файл `custom_components/inverter_analytics/frontend/dist/inverter-analytics-panel.js`, який і комітиться в репозиторій (HACS ставить лише `custom_components/`). Графіки — ECharts з tree-shaking (line, bar, heatmap, boxplot, sankey), ≈120 KB gzip. Власний бандл, а не внутрішній бандл HA — щоб оновлення HA не ламали панель.
+The panel's source lives in `frontend/` at the repo root; Vite builds it into a single file, `custom_components/inverter_analytics/frontend/dist/inverter-analytics-panel.js`, which is what gets committed to the repo (HACS only installs `custom_components/`). Charts use ECharts with tree-shaking (line, bar, heatmap, boxplot, sankey), ≈120 KB gzipped. A dedicated bundle rather than HA's internal bundle, so that HA updates don't break the panel.
 
-## 4. Ролі та пресети
+## 4. Roles and presets
 
-Плагін оперує **ролями**, а не конкретними сенсорами. Маппінг ролі → entity задає користувач.
+The plugin works with **roles**, not specific sensors. The user provides the role → entity mapping.
 
-| Роль | Тип | Од. | Обов'язково |
+| Role | Type | Unit | Required |
 |---|---|---|---|
-| `load_power` | entity | W | так |
-| `rated_power` | число в конфізі | W | так |
-| `pv_power` | entity | W | ні |
-| `battery_power` | entity | W | ні |
-| `grid_power` | entity | W | ні |
-| `battery_soc` | entity | % | ні |
-| `battery_capacity` | число в конфізі | kWh | ні |
-| `grid_connected` | entity (binary) | — | ні |
-| `pv_energy_total`, `load_energy_total`, `battery_charge_total`, `battery_discharge_total`, `grid_import_total`, `grid_export_total` | entity | kWh | ні |
+| `load_power` | entity | W | yes |
+| `rated_power` | number in config | W | yes |
+| `pv_power` | entity | W | no |
+| `battery_power` | entity | W | no |
+| `grid_power` | entity | W | no |
+| `battery_soc` | entity | % | no |
+| `battery_capacity` | number in config | kWh | no |
+| `grid_connected` | entity (binary) | — | no |
+| `pv_energy_total`, `load_energy_total`, `battery_charge_total`, `battery_discharge_total`, `grid_import_total`, `grid_export_total` | entity | kWh | no |
 
-Номінал інвертора та ємність батареї — числа в конфізі, не сенсори: це статичні характеристики залізяки.
+Rated inverter power and battery capacity are numbers in the config, not sensors: they're static characteristics of the hardware.
 
-Для кожної ролі-потужності є прапорець `invert`, бо знакова конвенція `battery_power` і `grid_power` у різних виробників протилежна.
+Every power role has an `invert` flag, because the sign convention for `battery_power` and `grid_power` is opposite across manufacturers.
 
-`presets.py` — словник `бренд → {роль: [патерни entity_id]}`. Пресети для: Deye/Sunsynk (solarman), Deye/Sunsynk (Solar Assistant), Victron, Growatt, Solax, GoodWe, Huawei, «Вручну». Пресет **тільки префілить форму** — ніколи не блокує й не падає, якщо збіг не знайдено.
+`presets.py` is a dictionary of `brand → {role: [entity_id patterns]}`. Presets exist for: Deye/Sunsynk (solarman), Deye/Sunsynk (Solar Assistant), Victron, Growatt, Solax, GoodWe, Huawei, "Manual". A preset **only pre-fills the form** — it never blocks or fails if no match is found.
 
-## 5. Доступ до даних
+## 5. Data access
 
-Єдиний інтерфейс, два бекенди:
+One interface, two backends:
 
-- **`RawStateSource`** — `recorder.history` в executor-потоці recorder. Точні крокові функції.
-- **`StatisticsSource`** — `statistics_during_period` з `mean/min/max/sum`, гранулярність `hour`/`day`/`month`.
+- **`RawStateSource`** — `recorder.history` on the recorder's executor thread. Exact step functions.
+- **`StatisticsSource`** — `statistics_during_period` with `mean/min/max/sum`, at `hour`/`day`/`month` granularity.
 
-Вибір автоматичний. На старті визначаємо реальну глибину сирої історії (найстаріший рядок `states`). Якщо запитане вікно вміщається — raw. Якщо ні — LTS. Якщо вікно перетинає межу — гібридний розрахунок, відповідь містить `precision: "mixed"` і мітку часу межі; UI малює вертикальну лінію з поясненням «лівіше — погодинні середні».
+The choice is automatic. On startup we determine the actual depth of raw history available (the oldest row in `states`). If the requested window fits — use raw. If not — use LTS. If the window straddles the boundary — a hybrid calculation, with the response carrying `precision: "mixed"` and the boundary timestamp; the UI draws a vertical line with an explanation: "left of this line — hourly averages."
 
-Обмеження вікна: LTS ≤ 400 днів, raw ≤ фактична глибина recorder. Перевищення — підрізаємо з поясненням, а не помилка.
+Window limits: LTS ≤ 400 days, raw ≤ actual recorder depth. Exceeding the limit clips the window with an explanation, rather than erroring.
 
-### Відомі обмеження точності
+### Known precision limitations
 
-Сира історія HA живе стільки, скільки задає `purge_keep_days` (типово 10 днів). LTS зберігає лише погодинні `mean/min/max`, тому гістограма за старі періоди змазана — піки коротші за годину зникають із середнього. Погодинні `min`/`max` при цьому зберігаються окремо як огинаюча, тож просадки SoC і пікові навантаження детектуються коректно навіть на LTS. Кожна відповідь API маркується рівнем точності, і UI це показує.
+HA's raw history lives only as long as `purge_keep_days` allows (10 days by default). LTS only stores hourly `mean/min/max`, so the histogram for older periods is smeared — spikes shorter than an hour disappear from the average. Hourly `min`/`max` are still kept separately as an envelope, though, so SoC dips and peak loads are detected correctly even from LTS alone. Every API response is tagged with its precision level, and the UI surfaces it.
 
-## 6. Математика (`resample.py`)
+## 6. Math (`resample.py`)
 
-Стани в HA приходять нерівномірно, тому **жодного арифметичного середнього по семплах** — усе зважене за тривалістю:
+States arrive from HA at irregular intervals, so there is **no plain arithmetic mean over samples** — everything is time-weighted:
 
-- гістограма: для кожної пари сусідніх станів `dt` додається в корзину значення
-- середнє = `Σ(v·dt) / Σdt`
-- перцентилі — з кумулятивної гістограми тривалостей
+- histogram: for each pair of adjacent states, `dt` is added to the bucket for that value
+- mean = `Σ(v·dt) / Σdt`
+- percentiles — from the cumulative duration histogram
 
-Для LTS-вікон кожен погодинний рядок дає 3600 с при значенні `mean`.
+For LTS windows, each hourly row contributes 3600 s at the `mean` value.
 
-`unavailable` / `unknown` виключаються зі статистики, але їхня тривалість рахується окремо: відповідь містить `coverage` (частка вікна з валідними даними), UI попереджає при `coverage < 0.95`.
+`unavailable` / `unknown` are excluded from the statistics, but their duration is tracked separately: the response carries `coverage` (the fraction of the window with valid data), and the UI warns when `coverage < 0.95`.
 
-Бакетизація по годинах доби — **у локальній таймзоні** (`hass.config.time_zone`), з окремими тестами на переходи DST (доба на 23 і 25 годин).
+Bucketing by hour of day is done **in the local time zone** (`hass.config.time_zone`), with dedicated tests for DST transitions (23- and 25-hour days).
 
-## 7. Аналітика
+## 7. Analytics
 
-### 7.1 Навантаження (`load.py`)
+### 7.1 Load (`load.py`)
 
-- time-weighted середнє, медіана, p95, максимум
-- гістограма розподілу потужності, крок = `rated_power / 40` (2.5% номіналу), налаштовується
-- крива тривалості навантаження (LDC): потужність за спаданням vs кумулятивний % часу
-- розподіл по смугах номіналу: 0-10 / 10-25 / 25-50 / 50-75 / 75-100 / >100%
-- максимальне стійке 15-хвилинне навантаження
-- епізоди перевантаження: суцільні інтервали вище номіналу з тривалістю й піком
+- time-weighted mean, median, p95, maximum
+- power-distribution histogram, bucket width = `rated_power / 40` (2.5% of rated power), configurable
+- load duration curve (LDC): power sorted descending vs. cumulative % of time
+- distribution across rated-power bands: 0-10 / 10-25 / 25-50 / 50-75 / 75-100 / >100%
+- maximum sustained 15-minute load
+- overload episodes: contiguous intervals above rated power, with duration and peak
 
-### 7.2 Акумулятор (`battery.py`)
+### 7.2 Battery (`battery.py`)
 
-- розподіл SoC, корзини по 5%
-- % часу нижче порогів (типово 20 / 30 / 50, налаштовуються)
-- **епізоди просадок**: суцільні інтервали SoC нижче порогу — кількість, тривалість, досягнутий мінімум; агрегація по днях і місяцях
-- еквівалентні повні цикли: `Σ енергії розряду / ємність`; з лічильників енергії, якщо є, інакше інтегруванням `battery_power`
-- розподіл DoD по подіях розряду (локальний максимум → локальний мінімум із гістерезисом, щоб шум не рахувався за цикл)
-- гістограма потужності заряду й розряду — чи впирається в ліміт BMS
-- оцінка автономності: медіанна швидкість розряду по смугах SoC
+- SoC distribution, 5% buckets
+- % of time below thresholds (default 20 / 30 / 50, configurable)
+- **dip episodes**: contiguous intervals with SoC below a threshold — count, duration, minimum reached; aggregated by day and by month
+- equivalent full cycles: `Σ discharge energy / capacity`; from energy counters where available, otherwise by integrating `battery_power`
+- DoD distribution across discharge events (local maximum → local minimum with hysteresis, so noise isn't counted as a cycle)
+- charge/discharge power histogram — whether it's hitting the BMS limit
+- autonomy estimate: median discharge rate by SoC band
 
-### 7.3 Сезонність (`seasonal.py`)
+### 7.3 Seasonality (`seasonal.py`)
 
-- таблиця по місяцях: середнє й p95 навантаження, спожита енергія, виробіток PV, середній і мінімальний SoC, кількість просадок
-- heatmap година × день тижня і година × місяць
-- типова доба: медіана з коридором p10–p90, з накладанням кількох місяців
-- оверлей будні / вихідні
+- monthly table: average and p95 load, energy consumed, PV yield, average and minimum SoC, number of dips
+- heatmaps of hour × day of week and hour × month
+- "typical day": median with a p10–p90 band, with multiple months overlaid
+- weekday / weekend overlay
 
-### 7.4 Баланс (`balance.py`)
+### 7.4 Balance (`balance.py`)
 
-- Sankey: PV / мережа / батарея → навантаження / батарея / експорт
-- коефіцієнти самоспоживання й автаркії
-- стовпчики по днях або місяцях зі структурою покриття навантаження
-- відключення мережі: кількість, сумарний час офлайн, найдовше, розподіл по місяцях. Джерело — `grid_connected`, за відсутності — евристика `grid_power ≈ 0` при розряді батареї
-- суми енергії беруться з `sum` у LTS, а не інтегруванням потужності: це коректно обробляє скидання лічильників `total_increasing`
+- Sankey: PV / grid / battery → load / battery / export
+- self-consumption and self-sufficiency ratios
+- daily or monthly bars showing load-coverage breakdown
+- grid outages: count, total offline time, longest outage, distribution by month. Source: `grid_connected`, or failing that a heuristic of `grid_power ≈ 0` while the battery is discharging
+- energy totals are taken from `sum` in LTS rather than by integrating power: this correctly handles resets of `total_increasing` counters
 
 ## 8. WebSocket API
 
-Команди: `inverter_analytics/config`, `.../load`, `.../battery`, `.../seasonal`, `.../balance`.
-Параметри: `{entry_id, start, end, ...специфічні}`.
+Commands: `inverter_analytics/config`, `.../load`, `.../battery`, `.../seasonal`, `.../balance`.
+Parameters: `{entry_id, start, end, ...command-specific}`.
 
-`config` повертає маппінг, застосований пресет, доступні ролі, межі даних (найстаріший raw, найстаріший LTS).
+`config` returns the mapping, the applied preset, the available roles, and the data boundaries (oldest raw, oldest LTS).
 
-Уся важка робота — в executor-потоці recorder. Назовні йдуть **лише агрегати**: гістограма ≤100 корзин, heatmap 24×12, типова доба 24×3. Payload — кілобайти.
+All the heavy work happens on the recorder's executor thread. Only **aggregates** go out: histogram ≤100 buckets, heatmap 24×12, typical day 24×3. Payload sizes are kilobytes.
 
-Кеш у пам'яті, ключ `(entry_id, команда, вікно, параметри)`. TTL: 60 с для вікон, що закінчуються «зараз»; 24 год для закритих історичних вікон (вони незмінні). Обмежений розмір (~50 записів).
+In-memory cache, keyed by `(entry_id, command, window, params)`. TTL: 60 s for windows ending "now"; 24 h for closed historical windows (they don't change). Bounded size (~50 entries).
 
 ## 9. UI
 
-Пункт бічного меню «Аналітика інвертора» (`mdi:chart-box-outline`). Одна сторінка: глобальна шапка + 4 вкладки.
+Sidebar entry "Inverter Analytics" (`mdi:chart-box-outline`). One page: a global header + 4 tabs.
 
-### Шапка
+### Header
 
-Селектор інвертора (лише якщо конфіг-записів >1), перемикач періоду (24 год / 7 днів / 30 днів / Цей місяць / Рік / Свій період), бейдж точності, оновлення, експорт CSV.
+Inverter selector (only if there is more than one config entry), period switch (`24 h` / `7 days` / `30 days` / `This month` / `Year` / Custom range), precision badge, refresh, CSV export.
 
-Бейдж точності має три стани: `Точні дані` (raw), `Змішано з <дата>` (гібрид), `Погодинні середні` (LTS), з тултипом-поясненням.
+The precision badge has three states: `Exact data` (raw), `Mixed since <date>` (hybrid), `Hourly averages` (LTS), with an explanatory tooltip.
 
-Активна вкладка й період зберігаються в URL (`/inverter-analytics/battery?range=30d`) — посилання й перезавантаження сторінки не губляться.
+The active tab and period are kept in the URL (`/inverter-analytics/battery?range=30d`) — links and page reloads don't lose state.
 
-### Вкладка «Навантаження»
+### "Load" tab
 
-KPI-рядок: середнє (і % номіналу), медіана, p95, пік (і % номіналу), % часу вище 80% номіналу.
-Далі: гістограма розподілу потужності з перемикачем «вати / % номіналу»; крива тривалості навантаження; смуговий розподіл по діапазонах номіналу; таблиця епізодів перевантаження.
+KPI row: Mean (and % of rated power), Median, P95, Peak (and % of rated power), % of time above 80% of rated power.
+Then: a "Time spent at each power level" histogram with a "watts / % of rated power" toggle; a load duration curve; a distribution across rated-power bands; an overload-episodes table.
 
-### Вкладка «Акумулятор»
+### "Battery" tab
 
-KPI: середній SoC, мінімум за період, % часу нижче 20%, кількість просадок, еквівалентні цикли, середній DoD.
-Далі: гістограма розподілу SoC; календар просадок (сітка днів, колір за кількістю та глибиною); таблиця епізодів (початок, тривалість, мінімум SoC, споживання в цей момент); гістограма DoD; графік потужності заряду/розряду.
-Пороги SoC редагуються в шапці вкладки й зберігаються в опціях.
+KPIs: average SoC, minimum over the period, % of time below 20%, number of dips, equivalent cycles, average DoD.
+Then: SoC-distribution histogram; dip calendar (day grid, colored by count and depth); episode table (start, duration, minimum SoC, load at that moment); DoD histogram; charge/discharge power chart.
+SoC thresholds are editable in the tab header and persisted in the options.
 
-### Вкладка «Сезонність»
+### "Seasonality" tab
 
-Таблиця по місяцях зі спарклайнами в комірках; два heatmap'и (година × день тижня, година × місяць); «типова доба» — медіана з коридором p10–p90, з накладанням кількох місяців і оверлеєм будні/вихідні.
+Monthly table with sparklines in the cells; two heatmaps (hour × day of week, hour × month); "typical day" — median with a p10–p90 band, with multiple months overlaid and a weekday/weekend overlay.
 
-### Вкладка «Баланс»
+### "Balance" tab
 
-Sankey потоків енергії; два кільця — самоспоживання й автаркія; стовпчики покриття навантаження по днях або місяцях; секція відключень мережі.
+Sankey of energy flows; two rings — self-consumption and self-sufficiency; load-coverage bars by day or month; grid-outage section.
 
-### Стилі
+### Styling
 
-Лише CSS-змінні HA (`--card-background-color`, `--primary-text-color`, `--primary-color`), нуль хардкоду кольорів — світла й темна тема працюють самі. Палітра серій фіксована й спільна для всіх вкладок: PV жовтий, батарея зелена, мережа сіра, навантаження синє. Числа й дати — через `hass.locale`. Мови: uk, en.
+Only HA CSS variables (`--card-background-color`, `--primary-text-color`, `--primary-color`), zero hardcoded colors — light and dark themes work automatically. The series palette is fixed and shared across all tabs: PV yellow, battery green, grid gray, load blue. Numbers and dates go through `hass.locale`. Languages: uk, en.
 
-## 10. Флоу користувача
+## 10. User flow
 
-**Встановлення**
+**Installation**
 
-1. HACS → Custom repositories → додати репозиторій → Install → перезапуск HA.
-2. Налаштування → Пристрої та служби → Додати інтеграцію → «Inverter Analytics».
+1. HACS → Custom repositories → add the repository → Install → restart HA.
+2. Settings → Devices & Services → Add integration → "Inverter Analytics".
 
-**Майстер налаштування**
+**Setup wizard**
 
-3. Крок «Бренд»: список пресетів + «Вручну».
-4. Крок «Маппінг»: entity-пікери, префілені пресетом (знайдені позначені), числові поля номіналу й ємності, чекбокси інверсії знаку. Обов'язковий лише `load_power`.
-5. Крок «Перевірка»: звіт **до збереження** — скільки сенсорів знайдено, з якої дати доступна сира історія й LTS, які сенсори виключені з recorder, які не мають `state_class`. Кожне попередження з конкретною підказкою, що дописати в `configuration.yaml`. Окремий крок навмисно: відсутність сенсора в recorder — головна причина «встановив, а графіки порожні».
-6. Готово. Пункт бічного меню з'являється без перезапуску HA.
+3. "Brand" step: list of presets + "Manual".
+4. "Mapping" step: entity pickers, pre-filled by the preset (matches marked), numeric fields for rated power and capacity, sign-inversion checkboxes. Only `load_power` is required.
+5. "Verification" step: a report **before saving** — how many sensors were found, since what date raw history and LTS are available, which sensors are excluded from the recorder, which lack `state_class`. Every warning comes with a concrete hint of what to add to `configuration.yaml`. This is a deliberately separate step: a sensor missing from the recorder is the top cause of "I installed it and the graphs are empty."
+6. Done. The sidebar entry appears without restarting HA.
 
-**Щоденне користування**
+**Day-to-day use**
 
-7. Перше відкриття: період «30 днів», вкладка «Навантаження». З кешу — ~100 мс; перший розрахунок 1-3 с зі скелетонами замість спінера.
-8. Зміна періоду перераховує активну вкладку, сусідні — ліниво при переході.
-9. Клік по стовпчику гістограми або по дню в календарі просадок відкриває бічну панель з деталями інтервалу і кнопкою «показати в History» — з аналітики можна провалитися в сирі дані HA.
-10. Експорт CSV для активного графіка.
+7. First open: "30 days" period, "Load" tab. From cache — ~100 ms; first computation 1-3 s, with skeletons instead of a spinner.
+8. Changing the period recomputes the active tab; other tabs recompute lazily when visited.
+9. Clicking a histogram bar or a day in the dip calendar opens a side panel with interval details and a "show in History" button — you can drill down from analytics into HA's raw data.
+10. CSV export for the active chart.
 
-**Обслуговування**
+**Maintenance**
 
-11. Перейменований або зниклий сенсор → Repair-issue «Сенсор X зник» з переходом у переналаштування маппінгу.
-12. Options flow: зміна маппінгу, номіналу, порогів SoC, кроку гістограми — без перевстановлення.
+11. A renamed or missing sensor → a Repair issue "Sensor X went missing" leading into the mapping reconfiguration.
+12. Options flow: change the mapping, rated power, SoC thresholds, histogram bucket width — without reinstalling.
 
-## 11. Обробка помилок і порожні стани
+## 11. Error handling and empty states
 
-- Немає опціональної ролі → блок показує запрошення «Для аналізу батареї потрібен сенсор SoC — додати» з переходом в options flow, а не помилку.
-- Сенсор зник або перейменований → Repair-issue + банер на панелі.
-- Сенсор виключений з recorder → ловиться на кроці «Перевірка», попередження з підказкою.
-- Немає `state_class` → сезонність по цьому сенсору недоступна, пояснюємо чому й що зробити.
-- Порожнє вікно → «Немає даних за цей період», без поламаних осей.
-- Помилка WS → тост і кнопка «Спробувати ще», без вічного спінера.
-- Запит перевищує ліміт вікна → період підрізається з поясненням.
+- A missing optional role → the block shows a prompt, "Battery analysis needs an SoC sensor — add one," leading into the options flow, instead of an error.
+- A sensor goes missing or gets renamed → Repair issue + banner on the panel.
+- A sensor excluded from the recorder → caught at the "Verification" step, with a hint in the warning.
+- No `state_class` → seasonality is unavailable for that sensor, with an explanation of why and what to do.
+- Empty window → "No data for this period," with no broken axes.
+- WS error → a toast and a "Try again" button, no endless spinner.
+- Request exceeds the window limit → the period is clipped, with an explanation.
 
-## 12. Тестування
+## 12. Testing
 
-- **`resample.py`** — юніт-тести на рукотворних крокових функціях: зважування за тривалістю, переходи DST, дірки в даних, `unavailable`, серія з однієї точки, значення на межах вікна. Це найризикованіша частина.
-- **Аналітика** — синтетичний 30-денний датасет із наперед відомими відповідями; перевірка гістограм, перцентилів, детекції епізодів, підрахунку циклів.
-- **Config flow** — пресет спрацював / не спрацював / сенсор виключений з recorder / options flow переналаштування.
-- **WS API** — через `hass_ws_client`, включно з кешем і обрізанням вікна.
-- **Фронтенд** — vitest на чистих функціях-трансформерах, без DOM.
-- **CI** — hassfest, HACS validation, pytest (`pytest-homeassistant-custom-component`), ruff, збірка фронтенду.
+- **`resample.py`** — unit tests against hand-built step functions: time-weighting, DST transitions, gaps in data, `unavailable`, a single-point series, values at the window boundaries. This is the highest-risk part.
+- **Analytics** — a synthetic 30-day dataset with known answers computed in advance; checks on histograms, percentiles, episode detection, cycle counting.
+- **Config flow** — preset matched / didn't match / sensor excluded from recorder / options flow reconfiguration.
+- **WS API** — via `hass_ws_client`, including cache and window clipping.
+- **Frontend** — vitest on pure transform functions, no DOM.
+- **CI** — hassfest, HACS validation, pytest (`pytest-homeassistant-custom-component`), ruff, frontend build.
 
-## 13. Поза межами v1
+## 13. Out of scope for v1
 
-- Створення власних HA-сенсорів (`sensor.inverter_avg_load_30d`) для автоматизацій
-- Прогнозування навантаження й генерації
-- Кореляція з погодою
-- Детект деградації батареї
-- Агрегування кількох інверторів в один графік
+- Creating dedicated HA sensors (`sensor.inverter_avg_load_30d`) for automations
+- Load and generation forecasting
+- Weather correlation
+- Battery degradation detection
+- Aggregating multiple inverters into one chart
 
-## 14. Порядок реалізації
+## 14. Implementation order
 
-Обсяг великий, тому реалізація розбивається на етапи. Кожен етап самодостатній і закінчується робочим станом.
+The scope is large, so implementation is broken into stages. Each stage is self-contained and ends in a working state.
 
-1. **Каркас** — інтеграція, `manifest.json`, config flow з ручним маппінгом (без пресетів), реєстрація порожньої панелі, CI. Результат: інтеграція ставиться, пункт меню відкривається.
-2. **Ядро даних** — `roles.py`, `source.py`, `resample.py` з повним набором тестів, кеш. Найризикованіша математика робиться й покривається тестами до того, як з'явиться перший графік.
-3. **Навантаження** — `load.py`, WS-команда, перша вкладка з KPI, гістограмою і LDC. Результат: головне питання користувача вже має відповідь.
-4. **Акумулятор** — `battery.py`, друга вкладка, пороги SoC в опціях.
-5. **Сезонність** — `seasonal.py`, гібридний raw+LTS шлях, бейдж точності, третя вкладка.
-6. **Баланс** — `balance.py`, Sankey, відключення мережі, четверта вкладка.
-7. **Полірування** — пресети брендів, крок «Перевірка» в майстрі, Repair-issues, експорт CSV, локалізація uk/en.
+1. **Scaffold** — integration, `manifest.json`, config flow with manual mapping (no presets), registering an empty panel, CI. Result: the integration installs, the menu entry opens.
+2. **Data core** — `roles.py`, `source.py`, `resample.py` with a full test suite, cache. The highest-risk math is built and covered by tests before the first chart exists.
+3. **Load** — `load.py`, the WS command, the first tab with KPIs, histogram, and LDC. Result: the user's main question already has an answer.
+4. **Battery** — `battery.py`, the second tab, SoC thresholds in options.
+5. **Seasonality** — `seasonal.py`, the hybrid raw+LTS path, the precision badge, the third tab.
+6. **Balance** — `balance.py`, Sankey, grid outages, the fourth tab.
+7. **Polish** — brand presets, the "Verification" step in the wizard, Repair issues, CSV export, uk/en localization.
 
-Пресети свідомо йдуть в кінці: до них потрібно знати фінальний список ролей, а ручний маппінг закриває потребу з першого етапу.
+Presets deliberately come last: they require knowing the final list of roles, and manual mapping already covers the need from stage one.

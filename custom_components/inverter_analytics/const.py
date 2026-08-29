@@ -1,4 +1,4 @@
-"""Константи інтеграції Inverter Analytics."""
+"""Constants for the Inverter Analytics integration."""
 
 from __future__ import annotations
 

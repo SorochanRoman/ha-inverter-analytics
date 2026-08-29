@@ -1,4 +1,4 @@
-"""Тести TTL-кешу результатів."""
+"""Tests for the result TTL cache."""
 
 from custom_components.inverter_analytics.analytics.cache import ResultCache
 

@@ -1,4 +1,4 @@
-"""Тести вибору джерела даних і конвертації в семпли."""
+"""Tests for data-source selection and conversion into samples."""
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -22,7 +22,7 @@ NOW = datetime(2026, 1, 31, 12, 0, tzinfo=UTC)
 
 @pytest.fixture
 def recorder_keep_days():
-    """Підмінити recorder на об'єкт із keep_days=10."""
+    """Replace the recorder with an object that has keep_days=10."""
     with patch(
         "custom_components.inverter_analytics.analytics.source.get_instance",
         return_value=SimpleNamespace(keep_days=10),

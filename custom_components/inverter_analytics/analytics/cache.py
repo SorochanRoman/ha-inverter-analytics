@@ -1,4 +1,4 @@
-"""Кеш результатів аналітики з TTL і обмеженням розміру."""
+"""Cache for analytics results with a TTL and a size limit."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class _Entry:
 
 
 class ResultCache:
-    """Обмежений за розміром кеш із часом життя запису."""
+    """A size-bounded cache with a per-entry lifetime."""
 
     def __init__(
         self, max_entries: int = 50, time_fn: Callable[[], float] = time.monotonic
@@ -27,11 +27,11 @@ class ResultCache:
 
     @property
     def size(self) -> int:
-        """Кількість записів у кеші."""
+        """Number of entries in the cache."""
         return len(self._entries)
 
     def get(self, key: Hashable) -> Any | None:
-        """Повернути значення або None, якщо його немає чи воно протухло."""
+        """Return the value, or None if it is missing or has expired."""
         entry = self._entries.get(key)
         if entry is None:
             return None
@@ -41,7 +41,7 @@ class ResultCache:
         return entry.value
 
     def set(self, key: Hashable, value: Any, ttl: float) -> None:
-        """Записати значення з часом життя в секундах."""
+        """Store a value with a lifetime in seconds."""
         if key in self._entries:
             del self._entries[key]
         self._entries[key] = _Entry(value=value, expires_at=self._time_fn() + ttl)
@@ -49,5 +49,5 @@ class ResultCache:
             self._entries.popitem(last=False)
 
     def clear(self) -> None:
-        """Очистити кеш."""
+        """Clear the cache."""
         self._entries.clear()

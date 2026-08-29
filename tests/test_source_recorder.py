@@ -1,4 +1,4 @@
-"""Перевірка async_series на живому recorder."""
+"""Check async_series against a live recorder."""
 
 from datetime import timedelta
 

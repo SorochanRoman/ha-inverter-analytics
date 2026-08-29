@@ -1,4 +1,4 @@
-"""Реєстрація custom-панелі Inverter Analytics."""
+"""Registration of the Inverter Analytics custom panel."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _DATA_STATIC_REGISTERED = "static_registered"
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
-    """Зареєструвати статичні файли й пункт бічного меню. Ідемпотентно."""
+    """Register the static files and the sidebar entry. Idempotent."""
     domain_data = hass.data.setdefault(DOMAIN, {})
 
     if not domain_data.get(_DATA_STATIC_REGISTERED):
@@ -54,6 +54,6 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
 
 def async_remove_panel(hass: HomeAssistant) -> None:
-    """Прибрати пункт бічного меню. Статичний шлях лишається — aiohttp не вміє його знімати."""
+    """Remove the sidebar entry. The static path stays registered — aiohttp can't unregister it."""
     if PANEL_URL_PATH in hass.data.get(frontend.DATA_PANELS, {}):
         frontend.async_remove_panel(hass, PANEL_URL_PATH)

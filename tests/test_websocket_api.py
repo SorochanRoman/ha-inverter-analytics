@@ -1,4 +1,4 @@
-"""Тести WebSocket API."""
+"""Tests for the WebSocket API."""
 
 from datetime import timedelta
 from unittest.mock import patch
@@ -124,7 +124,7 @@ async def test_load_command_rejects_unknown_entry(
 async def test_load_command_reports_not_found_for_an_unloaded_entry(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
-    """Вимкнений в UI інвертор існує як запис, але обслуговувати його нічим."""
+    """An inverter disabled in the UI still exists as an entry, but nothing serves it."""
     entry = _entry()
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -203,7 +203,7 @@ async def test_second_identical_request_is_served_from_cache(
         second = await client.receive_json()
 
     assert first["result"] == second["result"]
-    # Головне: друга відповідь не коштувала жодного перерахунку.
+    # The key point: the second response cost no recomputation at all.
     assert computed.call_count == 1
     cache = hass.data[DOMAIN][entry.entry_id]["cache"]
     assert cache.size == 1

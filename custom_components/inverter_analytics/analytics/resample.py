@@ -1,7 +1,7 @@
-"""Time-weighted математика над станами Home Assistant.
+"""Time-weighted math over Home Assistant states.
 
-Стани приходять нерівномірно, тому кожне значення важить рівно стільки,
-скільки воно трималось. Модуль не залежить від Home Assistant.
+States arrive at irregular intervals, so each value is weighted by exactly
+how long it held. This module has no dependency on Home Assistant.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, tzinfo
 
 @dataclass(frozen=True, slots=True)
 class Sample:
-    """Стан у момент часу. value is None — unavailable/unknown."""
+    """A state at a point in time. value is None — unavailable/unknown."""
 
     ts: datetime
     value: float | None
@@ -22,7 +22,7 @@ class Sample:
 
 @dataclass(frozen=True, slots=True)
 class Interval:
-    """Проміжок, протягом якого значення було сталим."""
+    """A span during which a value stayed constant."""
 
     start: datetime
     end: datetime
@@ -30,13 +30,13 @@ class Interval:
 
     @property
     def seconds(self) -> float:
-        """Тривалість у секундах."""
+        """Duration in seconds."""
         return (self.end - self.start).total_seconds()
 
 
 @dataclass(frozen=True, slots=True)
 class Series:
-    """Послідовність станів у межах вікна [start, end)."""
+    """A sequence of states within the window [start, end)."""
 
     start: datetime
     end: datetime
@@ -44,19 +44,19 @@ class Series:
 
     @classmethod
     def of(cls, start: datetime, end: datetime, samples: Iterable[Sample]) -> Series:
-        """Створити серію, впорядкувавши семпли за часом."""
+        """Build a series, ordering the samples by time."""
         return cls(start, end, tuple(sorted(samples, key=lambda sample: sample.ts)))
 
     @property
     def duration(self) -> float:
-        """Довжина вікна в секундах."""
+        """Window length in seconds."""
         return max((self.end - self.start).total_seconds(), 0.0)
 
 
 def to_intervals(series: Series) -> list[Interval]:
-    """Перетворити крокову функцію станів на інтервали, обрізані вікном.
+    """Turn a step function of states into intervals, clipped to the window.
 
-    Семпли зі значенням None пропускаються: розрив у даних не інтерполюється.
+    Samples with value None are skipped: a gap in the data is not interpolated.
     """
     intervals: list[Interval] = []
     samples = series.samples
@@ -75,7 +75,7 @@ def to_intervals(series: Series) -> list[Interval]:
 
 
 def coverage(series: Series) -> float:
-    """Частка вікна, для якої є валідні дані, від 0.0 до 1.0."""
+    """Share of the window with valid data, from 0.0 to 1.0."""
     total = series.duration
     if total <= 0:
         return 0.0
@@ -84,7 +84,7 @@ def coverage(series: Series) -> float:
 
 
 def time_weighted_mean(intervals: Sequence[Interval]) -> float | None:
-    """Середнє, зважене за тривалістю. None, якщо даних немає."""
+    """Mean weighted by duration. None if there is no data."""
     total_seconds = sum(interval.seconds for interval in intervals)
     if total_seconds <= 0:
         return None
@@ -94,7 +94,7 @@ def time_weighted_mean(intervals: Sequence[Interval]) -> float | None:
 
 @dataclass(frozen=True, slots=True)
 class Bucket:
-    """Одна корзина гістограми з готовими для UI межами й часткою."""
+    """One histogram bucket with UI-ready bounds and fraction."""
 
     index: int
     start: float
@@ -105,12 +105,12 @@ class Bucket:
 
 @dataclass(frozen=True, slots=True)
 class Histogram:
-    """Розподіл тривалості по корзинах значень.
+    """Distribution of duration across value buckets.
 
-    Значення поза діапазоном притискуються до перших або останніх корзин:
-    час не губиться, але його діапазон позначається неправильно.
-    Лічильники clipped_low_seconds і clipped_high_seconds записують,
-    скільки часу мислиться поза своїм діапазоном значень.
+    Out-of-range values are clamped into the first or last bucket: time is
+    not lost, but its value range is misrepresented. The clipped_low_seconds
+    and clipped_high_seconds counters record how much time is misattributed
+    outside its true value range.
     """
 
     bucket_width: float
@@ -121,11 +121,11 @@ class Histogram:
 
     @property
     def total_seconds(self) -> float:
-        """Сумарна тривалість усіх корзин."""
+        """Total duration across all buckets."""
         return sum(self.seconds)
 
     def buckets(self) -> list[Bucket]:
-        """Розгорнути корзини з межами та частками."""
+        """Expand into buckets with bounds and fractions."""
         total = self.total_seconds
         return [
             Bucket(
@@ -145,12 +145,12 @@ def duration_histogram(
     offset: float = 0.0,
     max_buckets: int = 400,
 ) -> Histogram:
-    """Розподіл тривалості по корзинах значень.
+    """Distribution of duration across value buckets.
 
-    Значення нижче offset потрапляють у нульову корзину, вище межі —
-    у останню: обрізати хвости мовчки гірше, ніж їх притиснути.
-    Час у прив'язаних значень лишається в кінцевих корзинах, але
-    лічильники clipped_* записують мислені діапазони.
+    Values below offset fall into bucket zero, values above the top edge
+    fall into the last bucket: silently dropping the tails is worse than
+    clamping them. Time from clamped values stays in the edge buckets, but
+    the clipped_* counters record the misattributed ranges.
     """
     if bucket_width <= 0:
         raise ValueError("bucket_width must be positive")
@@ -181,7 +181,7 @@ def duration_histogram(
 
 
 def percentile(hist: Histogram, q: float) -> float | None:
-    """Перцентиль за тривалістю з лінійною інтерполяцією всередину корзини."""
+    """Duration-weighted percentile, linearly interpolated within a bucket."""
     if not 0.0 <= q <= 1.0:
         raise ValueError("q must be between 0.0 and 1.0")
 
@@ -203,7 +203,7 @@ def percentile(hist: Histogram, q: float) -> float | None:
 
 
 def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]:
-    """Крива тривалості навантаження: значення, що перевищується частку часу."""
+    """Load duration curve: the value exceeded for a given fraction of time."""
     if points < 2 or hist.total_seconds <= 0:
         return []
     result: list[tuple[float, float]] = []
@@ -217,7 +217,7 @@ def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, floa
 
 @dataclass(frozen=True, slots=True)
 class Episode:
-    """Суцільний проміжок, протягом якого виконувалась умова."""
+    """A contiguous span during which the condition held."""
 
     start: datetime
     end: datetime
@@ -227,7 +227,7 @@ class Episode:
 
 
 def _contiguous_runs(intervals: Sequence[Interval]) -> Iterator[list[Interval]]:
-    """Розбити інтервали на серії без розривів у часі."""
+    """Split intervals into runs with no time gaps between them."""
     run: list[Interval] = []
     for interval in intervals:
         if run and interval.start != run[-1].end:
@@ -241,17 +241,17 @@ def _contiguous_runs(intervals: Sequence[Interval]) -> Iterator[list[Interval]]:
 def _matching_runs(
     intervals: Sequence[Interval], predicate: Callable[[float], bool]
 ) -> Iterator[list[Interval]]:
-    """Серії суміжних інтервалів, що задовольняють умову.
+    """Runs of adjacent intervals that satisfy the condition.
 
-    Відсіювання за умовою до перевірки суміжності дає ті самі межі серій:
-    і розрив у даних, і інтервал, що умову не задовольняє, однаково
-    розривають ланцюг.
+    Filtering by the condition before checking adjacency gives the same run
+    boundaries either way: a gap in the data and an interval that fails the
+    condition both break the chain the same way.
     """
     yield from _contiguous_runs([i for i in intervals if predicate(i.value)])
 
 
 def _to_episode(run: Sequence[Interval], extreme: Callable[[Iterable[float]], float]) -> Episode:
-    """Згорнути серію інтервалів в один епізод."""
+    """Collapse a run of intervals into a single episode."""
     seconds = sum(interval.seconds for interval in run)
     weighted = sum(interval.value * interval.seconds for interval in run)
     return Episode(
@@ -280,19 +280,19 @@ def _episodes(
 def episodes_above(
     intervals: Sequence[Interval], threshold: float, min_seconds: float = 0.0
 ) -> list[Episode]:
-    """Епізоди перевищення порогу; extreme — досягнутий максимум."""
+    """Episodes exceeding a threshold; extreme is the peak value reached."""
     return _episodes(intervals, lambda value: value > threshold, max, min_seconds)
 
 
 def episodes_below(
     intervals: Sequence[Interval], threshold: float, min_seconds: float = 0.0
 ) -> list[Episode]:
-    """Епізоди падіння нижче порогу; extreme — досягнутий мінімум."""
+    """Episodes dropping below a threshold; extreme is the minimum reached."""
     return _episodes(intervals, lambda value: value < threshold, min, min_seconds)
 
 
 def _max_window_mean(run: Sequence[Interval], window_seconds: float) -> float | None:
-    """Максимальне ковзне середнє всередині однієї суцільної серії."""
+    """Maximum sliding-window mean within a single contiguous run."""
     times: list[float] = [0.0]
     energy: list[float] = [0.0]
     for interval in run:
@@ -313,7 +313,7 @@ def _max_window_mean(run: Sequence[Interval], window_seconds: float) -> float | 
         share = (moment - times[index]) / span
         return energy[index] + share * (energy[index + 1] - energy[index])
 
-    # Максимум ковзного середнього досягається на точці зламу або за вікно до неї.
+    # The maximum sliding-window mean is attained at a breakpoint, or one window before it.
     candidates = {0.0}
     for moment in times:
         if moment + window_seconds <= total:
@@ -328,9 +328,9 @@ def _max_window_mean(run: Sequence[Interval], window_seconds: float) -> float | 
 
 
 def max_sustained_mean(intervals: Sequence[Interval], window_seconds: float) -> float | None:
-    """Найбільше середнє за будь-яке вікно заданої довжини.
+    """The largest mean over any window of the given length.
 
-    Вікна, що перетинають розрив у даних, не розглядаються.
+    Windows that cross a gap in the data are not considered.
     """
     if window_seconds <= 0:
         raise ValueError("window_seconds must be positive")
@@ -344,11 +344,11 @@ def max_sustained_mean(intervals: Sequence[Interval], window_seconds: float) -> 
 
 
 def hour_of_day_durations(intervals: Sequence[Interval], tz: tzinfo) -> list[float]:
-    """Тривалість по годинах доби в локальній зоні, рівно 24 елементи.
+    """Duration by hour of day in the local zone, exactly 24 elements.
 
-    Арифметика виконується в UTC, а локальна зона використовується лише для
-    визначення номера години. Тому переходи на літній час не створюють і не
-    втрачають секунд: сума завжди дорівнює довжині вхідних інтервалів.
+    The arithmetic is done in UTC; the local zone is only used to work out
+    the hour number. This means DST transitions neither create nor lose
+    seconds: the sum always equals the total length of the input intervals.
     """
     totals = [0.0] * 24
 
