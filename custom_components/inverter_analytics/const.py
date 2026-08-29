@@ -26,3 +26,9 @@ CONF_INVERTED: Final = "inverted"
 # meaningless. Without it the histogram would scream every night.
 DEFAULT_IMBALANCE_FLOOR_PCT: Final = 5.0
 DEFAULT_IMBALANCE_THRESHOLD_PCT: Final = 30.0
+
+# The charge a user wants to be told about, and the power below which a battery
+# is resting rather than working. Both are starting points; a lithium pack and
+# a lead-acid one disagree about what counts as low.
+DEFAULT_BATTERY_LOW_PCT: Final = 20.0
+DEFAULT_BATTERY_IDLE_W: Final = 50.0
