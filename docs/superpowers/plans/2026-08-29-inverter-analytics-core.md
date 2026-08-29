@@ -1971,7 +1971,7 @@ git commit -m "feat: епізоди, стійке навантаження та 
 - Produces:
   - `Precision` (StrEnum: `RAW = "raw"`, `LTS = "lts"`, `MIXED = "mixed"`)
   - `Window` (frozen dataclass: `start: datetime`, `end: datetime`; властивість `seconds -> float`)
-  - `PrecisionPlan` (frozen dataclass: `precision: Precision`, `boundary: datetime | None`)
+  - `PrecisionPlan` (frozen dataclass: `precision: Precision`, `boundary: datetime | None` — заповнена лише для `MIXED`)
   - `raw_available_from(hass) -> datetime`
   - `plan_precision(hass, window: Window) -> PrecisionPlan`
   - `states_to_samples(states: Iterable[State], sign: float) -> list[Sample]`
@@ -2025,6 +2025,8 @@ def test_raw_available_from_follows_recorder_keep_days(hass: HomeAssistant, reco
 def test_recent_window_uses_raw_states(hass: HomeAssistant, recorder_keep_days):
     plan = plan_precision(hass, Window(NOW - timedelta(days=3), NOW))
     assert plan.precision is Precision.RAW
+    # Межа існує лише для змішаних вікон; однорідне вікно її не має.
+    assert plan.boundary is None
 
 
 @freeze_time(NOW)
@@ -2186,7 +2188,10 @@ def plan_precision(hass: HomeAssistant, window: Window) -> PrecisionPlan:
     """Обрати джерело даних для вікна."""
     boundary = raw_available_from(hass)
     if window.start >= boundary:
-        return PrecisionPlan(Precision.RAW, window.start)
+        # boundary має сенс лише для змішаного вікна: це мить, де читач
+        # переходить із погодинних середніх на сирі стани. Для однорідних
+        # вікон межі немає, і UI не має малювати позначку.
+        return PrecisionPlan(Precision.RAW, None)
     if window.end <= boundary:
         return PrecisionPlan(Precision.LTS, None)
     return PrecisionPlan(Precision.MIXED, boundary)
