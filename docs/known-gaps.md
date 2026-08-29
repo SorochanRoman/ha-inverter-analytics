@@ -124,3 +124,72 @@ documented at the site with their reasoning.
 **Confirm the intent.** `replaceState` means the Back button does not undo a
 tab switch. `entryId` is not in the URL, so a reload with several inverters
 configured silently reverts to the first.
+
+## 8. What plan 2 inherits
+
+Written from the whole-branch review of the detection work, so the phase-analytics
+plan is written against what the code actually leaves rather than what its spec
+assumed.
+
+**Ready to build on unchanged.** `entity_ids()` returns an ordered tuple, which is
+the shape `align()` needs. `async_series(hass, entity_id, window, sign)` already
+takes one entity, so N series need N calls and no signature change. `sign()` is
+per-role, so one convention applies across all three phases at once. The
+total-versus-parts role split is exactly what the per-series payload and the
+"vendor total wins" rule need, and `has("load_power_phase")` already answers
+"should the Phases section render at all".
+
+**The one load-bearing gap: the phase index is parsed and thrown away.**
+Classification captures the number from `load_l(\d+)_power`, sorts on it, and
+discards it. The payload keys the series `load_l1`, `load_l2`, so plan 2 can only
+re-derive the label from list position — and a user who maps L1 and L3 would get a
+series labelled `load_l2` holding L3's data. Either store the index alongside the
+entity id or validate contiguity when the entry is written. Config time is the
+cheaper place.
+
+**Nothing validates phase counts or cross-role consistency.** `load_power_phase`
+may hold one entity or five, and may disagree in length with `grid_power_phase`.
+The imbalance maths needs at least two; that guard has to be written somewhere.
+
+**`Detection` has no link back to its `Cluster`** — no key, no label, no device id.
+Anything plan 2 wants to say about *which* inverter has to come from the entry
+title. Adding the field is trivial now and awkward once entries exist in the wild.
+
+**`Ambiguity` looks general but is single-question.** The confirm step re-binds one
+schema key per ambiguity and applies one answer to every ambiguity's role, so a
+second question would overwrite the first and then raise. Today exactly one
+ambiguity exists, so both faults are latent. Any second question — which CT set
+feeds the load, which string is which — requires reworking the step first.
+
+**Duplicate entity ids are permitted.** `align()` would double-count them. One line
+in the shared normaliser fixes it; Home Assistant's multi-entity picker already
+filters chosen entities, so the risk is low today.
+
+**`plan_precision` is window-based, not entity-based.** The per-series `precision`
+and `coverage` the payload needs have no per-entity equivalent yet.
+
+**No preset produces a `grid_power` total**, only per-phase parts. A three-phase
+Solarman user therefore has grid data as parts alone, so the balance work will have
+to sum there with no vendor total to prefer — the first place the "total wins" rule
+has nothing to apply to.
+
+## 9. Parked from the detection branch
+
+- **`_prefix` can offer a partial cluster as an inverter.** On a `deye2_*`-style
+  install its two-word rule yields `deye2_battery`, `deye2_pv1`, `deye2_total`, and
+  five battery sensors alone clear the prefix floor — so the user is offered
+  "Deye2 Battery — 5 sensors". Setup cannot complete, because `load_power` is
+  required and would be empty, but the option looks plausible. Acceptable to ship;
+  the earlier note calling the failure mode "shreds into singletons, falls back to
+  manual" was wrong and is corrected here.
+- **An incomplete CT set still raises the ambiguity**, and the option the user picks
+  silently carries only the phases that exist. Phase-count validation belongs to
+  plan 2; until then the cheapest mitigation is to put the count in the select label.
+- **`without_statistics` covers power and energy but not battery sensors**, so a SoC
+  sensor with no `state_class` is silently unwarned even though the helper text
+  advertises the dip analysis it feeds.
+- **An invert checkbox is still rendered for a role whose picker was filtered out**
+  by an ambiguity. Harmless — inversion applies to whatever the answer assigns — but
+  a checkbox with no visible field is confusing.
+- **The duplication guard compares `manual` and `options.init` only.** `confirm`'s
+  shared keys are identical today but are not frozen.
