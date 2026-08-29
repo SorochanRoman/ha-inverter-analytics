@@ -97,10 +97,22 @@ def test_max_sustained_15m_is_lower_than_a_short_peak():
     assert payload["kpi"]["max_sustained_15m"] < 6000.0
 
 
+def test_negative_values_fall_into_the_lowest_band_not_through_the_cracks():
+    """Від'ємне навантаження не має зникати зі смуг, лишаючись у знаменнику."""
+    series = Series.of(BASE, at(60), [Sample(BASE, -100.0), Sample(at(30), 400.0)])
+    payload = build_load_payload(series, rated_power=8000.0)
+    bands = {band["key"]: band["fraction"] for band in payload["bands"]}
+    assert bands["0-10"] == pytest.approx(1.0)
+    assert sum(bands.values()) == pytest.approx(1.0)
+    # Гістограма окремо повідомляє, скільки часу було поза діапазоном.
+    assert payload["histogram"]["clipped_low_seconds"] == pytest.approx(1800.0)
+
+
 def test_empty_series_yields_null_kpis_not_an_exception():
     payload = build_load_payload(Series.of(BASE, at(60), []), rated_power=8000.0)
     assert payload["kpi"]["mean"] is None
     assert payload["kpi"]["max"] is None
+    assert payload["kpi"]["fraction_above_80pct"] is None
     assert payload["histogram"]["buckets"] == []
     assert payload["coverage"] == 0.0
 

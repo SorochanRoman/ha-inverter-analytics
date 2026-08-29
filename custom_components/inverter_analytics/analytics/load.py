@@ -59,8 +59,12 @@ def build_load_payload(
     histogram = duration_histogram(intervals, bucket_width=bucket_width)
 
     bands = []
-    for key, low_share, high_share in BANDS:
-        low = low_share * rated_power
+    for index, (key, low_share, high_share) in enumerate(BANDS):
+        # Найнижча смуга ловить і від'ємні значення — так само, як гістограма
+        # втискає їх у нульову корзину. Інакше вони зникають із чисельників,
+        # лишаючись у знаменнику, і частки перестають давати одиницю.
+        # Скільки саме часу було нижче нуля, показує histogram.clipped_low_seconds.
+        low = float("-inf") if index == 0 else low_share * rated_power
         high = None if high_share is None else high_share * rated_power
         seconds = _seconds_between(intervals, low, high)
         bands.append(
@@ -84,7 +88,7 @@ def build_load_payload(
             "median": percentile(histogram, 0.5),
             "p95": percentile(histogram, 0.95),
             "max": max((interval.value for interval in intervals), default=None),
-            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else 0.0,
+            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else None,
             "max_sustained_15m": max_sustained_mean(intervals, SUSTAINED_WINDOW_SECONDS),
         },
         "histogram": {
