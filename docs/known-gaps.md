@@ -125,7 +125,7 @@ documented at the site with their reasoning.
 tab switch. `entryId` is not in the URL, so a reload with several inverters
 configured silently reverts to the first.
 
-## 8. What plan 2 inherits
+## 7. What plan 2 inherits
 
 Written from the whole-branch review of the detection work, so the phase-analytics
 plan is written against what the code actually leaves rather than what its spec
@@ -173,7 +173,7 @@ Solarman user therefore has grid data as parts alone, so the balance work will h
 to sum there with no vendor total to prefer — the first place the "total wins" rule
 has nothing to apply to.
 
-## 9. Parked from the detection branch
+## 8. Parked from the detection branch
 
 - **`_prefix` can offer a partial cluster as an inverter.** On a `deye2_*`-style
   install its two-word rule yields `deye2_battery`, `deye2_pv1`, `deye2_total`, and
