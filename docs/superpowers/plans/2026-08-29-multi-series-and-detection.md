@@ -1323,7 +1323,11 @@ Replace `custom_components/inverter_analytics/translations/en.json`. Every role 
 }
 ```
 
-The `options.init` step reuses the manual form, so copy the `data` and `data_description` blocks from `manual` into it as well — the test only checks `manual`, but a missing label there is just as visible to a user.
+The `confirm` and `options.init` steps render the same schema as `manual`, so
+copy the `data` and `data_description` blocks into both. All three are checked
+by the test: a step missing a key renders that field as a raw identifier and
+nothing else fails, so a guard that covers only one of the three leaves the
+other two free to drift.
 
 - [ ] **Step 4: Run the tests**
 
@@ -1358,5 +1362,8 @@ Tasks 2 and 3 are independent of each other once Task 1 lands.
 2. An existing config entry created before this plan still loads and its Load tab still renders — check with an entry whose `entities` hold bare strings.
 3. On an installation with a Solarman inverter, the wizard's first step lists it by name with a sensor count, and choosing it pre-fills load, phases, battery and the energy counters.
 4. The confirm step asks which CT set faces the grid, and names any sensors that have no long-term statistics.
-5. Every field in the manual form shows helper text underneath.
+5. Every field shows helper text underneath in every step that renders it —
+   `confirm`, `manual` and the options flow. The confirm step matters most: the
+   discovery path lands there, so a user who accepts the detected mapping may
+   never open the manual form at all.
 6. A single-phase user's experience is unchanged apart from the new descriptions.
