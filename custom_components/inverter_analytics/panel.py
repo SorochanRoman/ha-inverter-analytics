@@ -7,6 +7,7 @@ from pathlib import Path
 from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
+from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
 
 from .const import (
     DOMAIN,
@@ -19,6 +20,25 @@ from .const import (
 )
 
 _DATA_STATIC_REGISTERED = "static_registered"
+
+
+def _bundle_url(hass: HomeAssistant) -> str:
+    """The panel bundle's URL, carrying the version that produced it.
+
+    Without it the URL never changes, so a browser that has the file cached
+    keeps running the previous release's panel after an upgrade — silently,
+    with no error and no hint that a reload is needed. Home Assistant's own
+    frontend versions its assets for the same reason.
+
+    The version is read from the manifest, which is what an upgrade bumps.
+    Falling back to the plain URL keeps the panel working if it cannot be
+    read; a stale bundle is better than no panel.
+    """
+    try:
+        version = async_get_loaded_integration(hass, DOMAIN).version
+    except (IntegrationNotLoaded, KeyError):
+        version = None
+    return f"{STATIC_URL_BASE}/{PANEL_BUNDLE}" + (f"?v={version}" if version else "")
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
@@ -45,7 +65,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         config={
             "_panel_custom": {
                 "name": PANEL_ELEMENT,
-                "module_url": f"{STATIC_URL_BASE}/{PANEL_BUNDLE}",
+                "module_url": _bundle_url(hass),
                 "embed_iframe": False,
                 "trust_external": False,
             }

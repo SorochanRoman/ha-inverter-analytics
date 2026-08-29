@@ -30,6 +30,17 @@ describe("formatDuration", () => {
     expect(formatDuration(420)).toBe("7 min");
   });
 
+  it("keeps the seconds of a short span rather than rounding them away", () => {
+    // An episode of 100 s shown as "2 min" overstates it by a fifth, and
+    // episodes start at exactly 60 s — the worst place for that rounding.
+    expect(formatDuration(100)).toBe("1 min 40 s");
+    expect(formatDuration(61)).toBe("1 min 1 s");
+  });
+
+  it("drops the seconds once the span is long enough not to need them", () => {
+    expect(formatDuration(41 * 60 + 12)).toBe("41 min");
+  });
+
   it("renders hours and minutes above an hour", () => {
     expect(formatDuration(3900)).toBe("1 h 5 min");
   });
