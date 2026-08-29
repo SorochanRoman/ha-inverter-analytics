@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import re
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from . import presets
@@ -36,9 +37,12 @@ class SensorInfo:
 
     entity_id: str
     device_class: str | None
+    # Collected as a guard for plan 2, against e.g. a kW sensor being read as
+    # W; nothing in this module reads it yet.
     unit: str | None
     state_class: str | None
     device_id: str | None
+    device_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,26 +109,37 @@ def cluster_sensors(sensors: Sequence[SensorInfo]) -> list[Cluster]:
     for key, members in groups.items():
         floor = MIN_DEVICE_CLUSTER_SIZE if key in grouped_by_device else MIN_PREFIX_CLUSTER_SIZE
         if len(members) >= floor:
-            clusters.append(
-                Cluster(key=key, label=key.replace("_", " ").title(), sensors=tuple(members))
-            )
+            device_name = None
+            if key in grouped_by_device:
+                device_name = next(
+                    (sensor.device_name for sensor in members if sensor.device_name), None
+                )
+            # A device-backed group is keyed by device_id — a hex blob, not a
+            # name — so prefer the device's own name for the label. The
+            # prefix-derived key is already a readable name and stays as-is.
+            label = device_name or key.replace("_", " ").title()
+            clusters.append(Cluster(key=key, label=label, sensors=tuple(members)))
     clusters.sort(key=lambda cluster: (-len(cluster.sensors), cluster.key))
     return clusters
 
 
 def collect_sensors(hass: HomeAssistant) -> list[SensorInfo]:
     """Read every sensor's detection-relevant attributes from the state machine."""
-    registry = er.async_get(hass)
+    entities = er.async_get(hass)
+    devices = dr.async_get(hass)
     sensors: list[SensorInfo] = []
     for state in hass.states.async_all("sensor"):
-        entry = registry.async_get(state.entity_id)
+        entry = entities.async_get(state.entity_id)
+        device_id = entry.device_id if entry else None
+        device = devices.async_get(device_id) if device_id else None
         sensors.append(
             SensorInfo(
                 entity_id=state.entity_id,
                 device_class=state.attributes.get("device_class"),
                 unit=state.attributes.get("unit_of_measurement"),
                 state_class=state.attributes.get("state_class"),
-                device_id=entry.device_id if entry else None,
+                device_id=device_id,
+                device_name=(device.name_by_user or device.name) if device else None,
             )
         )
     return sensors
@@ -189,9 +204,11 @@ def classify(cluster: Cluster) -> Detection:
                 },
             )
         )
-    elif ct_sets:
-        [(_name, found)] = ct_sets.items()
-        mapping["grid_power_phase"] = tuple(entity for _, entity in sorted(found))
+    elif "external_ct" in ct_sets:
+        mapping["grid_power_phase"] = tuple(entity for _, entity in sorted(ct_sets["external_ct"]))
+    # A lone internal CT set is deliberately not mapped: CT_CHOICES describes it
+    # as the inverter's own measurement rather than the grid connection, so
+    # assuming it here would contradict the text we show the user.
 
     return Detection(
         mapping=mapping,

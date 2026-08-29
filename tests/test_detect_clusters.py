@@ -57,6 +57,34 @@ def test_a_device_id_groups_sensors_that_share_no_prefix():
     assert len(clusters[0].sensors) == 3
 
 
+def test_a_device_backed_cluster_is_labelled_with_the_device_name():
+    """The plan's done-criterion asks for the inverter by name, not by device_id."""
+    sensors = (
+        SensorInfo(
+            "sensor.alpha_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+        ),
+        SensorInfo(
+            "sensor.beta_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+        ),
+        SensorInfo(
+            "sensor.gamma_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+        ),
+    )
+    clusters = cluster_sensors(sensors)
+    assert len(clusters) == 1
+    assert clusters[0].label == "Deye SUN-12K"
+
+
+def test_a_device_backed_cluster_falls_back_to_the_key_without_a_device_name():
+    sensors = (
+        SensorInfo("sensor.alpha_output", "power", "W", "measurement", device_id="dev1"),
+        SensorInfo("sensor.beta_output", "power", "W", "measurement", device_id="dev1"),
+        SensorInfo("sensor.gamma_output", "power", "W", "measurement", device_id="dev1"),
+    )
+    clusters = cluster_sensors(sensors)
+    assert clusters[0].label == "Dev1"
+
+
 def test_a_group_too_small_to_be_an_inverter_is_dropped():
     sensors = (
         SensorInfo("sensor.lonely_power", "power", "W", "measurement", device_id=None),

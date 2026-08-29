@@ -57,3 +57,10 @@ def test_every_step_that_renders_the_schema_describes_all_of_it():
 def test_rated_power_description_says_where_to_find_the_number():
     description = _step("manual")["data_description"]["rated_power"]
     assert "nameplate" in description.lower()
+
+
+def test_the_duplicated_blocks_stay_identical():
+    """The repetition is forced by the format; drift between copies is not."""
+    manual, init = _step("manual"), _step("init")
+    assert manual["data"] == init["data"]
+    assert manual["data_description"] == init["data_description"]

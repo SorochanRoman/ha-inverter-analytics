@@ -1,6 +1,11 @@
 """Tests for turning a cluster of sensors into a role mapping."""
 
-from custom_components.inverter_analytics.detect import classify, cluster_sensors
+from custom_components.inverter_analytics.detect import (
+    Cluster,
+    SensorInfo,
+    classify,
+    cluster_sensors,
+)
 from tests.fixtures.solarman_entities import SOLARMAN_SENSORS
 
 
@@ -48,6 +53,32 @@ def test_the_two_ct_sets_become_a_question_not_a_guess():
     )
 
 
+def test_a_lone_external_ct_set_is_mapped_to_the_grid():
+    """The external clamp set is described as the grid connection, so it is safe to assume."""
+    sensors = tuple(
+        SensorInfo(f"sensor.inv_external_ct_l{phase}_power", "power", "W", "measurement", None)
+        for phase in (1, 2, 3)
+    )
+    detection = classify(Cluster(key="inv", label="Inv", sensors=sensors))
+    assert detection.mapping["grid_power_phase"] == (
+        "sensor.inv_external_ct_l1_power",
+        "sensor.inv_external_ct_l2_power",
+        "sensor.inv_external_ct_l3_power",
+    )
+    assert detection.ambiguities == ()
+
+
+def test_a_lone_internal_ct_set_is_left_unmapped():
+    """CT_CHOICES describes the internal set as the inverter's own measurement, not the grid."""
+    sensors = tuple(
+        SensorInfo(f"sensor.inv_internal_ct_l{phase}_power", "power", "W", "measurement", None)
+        for phase in (1, 2, 3)
+    )
+    detection = classify(Cluster(key="inv", label="Inv", sensors=sensors))
+    assert "grid_power_phase" not in detection.mapping
+    assert detection.ambiguities == ()
+
+
 def test_sensors_without_a_state_class_are_reported():
     """No state_class means no long-term statistics, so long windows come back empty."""
     detection = classify(_solarman())
@@ -64,8 +95,14 @@ def test_unrecognised_sensors_are_simply_left_out():
     assert "sensor.solarman_inverter_l1_power" not in mapped
 
 
-def test_an_unknown_naming_scheme_yields_an_empty_mapping_rather_than_a_wrong_one():
-    """The second inverter uses a different profile's names."""
+def test_an_unfamiliar_profile_yields_only_the_roles_that_genuinely_match():
+    """The second inverter uses a different naming profile.
+
+    total_energy_bought/sold legitimately match grid_import_total /
+    grid_export_total — those are generic grid-exchange terms, not a
+    vendor-specific abbreviation — so they are expected to map. Nothing
+    else in this profile's vocabulary should be recognised or guessed.
+    """
     deye = next(c for c in cluster_sensors(SOLARMAN_SENSORS) if c.key == "deye12_sun12k")
     detection = classify(deye)
-    assert detection.mapping.get("load_power") is None
+    assert set(detection.mapping) == {"grid_import_total", "grid_export_total"}
