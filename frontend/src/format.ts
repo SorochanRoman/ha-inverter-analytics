@@ -36,6 +36,11 @@ export function formatCoverage(value: number | null, locale: string): string {
 /** Below this, the seconds are shown: rounding them away misstates a short span. */
 const SECONDS_SHOWN_BELOW = 10 * 60;
 
+export function formatEnergy(kwh: number | null, locale: string): string {
+  if (kwh === null || Number.isNaN(kwh)) return DASH;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kwh)} kWh`;
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)} s`;
 

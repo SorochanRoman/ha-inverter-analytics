@@ -6,6 +6,7 @@ import { singleFlight } from "./single-flight";
 import { buildLocation, parseLocation } from "./location";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
+import "./tabs/battery-tab";
 import "./tabs/load-tab";
 
 const BASE_PATH = "/inverter-analytics";
@@ -187,6 +188,16 @@ export class InverterAnalyticsPanel extends LitElement {
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-load-tab>`
+          : nothing}
+        ${this.tab === "battery"
+          ? html`<ia-battery-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-battery-tab>`
+          : nothing}
+        ${this.tab === "load" || this.tab === "battery"
+          ? nothing
           : html`<div class="notice">This tab is not built yet.</div>`}
       </main>
     `;

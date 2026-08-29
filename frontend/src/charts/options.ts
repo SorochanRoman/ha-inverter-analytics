@@ -1,5 +1,5 @@
 import { SERIES, chartBaseOption } from "../theme";
-import type { Imbalance, LoadPayload, PartSummary } from "../types";
+import type { Band, BatteryPayload, Imbalance, LoadPayload, PartSummary } from "../types";
 
 const round = (value: number, digits: number): number =>
   Number(value.toFixed(digits));
@@ -138,6 +138,57 @@ export function partsOption(
         type: "bar",
         data: parts.map((part) => (part.peak === null ? null : round(part.peak, 1))),
         itemStyle: { color: SERIES.muted },
+      },
+    ],
+  };
+}
+
+export function socHistogramOption(payload: BatteryPayload): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  const buckets = payload.histogram.buckets;
+  return {
+    ...base,
+    xAxis: {
+      ...axis,
+      type: "category",
+      data: buckets.map((bucket) => String(round(bucket.start, 0))),
+      name: "% charge",
+      nameLocation: "end",
+    },
+    yAxis: { ...axis, type: "value", name: "% of time" },
+    series: [
+      {
+        type: "bar",
+        data: buckets.map((bucket) => round(bucket.fraction * 100, 2)),
+        // Everything under the configured low mark is the part worth looking
+        // at, coloured as a warning rather than left for the reader to compare
+        // against a number written elsewhere on the page.
+        itemStyle: {
+          color: (params: { dataIndex: number }) =>
+            buckets[params.dataIndex].end <= payload.low_pct ? SERIES.overload : SERIES.battery,
+        },
+        barCategoryGap: "10%",
+      },
+    ],
+  };
+}
+
+export function socBandsOption(bands: Band[]): Record<string, unknown> {
+  // ECharts draws Y-axis categories bottom-up, so the band order is reversed.
+  const { base, axis } = chartBaseOption();
+  const ordered = [...bands].reverse();
+  return {
+    ...base,
+    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
+    yAxis: { ...axis, type: "category", data: ordered.map((band) => band.key) },
+    series: [
+      {
+        type: "bar",
+        data: ordered.map((band) => round(band.fraction * 100, 2)),
+        itemStyle: {
+          color: (params: { dataIndex: number }) =>
+            ordered[params.dataIndex].key === "0-20" ? SERIES.overload : SERIES.battery,
+        },
       },
     ],
   };
