@@ -71,6 +71,7 @@
 - Create: `custom_components/inverter_analytics/__init__.py`
 - Create: `custom_components/inverter_analytics/manifest.json`
 - Create: `custom_components/inverter_analytics/const.py`
+- Create: `custom_components/inverter_analytics/config_flow.py` (заглушка, повністю переписується в Task 3)
 - Create: `hacs.json`, `pyproject.toml`, `requirements_test.txt`, `.gitignore`, `README.md`
 - Create: `tests/conftest.py`
 - Test: `tests/test_init.py`
@@ -91,6 +92,14 @@
 # резолвер pip у багатохвилинний backtracking.
 pytest-homeassistant-custom-component>=0.13.140
 ruff>=0.6.0
+
+# Компоненти frontend і recorder, від яких залежить інтеграція, тягнуть ці
+# пакети у рантаймі. PHACC їх не встановлює, тому в CI вони потрібні явно.
+# home-assistant-frontend лишається без піна: HA пінить точну версію у своєму
+# маніфесті, і дублювання того піна тут дрейфувало б на кожному оновленні HA.
+home-assistant-frontend
+fnv-hash-fast
+psutil-home-assistant
 ```
 
 Перевірене оточення: Python 3.12.9, HA 2025.1.4, pytest 8.3.4, ruff 0.16.5.
@@ -101,13 +110,21 @@ ruff>=0.6.0
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# ruff format переформатовує Python-блоки всередині Markdown. Плани й
+# специфікації в docs/ — це verbatim-джерело брифів для наступних задач,
+# тож форматувальник не має їх торкатися. Стосується format, не check.
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# Кодова база коментується українською; RUF001-003 хибно спрацьовують на
+# кирилицю як на "неоднозначні" символи, плутаючи її з латиницею.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -130,20 +147,15 @@ frontend/dist/
 
 - [ ] **Step 2: Написати падаючий тест**
 
-`tests/conftest.py`:
+`tests/conftest.py` містить лише оголошення плагіна — жодних autouse-фікстур:
 
 ```python
 """Спільні фікстури тестів."""
-import pytest
 
 pytest_plugins = "pytest_homeassistant_custom_component"
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Дозволити завантаження кастомних інтеграцій у всіх тестах."""
-    yield
 ```
+
+Autouse тут неможливий: pytest резолвить autouse-фікстури раніше за явно запитані, тому autouse-обгортка над `enable_custom_integrations` встигає побудувати `hass` до того, як `recorder_mock` отримає чергу, і той падає з `assert not hass_fixture_setup`. Тому кожен тест, що завантажує інтеграцію, запитує обидві фікстури явно, `recorder_mock` першим. Тести чистої математики з Tasks 5-7 і 9 не запитують жодної й не платять ні за recorder, ні за `hass`.
 
 `tests/test_init.py`:
 
@@ -168,7 +180,9 @@ def _entry() -> MockConfigEntry:
     )
 
 
-async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
+async def test_setup_and_unload_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
 
@@ -261,6 +275,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Перезавантажити запис після зміни опцій."""
     await hass.config_entries.async_reload(entry.entry_id)
+```
+
+`custom_components/inverter_analytics/config_flow.py` — заглушка. Home Assistant імпортує платформу `config_flow` під час налаштування будь-якого config entry, ще до виклику `async_setup_entry`, і без цього файлу запис отримує `SETUP_ERROR`. `MockConfigEntry` обходить сам майстер, але не цей імпорт. Повну реалізацію пише Task 3, вона переписує файл цілком.
+
+```python
+"""Майстер налаштування Inverter Analytics.
+
+Заглушка: повна реалізація з маппінгом сенсорів — Task 3.
+"""
+
+from __future__ import annotations
+
+from homeassistant.config_entries import ConfigFlow
+
+from .const import DOMAIN
+
+
+class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Майстер додавання інвертора."""
+
+    VERSION = 1
 ```
 
 - [ ] **Step 5: Запустити тест і переконатися, що він проходить**
@@ -584,7 +619,7 @@ git commit -m "feat: канонічні ролі сенсорів і модел�
 ### Task 3: Майстер налаштування з ручним маппінгом
 
 **Files:**
-- Create: `custom_components/inverter_analytics/config_flow.py`
+- Rewrite: `custom_components/inverter_analytics/config_flow.py` (замінює заглушку з Task 1 повністю)
 - Create: `custom_components/inverter_analytics/translations/en.json`
 - Test: `tests/test_config_flow.py`
 
@@ -637,7 +672,9 @@ def test_unpack_is_the_inverse_of_pack():
     assert unpack(pack(flat)) == flat
 
 
-async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
+async def test_user_flow_creates_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -656,7 +693,9 @@ async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
     assert result["data"]["numbers"] == {"rated_power": 8000.0}
 
 
-async def test_options_flow_overrides_data(hass: HomeAssistant) -> None:
+async def test_options_flow_overrides_data(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Deye",
@@ -959,7 +998,9 @@ def _entry(title: str) -> MockConfigEntry:
     )
 
 
-async def test_panel_registered_on_setup(hass: HomeAssistant) -> None:
+async def test_panel_registered_on_setup(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry("Deye")
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -968,7 +1009,9 @@ async def test_panel_registered_on_setup(hass: HomeAssistant) -> None:
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS]
 
 
-async def test_panel_removed_when_last_entry_unloaded(hass: HomeAssistant) -> None:
+async def test_panel_removed_when_last_entry_unloaded(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry("Deye")
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -980,7 +1023,9 @@ async def test_panel_removed_when_last_entry_unloaded(hass: HomeAssistant) -> No
     assert PANEL_URL_PATH not in hass.data[frontend.DATA_PANELS]
 
 
-async def test_panel_survives_while_another_entry_remains(hass: HomeAssistant) -> None:
+async def test_panel_survives_while_another_entry_remains(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     first, second = _entry("Deye"), _entry("Victron")
     for entry in (first, second):
         entry.add_to_hass(hass)
@@ -2050,7 +2095,9 @@ from custom_components.inverter_analytics.analytics.resample import to_intervals
 from custom_components.inverter_analytics.analytics.source import Window, async_series
 
 
-async def test_async_series_reads_recorded_states(hass: HomeAssistant, recorder_mock) -> None:
+async def test_async_series_reads_recorded_states(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     hass.states.async_set("sensor.load_power", "1000")
     await async_wait_recording_done(hass)
     hass.states.async_set("sensor.load_power", "2000")
@@ -2772,7 +2819,7 @@ def test_clamp_window_shortens_windows_beyond_the_limit():
 
 
 async def test_config_command_lists_entries(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2793,7 +2840,7 @@ async def test_config_command_lists_entries(
 
 
 async def test_load_command_returns_analytics(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2825,7 +2872,7 @@ async def test_load_command_returns_analytics(
 
 
 async def test_load_command_rejects_unknown_entry(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2850,7 +2897,7 @@ async def test_load_command_rejects_unknown_entry(
 
 
 async def test_load_command_rejects_inverted_window(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2875,7 +2922,7 @@ async def test_load_command_rejects_inverted_window(
 
 
 async def test_second_identical_request_is_served_from_cache(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
