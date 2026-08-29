@@ -3775,6 +3775,7 @@ describe("formatDuration", () => {
 
 ```typescript
 import { describe, expect, it } from "vitest";
+import { SERIES } from "../theme";
 import type { LoadPayload } from "../types";
 import { bandsOption, durationCurveOption, histogramOption } from "./options";
 
@@ -3797,8 +3798,10 @@ const payload: LoadPayload = {
     { fraction: 1, value: 0 },
   ],
   bands: [
-    { key: "0-10", from: 0, to: 0.1, seconds: 1800, fraction: 0.5 },
-    { key: "100+", from: 1, to: null, seconds: 1800, fraction: 0.5 },
+    // Частки навмисно різні: за рівних 0.5 твердження про порядок смуг
+    // проходило б і при зламаному реверсі.
+    { key: "0-10", from: 0, to: 0.1, seconds: 900, fraction: 0.25 },
+    { key: "100+", from: 1, to: null, seconds: 2700, fraction: 0.75 },
   ],
   overloads: [],
   precision: "raw",
@@ -3841,7 +3844,14 @@ describe("bandsOption", () => {
   it("keeps band order and converts fractions to percent", () => {
     const option = bandsOption(payload) as any;
     expect(option.yAxis.data).toEqual(["100+", "0-10"]);
-    expect(option.series[0].data).toEqual([50, 50]);
+    expect(option.series[0].data).toEqual([75, 25]);
+  });
+
+  it("paints the overload band in the overload colour", () => {
+    const option = bandsOption(payload) as any;
+    // Після реверсу нульовий індекс — це "100+".
+    expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
+    expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
   });
 });
 ```
@@ -4072,6 +4082,8 @@ export class IaLoadTab extends LitElement {
   @state() private loading = false;
   @state() private mode: "watts" | "percent" = "watts";
 
+  private requestId = 0;
+
   protected willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("entryId") || changed.has("range")) {
       void this.load();
@@ -4080,15 +4092,24 @@ export class IaLoadTab extends LitElement {
 
   private async load(): Promise<void> {
     if (!this.entryId) return;
+    // Кожен запит отримує номер. Поки він летить, користувач міг перемкнути
+    // період — тоді повільніша стара відповідь прийшла б останньою й
+    // перезаписала свіжі дані під заголовком уже іншого періоду.
+    const requestId = ++this.requestId;
     this.loading = true;
     this.error = undefined;
     try {
       const { start, end } = resolveRange(this.range, new Date());
-      this.payload = await fetchLoad(this.hass, this.entryId, start, end);
+      const payload = await fetchLoad(this.hass, this.entryId, start, end);
+      if (requestId !== this.requestId) return;
+      this.payload = payload;
     } catch (err) {
+      if (requestId !== this.requestId) return;
       this.error = String(err);
     } finally {
-      this.loading = false;
+      if (requestId === this.requestId) {
+        this.loading = false;
+      }
     }
   }
 
@@ -4210,7 +4231,7 @@ export class IaLoadTab extends LitElement {
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .warn { color: var(--warning-color, #f0a30a); font-size: 13px; }
+    .warn { color: var(--warning-color); font-size: 13px; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
