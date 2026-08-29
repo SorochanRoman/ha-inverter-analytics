@@ -1403,7 +1403,7 @@ git commit -m "feat: time-weighted інтервали, покриття та с�
 - Consumes: `Interval` з Task 5.
 - Produces:
   - `Bucket` (frozen dataclass: `index: int`, `start: float`, `end: float`, `seconds: float`, `fraction: float`)
-  - `Histogram` (frozen dataclass: `bucket_width: float`, `offset: float`, `seconds: tuple[float, ...]`; властивість `total_seconds -> float`; метод `buckets() -> list[Bucket]`)
+  - `Histogram` (frozen dataclass: `bucket_width: float`, `offset: float`, `seconds: tuple[float, ...]`, `clipped_low_seconds: float = 0.0`, `clipped_high_seconds: float = 0.0`; властивість `total_seconds -> float`; метод `buckets() -> list[Bucket]`)
   - `duration_histogram(intervals, bucket_width, offset=0.0, max_buckets=400) -> Histogram`
   - `percentile(hist: Histogram, q: float) -> float | None` — `q` від 0.0 до 1.0
   - `duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]` — пари «частка часу, значення, що перевищується цю частку часу»
@@ -2478,6 +2478,7 @@ git commit -m "feat: TTL-кеш результатів аналітики"
   "kpi": {"mean": 1240.0, "median": 980.0, "p95": 3100.0, "max": 6800.0,
           "fraction_above_80pct": 0.024, "max_sustained_15m": 4200.0},
   "histogram": {"bucket_width": 200.0,
+                "clipped_low_seconds": 0.0, "clipped_high_seconds": 0.0,
                 "buckets": [{"start": 0.0, "end": 200.0, "seconds": 1200.0, "fraction": 0.05}]},
   "duration_curve": [{"fraction": 0.0, "value": 6800.0}],
   "bands": [{"key": "0-10", "from": 0.0, "to": 0.1, "seconds": 1200.0, "fraction": 0.31}],
@@ -2706,6 +2707,11 @@ def build_load_payload(
         },
         "histogram": {
             "bucket_width": bucket_width,
+            # Час поза діапазоном гістограми втискається в крайні корзини й
+            # підписується їхніми межами. Ці лічильники кажуть, скільки саме
+            # часу підписано неправдиво — UI має це показати, а не мовчати.
+            "clipped_low_seconds": histogram.clipped_low_seconds,
+            "clipped_high_seconds": histogram.clipped_high_seconds,
             "buckets": [
                 {
                     "start": bucket.start,
@@ -3297,7 +3303,12 @@ export interface LoadPayload {
   coverage: number;
   rated_power: number;
   kpi: Kpi;
-  histogram: { bucket_width: number; buckets: HistogramBucket[] };
+  histogram: {
+    bucket_width: number;
+    clipped_low_seconds: number;
+    clipped_high_seconds: number;
+    buckets: HistogramBucket[];
+  };
   duration_curve: { fraction: number; value: number }[];
   bands: Band[];
   overloads: Overload[];
@@ -4139,6 +4150,11 @@ export class IaLoadTab extends LitElement {
           : nothing}
         ${payload.clamped
           ? html`<span class="warn">Період скорочено до максимально дозволеного</span>`
+          : nothing}
+        ${payload.histogram.clipped_low_seconds + payload.histogram.clipped_high_seconds > 0
+          ? html`<span class="warn">
+              Частина значень вийшла за діапазон гістограми й показана в крайніх корзинах
+            </span>`
           : nothing}
         ${this.loading ? html`<span class="warn">Оновлення…</span>` : nothing}
       </div>
