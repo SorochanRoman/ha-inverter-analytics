@@ -32,14 +32,21 @@ def test_pack_drops_empty_fields():
     assert "pv_power" not in packed["entities"]
 
 
-def test_unpack_is_the_inverse_of_pack():
+def test_unpack_restores_entities_numbers_and_set_inversions():
     flat = {
         "load_power": "sensor.load",
+        "battery_power": "sensor.batt",
         "rated_power": 8000.0,
         "invert_battery_power": True,
-        "battery_power": "sensor.batt",
     }
     assert unpack(pack(flat)) == flat
+
+
+def test_pack_drops_unset_inversion_flags():
+    """False дорівнює відсутності: build_schema все одно підставляє False."""
+    packed = pack({"load_power": "sensor.load", "invert_battery_power": False})
+    assert packed["inverted"] == []
+    assert "invert_battery_power" not in unpack(packed)
 
 
 async def test_user_flow_creates_entry(
@@ -70,7 +77,12 @@ async def test_options_flow_overrides_data(
         domain=DOMAIN,
         title="Deye",
         data={
-            "entities": {"load_power": "sensor.old"},
+            # "legacy_role" імітує роль, знята з ROLES у пізнішій версії:
+            # build_schema() будує поля лише з поточних відомих ролей, тож
+            # options flow органічно ніколи не міг би повторно надіслати
+            # це значення — воно не існує ні як дефолт форми, ні в
+            # відправленому user_input.
+            "entities": {"load_power": "sensor.old", "legacy_role": "sensor.retired"},
             "numbers": {"rated_power": 8000.0},
             "inverted": [],
         },
@@ -92,8 +104,15 @@ async def test_options_flow_overrides_data(
     assert entry.options["numbers"] == {"rated_power": 12000.0}
 
     # Контракт EntryConfig: непорожні options повністю перекривають data,
-    # а не зливаються з ними. Перевіряється саме тут, бо options flow —
-    # єдине місце, де ці options з'являються.
+    # а не зливаються з ними. "legacy_role" був у data, але схема форми
+    # не знає такої ролі, тож options ніколи не міг отримати цей ключ.
+    # EntryConfig.from_entry() читає лише entry.options (бо вони непорожні)
+    # і не торкається entry.data — інакше EntryConfig.from_dict() впав би
+    # з KeyError на невідомій ролі "legacy_role" ще до того, як тест
+    # встиг би щось перевірити. Саме відсутність винятку тут і є доказом,
+    # що data не зливається (навіть на рівні вкладеного entities-словника)
+    # в options.
     config = EntryConfig.from_entry(entry)
     assert config.entity_id("load_power") == "sensor.new"
     assert config.number("rated_power") == 12000.0
+    assert "legacy_role" not in config.entities
