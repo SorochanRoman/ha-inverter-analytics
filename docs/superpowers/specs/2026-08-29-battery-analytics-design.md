@@ -54,8 +54,16 @@ reads as "no dips".
 ## 5. Sections
 
 **KPI row.** Mean state of charge; lowest reached; time below the low
-threshold; number of dips; mean depth of discharge; equivalent full cycles per
-day. Each figure that comes from the raw window only is marked as such.
+threshold; number of dips; the mean low point across those dips; equivalent full
+cycles per day. Each figure that comes from the raw window only is marked as
+such.
+
+"Mean depth of discharge" was in an earlier draft and is not here. Measured
+across dip episodes it would have been the threshold minus the minimum — a
+useful number wearing the name of a different one, since every episode starts at
+the threshold by construction. A real depth-of-discharge figure needs discharge
+runs detected from the state of charge itself, which is noise-sensitive work
+this tab does not need.
 
 **Time spent at each state of charge.** A histogram in 5% buckets, and a band
 breakdown (0–20 / 20–40 / 40–60 / 60–80 / 80–100) with the lowest band in the
