@@ -1,0 +1,189 @@
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import { fetchConfig } from "./api";
+import { describeError } from "./format";
+import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
+import type { ConfigResult, HomeAssistant } from "./types";
+import "./tabs/load-tab";
+
+const TABS = [
+  { id: "load", label: "Навантаження" },
+  { id: "battery", label: "Акумулятор" },
+  { id: "seasonal", label: "Сезонність" },
+  { id: "balance", label: "Баланс" },
+] as const;
+
+@customElement("inverter-analytics-panel")
+export class InverterAnalyticsPanel extends LitElement {
+  @property({ attribute: false }) public hass!: HomeAssistant;
+  @property({ type: Boolean }) public narrow = false;
+  @property({ attribute: false }) public route?: { path: string };
+
+  @state() private config?: ConfigResult;
+  @state() private error?: string;
+  @state() private entryId?: string;
+  @state() private tab: string = "load";
+  @state() private range: RangeKey = "30d";
+
+  public connectedCallback(): void {
+    super.connectedCallback();
+    this.readLocation();
+    window.addEventListener("popstate", this.readLocation);
+    if (this.hass) {
+      void this.loadConfig();
+    }
+  }
+
+  public disconnectedCallback(): void {
+    window.removeEventListener("popstate", this.readLocation);
+    super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: Map<string, unknown>): void {
+    // Home Assistant може призначити hass вже після приєднання елемента —
+    // тоді connectedCallback запустив би fetchConfig(undefined). Чекаємо
+    // на перше значення hass і пробуємо ще раз, якщо конфіг ще не
+    // завантажено (і попередня спроба не завершилась помилкою, яку
+    // користувач може повторити кнопкою).
+    if (changed.has("hass") && this.hass && !this.config && !this.error) {
+      void this.loadConfig();
+    }
+  }
+
+  private readLocation = (): void => {
+    const path = window.location.pathname.split("/").filter(Boolean);
+    const tab = path[1];
+    if (tab && TABS.some((item) => item.id === tab)) {
+      this.tab = tab;
+    }
+    const range = new URLSearchParams(window.location.search).get("range");
+    if (range && (RANGE_KEYS as readonly string[]).includes(range)) {
+      this.range = range as RangeKey;
+    }
+  };
+
+  private writeLocation(): void {
+    const url = `/inverter-analytics/${this.tab}?range=${this.range}`;
+    window.history.replaceState(null, "", url);
+  }
+
+  private async loadConfig(): Promise<void> {
+    try {
+      this.config = await fetchConfig(this.hass);
+      this.entryId ??= this.config.entries[0]?.entry_id;
+    } catch (err) {
+      this.error = describeError(err);
+    }
+  }
+
+  private selectTab(tab: string): void {
+    this.tab = tab;
+    this.writeLocation();
+  }
+
+  private selectRange(range: RangeKey): void {
+    this.range = range;
+    this.writeLocation();
+  }
+
+  protected render() {
+    if (this.error) {
+      return html`<div class="notice">
+        Не вдалося завантажити конфігурацію: ${this.error}
+        <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
+          Спробувати ще
+        </button>
+      </div>`;
+    }
+    if (!this.config) {
+      return html`<div class="notice">Завантаження…</div>`;
+    }
+    if (!this.config.entries.length) {
+      return html`<div class="notice">
+        Жодного інвертора не налаштовано. Додайте інтеграцію Inverter Analytics у налаштуваннях.
+      </div>`;
+    }
+
+    return html`
+      <div class="header">
+        <h1>Аналітика інвертора</h1>
+        ${this.config.entries.length > 1
+          ? html`<select @change=${(event: Event) => {
+              this.entryId = (event.target as HTMLSelectElement).value;
+            }}>
+              ${this.config.entries.map(
+                (entry) => html`<option value=${entry.entry_id}>${entry.title}</option>`,
+              )}
+            </select>`
+          : nothing}
+        <div class="ranges">
+          ${RANGE_KEYS.map(
+            (key) => html`<button
+              class=${key === this.range ? "active" : ""}
+              @click=${() => this.selectRange(key)}
+            >${RANGE_LABELS[key]}</button>`,
+          )}
+        </div>
+      </div>
+
+      <nav class="tabs">
+        ${TABS.map(
+          (item) => html`<button
+            class=${item.id === this.tab ? "active" : ""}
+            @click=${() => this.selectTab(item.id)}
+          >${item.label}</button>`,
+        )}
+      </nav>
+
+      <main>
+        ${this.tab === "load"
+          ? html`<ia-load-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-load-tab>`
+          : html`<div class="notice">Ця вкладка з'явиться в наступних версіях.</div>`}
+      </main>
+    `;
+  }
+
+  static styles = css`
+    :host {
+      display: block;
+      padding: 16px;
+      background: var(--primary-background-color);
+      color: var(--primary-text-color);
+      min-height: 100%;
+      box-sizing: border-box;
+    }
+    .header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    h1 { font-size: 20px; margin: 0; font-weight: 500; }
+    .ranges { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+    button {
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      border: 1px solid var(--divider-color);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.active { border-color: var(--primary-color); color: var(--primary-color); }
+    .tabs { display: flex; gap: 4px; margin: 16px 0; flex-wrap: wrap; }
+    .notice { padding: 24px; color: var(--secondary-text-color); }
+    select {
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      border: 1px solid var(--divider-color);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font: inherit;
+    }
+  `;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "inverter-analytics-panel": InverterAnalyticsPanel;
+  }
+}

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Перевіряє маніфест інтеграції — це властивість коду, тож ганяємо на всьому.
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  # HACS перевіряє метадані самого репозиторію — ліцензію, опис, теми — а
+  # GitHub віддає їх лише з дефолтної гілки. На гілці ці перевірки нічого не
+  # міряють: ліцензію, покладену в гілку, GitHub не побачить, доки її не злито
+  # в main, тож червоний результат там неминучий і неінформативний.
+  hacs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # brands вимагає іконки в репозиторії home-assistant/brands. Це умова
+          # потрапляння в дефолтний каталог HACS, а не встановлення через
+          # Custom repositories. Знімати, коли подамо іконку в brands.
+          ignore: brands
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements_test.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build

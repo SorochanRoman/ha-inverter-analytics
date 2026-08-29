@@ -71,6 +71,7 @@
 - Create: `custom_components/inverter_analytics/__init__.py`
 - Create: `custom_components/inverter_analytics/manifest.json`
 - Create: `custom_components/inverter_analytics/const.py`
+- Create: `custom_components/inverter_analytics/config_flow.py` (заглушка, повністю переписується в Task 3)
 - Create: `hacs.json`, `pyproject.toml`, `requirements_test.txt`, `.gitignore`, `README.md`
 - Create: `tests/conftest.py`
 - Test: `tests/test_init.py`
@@ -85,12 +86,23 @@
 `requirements_test.txt`:
 
 ```
-homeassistant>=2024.11.0
+# pytest-homeassistant-custom-component сам пінить точну сумісну версію
+# homeassistant і тягне pytest та pytest-asyncio. Не додавай сюди окремий
+# рядок homeassistant: два джерела правди про версію HA відправляють
+# резолвер pip у багатохвилинний backtracking.
 pytest-homeassistant-custom-component>=0.13.140
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
 ruff>=0.6.0
+
+# Компоненти frontend і recorder, від яких залежить інтеграція, тягнуть ці
+# пакети у рантаймі. PHACC їх не встановлює, тому в CI вони потрібні явно.
+# home-assistant-frontend лишається без піна: HA пінить точну версію у своєму
+# маніфесті, і дублювання того піна тут дрейфувало б на кожному оновленні HA.
+home-assistant-frontend
+fnv-hash-fast
+psutil-home-assistant
 ```
+
+Перевірене оточення: Python 3.12.9, HA 2025.1.4, pytest 8.3.4, ruff 0.16.5.
 
 `pyproject.toml`:
 
@@ -98,13 +110,21 @@ ruff>=0.6.0
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# ruff format переформатовує Python-блоки всередині Markdown. Плани й
+# специфікації в docs/ — це verbatim-джерело брифів для наступних задач,
+# тож форматувальник не має їх торкатися. Стосується format, не check.
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# Кодова база коментується українською; RUF001-003 хибно спрацьовують на
+# кирилицю як на "неоднозначні" символи, плутаючи її з латиницею.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -127,20 +147,15 @@ frontend/dist/
 
 - [ ] **Step 2: Написати падаючий тест**
 
-`tests/conftest.py`:
+`tests/conftest.py` містить лише оголошення плагіна — жодних autouse-фікстур:
 
 ```python
 """Спільні фікстури тестів."""
-import pytest
 
 pytest_plugins = "pytest_homeassistant_custom_component"
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Дозволити завантаження кастомних інтеграцій у всіх тестах."""
-    yield
 ```
+
+Autouse тут неможливий: pytest резолвить autouse-фікстури раніше за явно запитані, тому autouse-обгортка над `enable_custom_integrations` встигає побудувати `hass` до того, як `recorder_mock` отримає чергу, і той падає з `assert not hass_fixture_setup`. Тому кожен тест, що завантажує інтеграцію, запитує обидві фікстури явно, `recorder_mock` першим. Тести чистої математики з Tasks 5-7 і 9 не запитують жодної й не платять ні за recorder, ні за `hass`.
 
 `tests/test_init.py`:
 
@@ -165,7 +180,9 @@ def _entry() -> MockConfigEntry:
     )
 
 
-async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
+async def test_setup_and_unload_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
 
@@ -258,6 +275,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Перезавантажити запис після зміни опцій."""
     await hass.config_entries.async_reload(entry.entry_id)
+```
+
+`custom_components/inverter_analytics/config_flow.py` — заглушка. Home Assistant імпортує платформу `config_flow` під час налаштування будь-якого config entry, ще до виклику `async_setup_entry`, і без цього файлу запис отримує `SETUP_ERROR`. `MockConfigEntry` обходить сам майстер, але не цей імпорт. Повну реалізацію пише Task 3, вона переписує файл цілком.
+
+```python
+"""Майстер налаштування Inverter Analytics.
+
+Заглушка: повна реалізація з маппінгом сенсорів — Task 3.
+"""
+
+from __future__ import annotations
+
+from homeassistant.config_entries import ConfigFlow
+
+from .const import DOMAIN
+
+
+class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Майстер додавання інвертора."""
+
+    VERSION = 1
 ```
 
 - [ ] **Step 5: Запустити тест і переконатися, що він проходить**
@@ -581,7 +619,7 @@ git commit -m "feat: канонічні ролі сенсорів і модел�
 ### Task 3: Майстер налаштування з ручним маппінгом
 
 **Files:**
-- Create: `custom_components/inverter_analytics/config_flow.py`
+- Rewrite: `custom_components/inverter_analytics/config_flow.py` (замінює заглушку з Task 1 повністю)
 - Create: `custom_components/inverter_analytics/translations/en.json`
 - Test: `tests/test_config_flow.py`
 
@@ -604,6 +642,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.inverter_analytics.config_flow import pack, unpack
 from custom_components.inverter_analytics.const import DOMAIN
+from custom_components.inverter_analytics.roles import EntryConfig
 
 
 def test_pack_splits_flat_form_into_entities_numbers_and_inverted():
@@ -634,7 +673,9 @@ def test_unpack_is_the_inverse_of_pack():
     assert unpack(pack(flat)) == flat
 
 
-async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
+async def test_user_flow_creates_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -653,7 +694,9 @@ async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
     assert result["data"]["numbers"] == {"rated_power": 8000.0}
 
 
-async def test_options_flow_overrides_data(hass: HomeAssistant) -> None:
+async def test_options_flow_overrides_data(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Deye",
@@ -675,6 +718,13 @@ async def test_options_flow_overrides_data(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["entities"] == {"load_power": "sensor.new"}
     assert entry.options["numbers"] == {"rated_power": 12000.0}
+
+    # Контракт EntryConfig: непорожні options повністю перекривають data,
+    # а не зливаються з ними. Перевіряється саме тут, бо options flow —
+    # єдине місце, де ці options з'являються.
+    config = EntryConfig.from_entry(entry)
+    assert config.entity_id("load_power") == "sensor.new"
+    assert config.number("rated_power") == 12000.0
 ```
 
 - [ ] **Step 2: Запустити тест і переконатися, що він падає**
@@ -956,7 +1006,9 @@ def _entry(title: str) -> MockConfigEntry:
     )
 
 
-async def test_panel_registered_on_setup(hass: HomeAssistant) -> None:
+async def test_panel_registered_on_setup(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry("Deye")
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -965,7 +1017,9 @@ async def test_panel_registered_on_setup(hass: HomeAssistant) -> None:
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS]
 
 
-async def test_panel_removed_when_last_entry_unloaded(hass: HomeAssistant) -> None:
+async def test_panel_removed_when_last_entry_unloaded(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     entry = _entry("Deye")
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -977,7 +1031,9 @@ async def test_panel_removed_when_last_entry_unloaded(hass: HomeAssistant) -> No
     assert PANEL_URL_PATH not in hass.data[frontend.DATA_PANELS]
 
 
-async def test_panel_survives_while_another_entry_remains(hass: HomeAssistant) -> None:
+async def test_panel_survives_while_another_entry_remains(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     first, second = _entry("Deye"), _entry("Victron")
     for entry in (first, second):
         entry.add_to_hass(hass)
@@ -990,7 +1046,7 @@ async def test_panel_survives_while_another_entry_remains(hass: HomeAssistant) -
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS]
 ```
 
-Третій тест ловить найімовірнішу помилку: зняття панелі при вивантаженні будь-якого запису, а не останнього. Повторна реєстрація статичного шляху в aiohttp кидає помилку, тому ідемпотентність тут не косметична.
+Третій тест ловить найімовірнішу помилку: зняття панелі при вивантаженні будь-якого запису, а не останнього. Ідемпотентність реєстрації статичного шляху потрібна тому, що HA піднімає всі config entries домену конкурентно через `asyncio.gather`, і без прапорця кожен запис додавав би до роутера дублікат ресурсу. Перевірено емпірично на HA 2025.1.4: повторна реєстрація там не кидає винятку, тож охоронець — це гігієна, а не запобігання падінню.
 
 - [ ] **Step 4: Запустити тести і переконатися, що вони падають**
 
@@ -1197,7 +1253,8 @@ def test_unavailable_states_are_excluded_and_reduce_coverage():
 def test_single_sample_covers_the_whole_window():
     series = hour_series(Sample(at(0), 42.0))
     intervals = to_intervals(series)
-    assert intervals == [intervals[0]]
+    assert len(intervals) == 1
+    assert intervals[0].value == 42.0
     assert intervals[0].seconds == 3600.0
     assert coverage(series) == 1.0
 
@@ -1346,7 +1403,7 @@ git commit -m "feat: time-weighted інтервали, покриття та с�
 - Consumes: `Interval` з Task 5.
 - Produces:
   - `Bucket` (frozen dataclass: `index: int`, `start: float`, `end: float`, `seconds: float`, `fraction: float`)
-  - `Histogram` (frozen dataclass: `bucket_width: float`, `offset: float`, `seconds: tuple[float, ...]`; властивість `total_seconds -> float`; метод `buckets() -> list[Bucket]`)
+  - `Histogram` (frozen dataclass: `bucket_width: float`, `offset: float`, `seconds: tuple[float, ...]`, `clipped_low_seconds: float = 0.0`, `clipped_high_seconds: float = 0.0`; властивість `total_seconds -> float`; метод `buckets() -> list[Bucket]`)
   - `duration_histogram(intervals, bucket_width, offset=0.0, max_buckets=400) -> Histogram`
   - `percentile(hist: Histogram, q: float) -> float | None` — `q` від 0.0 до 1.0
   - `duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]` — пари «частка часу, значення, що перевищується цю частку часу»
@@ -1914,7 +1971,7 @@ git commit -m "feat: епізоди, стійке навантаження та 
 - Produces:
   - `Precision` (StrEnum: `RAW = "raw"`, `LTS = "lts"`, `MIXED = "mixed"`)
   - `Window` (frozen dataclass: `start: datetime`, `end: datetime`; властивість `seconds -> float`)
-  - `PrecisionPlan` (frozen dataclass: `precision: Precision`, `boundary: datetime | None`)
+  - `PrecisionPlan` (frozen dataclass: `precision: Precision`, `boundary: datetime | None` — заповнена лише для `MIXED`)
   - `raw_available_from(hass) -> datetime`
   - `plan_precision(hass, window: Window) -> PrecisionPlan`
   - `states_to_samples(states: Iterable[State], sign: float) -> list[Sample]`
@@ -1968,6 +2025,8 @@ def test_raw_available_from_follows_recorder_keep_days(hass: HomeAssistant, reco
 def test_recent_window_uses_raw_states(hass: HomeAssistant, recorder_keep_days):
     plan = plan_precision(hass, Window(NOW - timedelta(days=3), NOW))
     assert plan.precision is Precision.RAW
+    # Межа існує лише для змішаних вікон; однорідне вікно її не має.
+    assert plan.boundary is None
 
 
 @freeze_time(NOW)
@@ -2046,7 +2105,9 @@ from custom_components.inverter_analytics.analytics.resample import to_intervals
 from custom_components.inverter_analytics.analytics.source import Window, async_series
 
 
-async def test_async_series_reads_recorded_states(hass: HomeAssistant, recorder_mock) -> None:
+async def test_async_series_reads_recorded_states(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
     hass.states.async_set("sensor.load_power", "1000")
     await async_wait_recording_done(hass)
     hass.states.async_set("sensor.load_power", "2000")
@@ -2127,7 +2188,10 @@ def plan_precision(hass: HomeAssistant, window: Window) -> PrecisionPlan:
     """Обрати джерело даних для вікна."""
     boundary = raw_available_from(hass)
     if window.start >= boundary:
-        return PrecisionPlan(Precision.RAW, window.start)
+        # boundary має сенс лише для змішаного вікна: це мить, де читач
+        # переходить із погодинних середніх на сирі стани. Для однорідних
+        # вікон межі немає, і UI не має малювати позначку.
+        return PrecisionPlan(Precision.RAW, None)
     if window.end <= boundary:
         return PrecisionPlan(Precision.LTS, None)
     return PrecisionPlan(Precision.MIXED, boundary)
@@ -2418,7 +2482,9 @@ git commit -m "feat: TTL-кеш результатів аналітики"
   "rated_power": 8000.0,
   "kpi": {"mean": 1240.0, "median": 980.0, "p95": 3100.0, "max": 6800.0,
           "fraction_above_80pct": 0.024, "max_sustained_15m": 4200.0},
+  // всі поля kpi нульовані на порожній серії: number | null
   "histogram": {"bucket_width": 200.0,
+                "clipped_low_seconds": 0.0, "clipped_high_seconds": 0.0,
                 "buckets": [{"start": 0.0, "end": 200.0, "seconds": 1200.0, "fraction": 0.05}]},
   "duration_curve": [{"fraction": 0.0, "value": 6800.0}],
   "bands": [{"key": "0-10", "from": 0.0, "to": 0.1, "seconds": 1200.0, "fraction": 0.31}],
@@ -2615,8 +2681,12 @@ def build_load_payload(
     histogram = duration_histogram(intervals, bucket_width=bucket_width)
 
     bands = []
-    for key, low_share, high_share in BANDS:
-        low = low_share * rated_power
+    for index, (key, low_share, high_share) in enumerate(BANDS):
+        # Найнижча смуга ловить і від'ємні значення — так само, як гістограма
+        # втискає їх у нульову корзину. Інакше вони зникають із чисельників,
+        # лишаючись у знаменнику, і частки перестають давати одиницю.
+        # Скільки часу було нижче нуля, показує histogram.clipped_low_seconds.
+        low = float("-inf") if index == 0 else low_share * rated_power
         high = None if high_share is None else high_share * rated_power
         seconds = _seconds_between(intervals, low, high)
         bands.append(
@@ -2642,11 +2712,18 @@ def build_load_payload(
             "median": percentile(histogram, 0.5),
             "p95": percentile(histogram, 0.95),
             "max": max((interval.value for interval in intervals), default=None),
-            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else 0.0,
+            # None, а не 0.0: на порожній серії «0% часу вище 80%» — це
+            # впевнене твердження про період, про який нічого не відомо.
+            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else None,
             "max_sustained_15m": max_sustained_mean(intervals, SUSTAINED_WINDOW_SECONDS),
         },
         "histogram": {
             "bucket_width": bucket_width,
+            # Час поза діапазоном гістограми втискається в крайні корзини й
+            # підписується їхніми межами. Ці лічильники кажуть, скільки саме
+            # часу підписано неправдиво — UI має це показати, а не мовчати.
+            "clipped_low_seconds": histogram.clipped_low_seconds,
+            "clipped_high_seconds": histogram.clipped_high_seconds,
             "buckets": [
                 {
                     "start": bucket.start,
@@ -2768,7 +2845,7 @@ def test_clamp_window_shortens_windows_beyond_the_limit():
 
 
 async def test_config_command_lists_entries(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2789,7 +2866,7 @@ async def test_config_command_lists_entries(
 
 
 async def test_load_command_returns_analytics(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2821,7 +2898,7 @@ async def test_load_command_returns_analytics(
 
 
 async def test_load_command_rejects_unknown_entry(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2846,7 +2923,7 @@ async def test_load_command_rejects_unknown_entry(
 
 
 async def test_load_command_rejects_inverted_window(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -2871,7 +2948,7 @@ async def test_load_command_rejects_inverted_window(
 
 
 async def test_second_identical_request_is_served_from_cache(
-    hass: HomeAssistant, hass_ws_client, recorder_mock
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
     entry = _entry()
     entry.add_to_hass(hass)
@@ -3076,6 +3153,7 @@ git commit -m "feat: WebSocket API для конфігурації та анал
 **Files:**
 - Create: `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`
 - Create: `frontend/src/types.ts`, `frontend/src/api.ts`, `frontend/src/range.ts`, `frontend/src/theme.ts`, `frontend/src/panel.ts`
+- Create: `frontend/src/tabs/load-tab.ts` (заглушка, повністю переписується в Task 13)
 - Create: `frontend/src/range.test.ts`
 - Modify: `.github/workflows/ci.yml`
 - Modify: `custom_components/inverter_analytics/frontend/dist/inverter-analytics-panel.js` (перезаписується збіркою)
@@ -3207,7 +3285,7 @@ export interface Kpi {
   median: number | null;
   p95: number | null;
   max: number | null;
-  fraction_above_80pct: number;
+  fraction_above_80pct: number | null;
   max_sustained_15m: number | null;
 }
 
@@ -3237,7 +3315,12 @@ export interface LoadPayload {
   coverage: number;
   rated_power: number;
   kpi: Kpi;
-  histogram: { bucket_width: number; buckets: HistogramBucket[] };
+  histogram: {
+    bucket_width: number;
+    clipped_low_seconds: number;
+    clipped_high_seconds: number;
+    buckets: HistogramBucket[];
+  };
   duration_curve: { fraction: number; value: number }[];
   bands: Band[];
   overloads: Overload[];
@@ -3554,9 +3637,46 @@ declare global {
 }
 ```
 
-Файл імпортує `./tabs/load-tab`, який створюється в Task 13 — до нього збірка не пройде. Це навмисно: Task 12 і Task 13 разом дають першу робочу вкладку, а розділені вони тому, що каркас із роутингом і аналітичні графіки перевіряються різними тестами.
+- [ ] **Step 7: Створити тимчасову заглушку вкладки**
 
-- [ ] **Step 7: Додати збірку фронтенду в CI**
+`panel.ts` імпортує `./tabs/load-tab`, справжня реалізація якого — Task 13. Щоб Task 12 залишався незалежно зібраним і перевіреним, створити заглушку, яку Task 13 повністю перепише.
+
+`frontend/src/tabs/load-tab.ts`:
+
+```typescript
+import { LitElement, css, html } from "lit";
+import { customElement, property } from "lit/decorators.js";
+import type { HomeAssistant } from "../types";
+import type { RangeKey } from "../range";
+
+/** Заглушка: повна реалізація вкладки — Task 13. */
+@customElement("ia-load-tab")
+export class IaLoadTab extends LitElement {
+  @property({ attribute: false }) public hass!: HomeAssistant;
+  @property({ type: String }) public entryId?: string;
+  @property({ type: String }) public range: RangeKey = "30d";
+
+  protected render() {
+    return html`<div class="notice">
+      Вкладка «Навантаження»: період ${this.range}, інвертор ${this.entryId ?? "—"}.
+    </div>`;
+  }
+
+  static styles = css`
+    .notice { padding: 24px; color: var(--secondary-text-color); }
+  `;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ia-load-tab": IaLoadTab;
+  }
+}
+```
+
+Після цього `npm run typecheck && npm run test && npm run build` мають бути зеленими, а панель у живому Home Assistant — відкриватися з робочими вкладками й перемиканням періодів.
+
+- [ ] **Step 8: Додати збірку фронтенду в CI**
 
 Дописати в `.github/workflows/ci.yml` нову джобу:
 
@@ -3577,7 +3697,7 @@ declare global {
       - run: npm run build
 ```
 
-- [ ] **Step 8: Коміт**
+- [ ] **Step 9: Коміт**
 
 ```bash
 git add frontend .github/workflows/ci.yml
@@ -3592,7 +3712,7 @@ git commit -m "feat: каркас фронтенду — збірка, шапк�
 - Create: `frontend/src/format.ts`, `frontend/src/format.test.ts`
 - Create: `frontend/src/charts/options.ts`, `frontend/src/charts/options.test.ts`
 - Create: `frontend/src/charts/echart.ts`
-- Create: `frontend/src/tabs/load-tab.ts`
+- Rewrite: `frontend/src/tabs/load-tab.ts` (замінює заглушку з Task 12 повністю)
 
 **Interfaces:**
 - Consumes: `types.LoadPayload`, `api.fetchLoad`, `range.resolveRange`, `theme.SERIES`, `theme.chartBaseOption`.
@@ -3655,6 +3775,7 @@ describe("formatDuration", () => {
 
 ```typescript
 import { describe, expect, it } from "vitest";
+import { SERIES } from "../theme";
 import type { LoadPayload } from "../types";
 import { bandsOption, durationCurveOption, histogramOption } from "./options";
 
@@ -3677,8 +3798,10 @@ const payload: LoadPayload = {
     { fraction: 1, value: 0 },
   ],
   bands: [
-    { key: "0-10", from: 0, to: 0.1, seconds: 1800, fraction: 0.5 },
-    { key: "100+", from: 1, to: null, seconds: 1800, fraction: 0.5 },
+    // Частки навмисно різні: за рівних 0.5 твердження про порядок смуг
+    // проходило б і при зламаному реверсі.
+    { key: "0-10", from: 0, to: 0.1, seconds: 900, fraction: 0.25 },
+    { key: "100+", from: 1, to: null, seconds: 2700, fraction: 0.75 },
   ],
   overloads: [],
   precision: "raw",
@@ -3721,7 +3844,14 @@ describe("bandsOption", () => {
   it("keeps band order and converts fractions to percent", () => {
     const option = bandsOption(payload) as any;
     expect(option.yAxis.data).toEqual(["100+", "0-10"]);
-    expect(option.series[0].data).toEqual([50, 50]);
+    expect(option.series[0].data).toEqual([75, 25]);
+  });
+
+  it("paints the overload band in the overload colour", () => {
+    const option = bandsOption(payload) as any;
+    // Після реверсу нульовий індекс — це "100+".
+    expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
+    expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
   });
 });
 ```
@@ -3921,7 +4051,7 @@ declare global {
 }
 ```
 
-- [ ] **Step 7: Реалізувати вкладку**
+- [ ] **Step 7: Замінити заглушку вкладки повною реалізацією**
 
 `frontend/src/tabs/load-tab.ts`:
 
@@ -3952,6 +4082,8 @@ export class IaLoadTab extends LitElement {
   @state() private loading = false;
   @state() private mode: "watts" | "percent" = "watts";
 
+  private requestId = 0;
+
   protected willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("entryId") || changed.has("range")) {
       void this.load();
@@ -3960,15 +4092,24 @@ export class IaLoadTab extends LitElement {
 
   private async load(): Promise<void> {
     if (!this.entryId) return;
+    // Кожен запит отримує номер. Поки він летить, користувач міг перемкнути
+    // період — тоді повільніша стара відповідь прийшла б останньою й
+    // перезаписала свіжі дані під заголовком уже іншого періоду.
+    const requestId = ++this.requestId;
     this.loading = true;
     this.error = undefined;
     try {
       const { start, end } = resolveRange(this.range, new Date());
-      this.payload = await fetchLoad(this.hass, this.entryId, start, end);
+      const payload = await fetchLoad(this.hass, this.entryId, start, end);
+      if (requestId !== this.requestId) return;
+      this.payload = payload;
     } catch (err) {
+      if (requestId !== this.requestId) return;
       this.error = String(err);
     } finally {
-      this.loading = false;
+      if (requestId === this.requestId) {
+        this.loading = false;
+      }
     }
   }
 
@@ -4043,6 +4184,11 @@ export class IaLoadTab extends LitElement {
         ${payload.clamped
           ? html`<span class="warn">Період скорочено до максимально дозволеного</span>`
           : nothing}
+        ${payload.histogram.clipped_low_seconds + payload.histogram.clipped_high_seconds > 0
+          ? html`<span class="warn">
+              Частина значень вийшла за діапазон гістограми й показана в крайніх корзинах
+            </span>`
+          : nothing}
         ${this.loading ? html`<span class="warn">Оновлення…</span>` : nothing}
       </div>
 
@@ -4085,7 +4231,7 @@ export class IaLoadTab extends LitElement {
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .warn { color: var(--warning-color, #f0a30a); font-size: 13px; }
+    .warn { color: var(--warning-color); font-size: 13px; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
