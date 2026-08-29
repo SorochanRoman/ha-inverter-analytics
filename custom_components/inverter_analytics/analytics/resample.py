@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from bisect import bisect_right
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, tzinfo
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,3 +213,164 @@ def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, floa
         if value is not None:
             result.append((fraction, value))
     return result
+
+
+@dataclass(frozen=True, slots=True)
+class Episode:
+    """Суцільний проміжок, протягом якого виконувалась умова."""
+
+    start: datetime
+    end: datetime
+    seconds: float
+    extreme: float
+    mean: float
+
+
+def _contiguous_runs(intervals: Sequence[Interval]) -> Iterator[list[Interval]]:
+    """Розбити інтервали на серії без розривів у часі."""
+    run: list[Interval] = []
+    for interval in intervals:
+        if run and interval.start != run[-1].end:
+            yield run
+            run = []
+        run.append(interval)
+    if run:
+        yield run
+
+
+def _matching_runs(
+    intervals: Sequence[Interval], predicate: Callable[[float], bool]
+) -> Iterator[list[Interval]]:
+    """Серії суміжних інтервалів, що задовольняють умову."""
+    run: list[Interval] = []
+    for interval in intervals:
+        if not predicate(interval.value):
+            if run:
+                yield run
+                run = []
+            continue
+        if run and interval.start != run[-1].end:
+            yield run
+            run = []
+        run.append(interval)
+    if run:
+        yield run
+
+
+def _to_episode(run: Sequence[Interval], extreme: Callable[[Iterable[float]], float]) -> Episode:
+    """Згорнути серію інтервалів в один епізод."""
+    seconds = sum(interval.seconds for interval in run)
+    weighted = sum(interval.value * interval.seconds for interval in run)
+    return Episode(
+        start=run[0].start,
+        end=run[-1].end,
+        seconds=seconds,
+        extreme=extreme(interval.value for interval in run),
+        mean=weighted / seconds,
+    )
+
+
+def _episodes(
+    intervals: Sequence[Interval],
+    predicate: Callable[[float], bool],
+    extreme: Callable[[Iterable[float]], float],
+    min_seconds: float,
+) -> list[Episode]:
+    episodes: list[Episode] = []
+    for run in _matching_runs(intervals, predicate):
+        episode = _to_episode(run, extreme)
+        if episode.seconds >= min_seconds:
+            episodes.append(episode)
+    return episodes
+
+
+def episodes_above(
+    intervals: Sequence[Interval], threshold: float, min_seconds: float = 0.0
+) -> list[Episode]:
+    """Епізоди перевищення порогу; extreme — досягнутий максимум."""
+    return _episodes(intervals, lambda value: value > threshold, max, min_seconds)
+
+
+def episodes_below(
+    intervals: Sequence[Interval], threshold: float, min_seconds: float = 0.0
+) -> list[Episode]:
+    """Епізоди падіння нижче порогу; extreme — досягнутий мінімум."""
+    return _episodes(intervals, lambda value: value < threshold, min, min_seconds)
+
+
+def _max_window_mean(run: Sequence[Interval], window_seconds: float) -> float | None:
+    """Максимальне ковзне середнє всередині однієї суцільної серії."""
+    times: list[float] = [0.0]
+    energy: list[float] = [0.0]
+    for interval in run:
+        times.append(times[-1] + interval.seconds)
+        energy.append(energy[-1] + interval.value * interval.seconds)
+
+    total = times[-1]
+    if total < window_seconds:
+        return None
+
+    def energy_at(moment: float) -> float:
+        if moment <= 0.0:
+            return 0.0
+        if moment >= total:
+            return energy[-1]
+        index = bisect_right(times, moment) - 1
+        span = times[index + 1] - times[index]
+        share = (moment - times[index]) / span
+        return energy[index] + share * (energy[index + 1] - energy[index])
+
+    # Максимум ковзного середнього досягається на точці зламу або за вікно до неї.
+    candidates = {0.0}
+    for moment in times:
+        if moment + window_seconds <= total:
+            candidates.add(moment)
+        if moment - window_seconds >= 0.0:
+            candidates.add(moment - window_seconds)
+
+    return max(
+        (energy_at(moment + window_seconds) - energy_at(moment)) / window_seconds
+        for moment in candidates
+    )
+
+
+def max_sustained_mean(intervals: Sequence[Interval], window_seconds: float) -> float | None:
+    """Найбільше середнє за будь-яке вікно заданої довжини.
+
+    Вікна, що перетинають розрив у даних, не розглядаються.
+    """
+    if window_seconds <= 0:
+        raise ValueError("window_seconds має бути додатним")
+
+    best: float | None = None
+    for run in _contiguous_runs(intervals):
+        value = _max_window_mean(run, window_seconds)
+        if value is not None and (best is None or value > best):
+            best = value
+    return best
+
+
+def hour_of_day_durations(intervals: Sequence[Interval], tz: tzinfo) -> list[float]:
+    """Тривалість по годинах доби в локальній зоні, рівно 24 елементи.
+
+    Арифметика виконується в UTC, а локальна зона використовується лише для
+    визначення номера години. Тому переходи на літній час не створюють і не
+    втрачають секунд: сума завжди дорівнює довжині вхідних інтервалів.
+    """
+    totals = [0.0] * 24
+
+    for interval in intervals:
+        cursor = interval.start
+        while cursor < interval.end:
+            local = cursor.astimezone(tz)
+            hour_start = cursor - timedelta(
+                minutes=local.minute, seconds=local.second, microseconds=local.microsecond
+            )
+            boundary = hour_start + timedelta(hours=1)
+            if boundary <= cursor:
+                boundary = cursor + timedelta(hours=1)
+            step_end = min(boundary, interval.end)
+            totals[local.hour] += (step_end - cursor).total_seconds()
+            cursor = step_end
+
+    return totals
