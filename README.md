@@ -59,7 +59,20 @@ what is deliberately missing and what remains unverified.
 ## Installing through HACS
 
 1. Open HACS → **Integrations** → the three-dot menu → **Custom repositories**.
-2. Add this repository's URL with the **Integration** category.
+2. Add this repository's URL and pick **Integration** as the category.
+
+   Not *Lovelace* / *Plugin*. Those expect a JavaScript file in the repository
+   root, a `dist/` directory, or a release asset, and this repository has none
+   of those by design — its frontend bundle ships inside
+   `custom_components/inverter_analytics/frontend/dist/` and is installed with
+   the integration. Choosing the wrong category fails with:
+
+   ```
+   Repository structure for main is not compliant
+   ```
+
+   If you see that, remove the custom repository and add it again as an
+   Integration.
 3. Find "Inverter Analytics" in the HACS integration list and install it.
 4. Restart Home Assistant.
 5. Add the integration from **Settings → Devices & Services → Add Integration**
