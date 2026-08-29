@@ -1044,7 +1044,10 @@ Replace `async_step_user` in `InverterAnalyticsConfigFlow` and add the two new s
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show what was detected, ask for what could not be."""
-        assert self._detection is not None
+        # Reaching confirm without a detection would mean the flow was driven
+        # out of order; send the user back to discovery rather than raising.
+        if self._detection is None:
+            return await self.async_step_user()
         detection = self._detection
 
         if user_input is not None:
@@ -1138,6 +1141,14 @@ git commit -m "feat: discover inverters instead of asking for seventeen fields"
 - Produces: no Python interface — a data file the wizard renders.
 
 A translation file drifts from the schema silently: a field added without a label shows as a raw key, and nothing fails. The test closes that gap.
+
+**On the duplication between steps.** The `data` and `data_description` blocks
+repeat across `confirm`, `manual` and `options.init`. Home Assistant's
+translation format has no include mechanism — a step that omits a key renders
+that field as a raw identifier — so the repetition is imposed by the platform,
+not a shortcut. The test above is what keeps the copies from drifting apart; it
+checks the schema against `manual`, and a reviewer should read the repetition as
+deliberate rather than as duplicated logic.
 
 - [ ] **Step 1: Write the failing test**
 
