@@ -3,9 +3,10 @@
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.inverter_analytics.config_flow import pack, unpack
+from custom_components.inverter_analytics.config_flow import CT_CHOICE, pack, unpack
 from custom_components.inverter_analytics.const import DOMAIN
 from custom_components.inverter_analytics.roles import EntryConfig
 
@@ -125,6 +126,40 @@ async def test_options_flow_overrides_data(
     assert "legacy_role" not in config.entities
 
 
+async def test_an_optional_sensor_can_be_cleared_through_the_options_flow(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """A field the user empties must stay empty.
+
+    Home Assistant omits a cleared optional field from the submission, so a
+    schema built with default= would silently put the old value back. This is
+    why build_schema uses suggested_value.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye",
+        data={
+            "entities": {"load_power": ["sensor.load"], "pv_power": ["sensor.pv"]},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"name": "Deye", "load_power": "sensor.load", "rated_power": 8000},
+    )
+    await hass.async_block_till_done()
+
+    config = EntryConfig.from_entry(entry)
+    assert config.entity_id("load_power") == "sensor.load"
+    assert config.entity_ids("pv_power") == ()
+
+
 def test_pack_keeps_several_entities_for_a_multiple_role():
     packed = pack(
         {
@@ -184,8 +219,21 @@ async def test_discovery_offers_the_detected_inverter(
     )
     assert result["step_id"] == "confirm"
 
+    # A real browser resubmits every displayed field's current contents,
+    # including the ones the confirm step pre-filled from detection and the
+    # user never touched — it does not omit them.
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"name": "Deye", "rated_power": 12000}
+        result["flow_id"],
+        {
+            "name": "Deye",
+            "rated_power": 12000,
+            "load_power": "sensor.solarman_total_load_power",
+            "load_power_phase": [
+                "sensor.solarman_load_l1_power",
+                "sensor.solarman_load_l2_power",
+                "sensor.solarman_load_l3_power",
+            ],
+        },
     )
     await hass.async_block_till_done()
 
@@ -206,3 +254,54 @@ async def test_manual_is_reachable_when_nothing_is_detected(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["step_id"] == "manual"
+
+
+@pytest.mark.parametrize("choice", ["external_ct", "internal_ct"])
+async def test_confirm_resolves_the_ct_ambiguity_to_the_chosen_set(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, choice: str
+) -> None:
+    """Two CT sets look identical to pattern matching, so the user decides.
+
+    An installation with both an external and an internal clamp set is
+    exactly the case classify() cannot settle on its own — this is the
+    wizard's only interactive decision, so it needs an end-to-end check, not
+    just tracing the merge logic on paper.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    for kind in ("external_ct", "internal_ct"):
+        for phase in (1, 2, 3):
+            entity_ids.append(f"sensor.solarman_{kind}_l{phase}_power")
+    for entity_id in entity_ids:
+        hass.states.async_set(
+            entity_id,
+            "100",
+            {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+        )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "name": "Deye",
+            "rated_power": 12000,
+            "load_power": "sensor.solarman_total_load_power",
+            CT_CHOICE: choice,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    entities = result["result"].data["entities"]
+    assert entities["grid_power_phase"] == [
+        f"sensor.solarman_{choice}_l{phase}_power" for phase in (1, 2, 3)
+    ]

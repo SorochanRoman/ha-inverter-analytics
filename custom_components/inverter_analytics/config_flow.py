@@ -68,13 +68,14 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
 
     for role in number_roles():
         marker = vol.Required if role.required else vol.Optional
-        # A real `default=`, not just a `suggested_value` hint, matters here:
-        # the confirm step pre-fills roles from detection, and a user who
-        # leaves a detected field untouched must still validate — voluptuous
-        # only falls back to a value for a key missing from the submission,
-        # description metadata does not do that.
+        # `suggested_value`, not `default=`, matters here: the frontend omits
+        # an optional field from the submission precisely when the user
+        # clears it, and `default=` would then silently restore the old
+        # value instead of accepting the clear (see commit 08fb537). A real
+        # frontend always resubmits an untouched, pre-filled field's current
+        # contents, so `suggested_value` alone is enough for that case.
         key = (
-            marker(role.key, default=defaults[role.key])
+            marker(role.key, description={"suggested_value": defaults[role.key]})
             if role.key in defaults
             else marker(role.key)
         )
@@ -90,7 +91,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
     for role in entity_roles():
         marker = vol.Required if role.required else vol.Optional
         key = (
-            marker(role.key, default=defaults[role.key])
+            marker(role.key, description={"suggested_value": defaults[role.key]})
             if role.key in defaults
             else marker(role.key)
         )
@@ -173,7 +174,11 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             if user_input[CONF_SOURCE] == MANUAL:
                 return await self.async_step_manual()
-            cluster = next(c for c in clusters if c.key == user_input[CONF_SOURCE])
+            cluster = next((c for c in clusters if c.key == user_input[CONF_SOURCE]), None)
+            if cluster is None:
+                # The installation changed between rendering the form and
+                # submitting it; ask again rather than raising at the user.
+                return await self.async_step_user()
             self._detection = classify(cluster)
             return await self.async_step_confirm()
 
