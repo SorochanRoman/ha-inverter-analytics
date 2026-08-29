@@ -24,6 +24,8 @@ export class IaLoadTab extends LitElement {
   @state() private loading = false;
   @state() private mode: "watts" | "percent" = "watts";
 
+  private requestId = 0;
+
   protected willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("entryId") || changed.has("range")) {
       void this.load();
@@ -32,15 +34,23 @@ export class IaLoadTab extends LitElement {
 
   private async load(): Promise<void> {
     if (!this.entryId) return;
+    // Кожен запит отримує номер. Поки він летить, користувач міг уже
+    // перемкнути період — тоді відповідь застаріла й показувати її не можна.
+    const requestId = ++this.requestId;
     this.loading = true;
     this.error = undefined;
     try {
       const { start, end } = resolveRange(this.range, new Date());
-      this.payload = await fetchLoad(this.hass, this.entryId, start, end);
+      const payload = await fetchLoad(this.hass, this.entryId, start, end);
+      if (requestId !== this.requestId) return;
+      this.payload = payload;
     } catch (err) {
+      if (requestId !== this.requestId) return;
       this.error = String(err);
     } finally {
-      this.loading = false;
+      if (requestId === this.requestId) {
+        this.loading = false;
+      }
     }
   }
 
@@ -162,7 +172,7 @@ export class IaLoadTab extends LitElement {
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .warn { color: var(--warning-color, #f0a30a); font-size: 13px; }
+    .warn { color: var(--warning-color); font-size: 13px; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

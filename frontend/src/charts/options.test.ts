@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SERIES } from "../theme";
 import type { LoadPayload } from "../types";
 import { bandsOption, durationCurveOption, histogramOption } from "./options";
 
@@ -23,8 +24,8 @@ const payload: LoadPayload = {
     { fraction: 1, value: 0 },
   ],
   bands: [
-    { key: "0-10", from: 0, to: 0.1, seconds: 1800, fraction: 0.5 },
-    { key: "100+", from: 1, to: null, seconds: 1800, fraction: 0.5 },
+    { key: "0-10", from: 0, to: 0.1, seconds: 900, fraction: 0.25 },
+    { key: "100+", from: 1, to: null, seconds: 2700, fraction: 0.75 },
   ],
   overloads: [],
   precision: "raw",
@@ -70,6 +71,13 @@ describe("bandsOption", () => {
   it("keeps band order and converts fractions to percent", () => {
     const option = bandsOption(payload) as any;
     expect(option.yAxis.data).toEqual(["100+", "0-10"]);
-    expect(option.series[0].data).toEqual([50, 50]);
+    expect(option.series[0].data).toEqual([75, 25]);
+  });
+
+  it("paints the overload band in the overload colour", () => {
+    const option = bandsOption(payload) as any;
+    // Після реверсу нульовий індекс — це "100+".
+    expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
+    expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
   });
 });

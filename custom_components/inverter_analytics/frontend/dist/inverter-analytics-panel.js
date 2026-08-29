@@ -20930,22 +20930,24 @@ const zM = {
 };
 let Re = class extends Jr {
   constructor() {
-    super(...arguments), this.range = "30d", this.loading = !1, this.mode = "watts";
+    super(...arguments), this.range = "30d", this.loading = !1, this.mode = "watts", this.requestId = 0;
   }
   willUpdate(r) {
     (r.has("entryId") || r.has("range")) && this.load();
   }
   async load() {
-    if (this.entryId) {
-      this.loading = !0, this.error = void 0;
-      try {
-        const { start: r, end: t } = m_(this.range, /* @__PURE__ */ new Date());
-        this.payload = await p_(this.hass, this.entryId, r, t);
-      } catch (r) {
-        this.error = String(r);
-      } finally {
-        this.loading = !1;
-      }
+    if (!this.entryId) return;
+    const r = ++this.requestId;
+    this.loading = !0, this.error = void 0;
+    try {
+      const { start: t, end: e } = m_(this.range, /* @__PURE__ */ new Date()), i = await p_(this.hass, this.entryId, t, e);
+      if (r !== this.requestId) return;
+      this.payload = i;
+    } catch (t) {
+      if (r !== this.requestId) return;
+      this.error = String(t);
+    } finally {
+      r === this.requestId && (this.loading = !1);
     }
   }
   renderKpi(r) {
@@ -21047,7 +21049,7 @@ Re.styles = Qu`
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .warn { color: var(--warning-color, #f0a30a); font-size: 13px; }
+    .warn { color: var(--warning-color); font-size: 13px; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
