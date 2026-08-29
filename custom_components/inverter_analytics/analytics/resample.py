@@ -10,6 +10,7 @@ from bisect import bisect_right
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
+from itertools import pairwise
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +73,91 @@ def to_intervals(series: Series) -> list[Interval]:
         intervals.append(Interval(start, end, float(sample.value)))
 
     return intervals
+
+
+@dataclass(frozen=True, slots=True)
+class AlignedInterval:
+    """A span over which every one of several series held a constant value."""
+
+    start: datetime
+    end: datetime
+    values: tuple[float, ...]
+
+    @property
+    def seconds(self) -> float:
+        """Duration in seconds."""
+        return (self.end - self.start).total_seconds()
+
+
+def align(series_list: Sequence[Series]) -> list[AlignedInterval]:
+    """Merge several step functions onto one timeline.
+
+    Phases are separate entities that change state at their own moments, so
+    nothing instantaneous can be computed across them until they share a
+    timeline. The result is cut at every change in any series, so within each
+    interval all of them are constant.
+
+    A gap in any one series invalidates the interval, exactly as a gap in a
+    single series does: the imbalance across three phases is unknown while one
+    of them is unknown, and interpolating over it would invent the very
+    difference the number is supposed to measure. The consequence is that the
+    aligned coverage is always at most the worst individual series' coverage,
+    which is why it is reported as its own number rather than the header's.
+    """
+    if not series_list:
+        return []
+
+    per_series = [to_intervals(series) for series in series_list]
+    # The overlap of the windows, which narrows the sweep but does not decide
+    # the result: to_intervals has already clipped each series to its own
+    # window, so a segment outside the overlap has no covering interval in at
+    # least one series and the gap rule below would drop it anyway. Widening
+    # this to the union produces the same aligned intervals, more slowly —
+    # which is why no test can distinguish the two.
+    start = max(series.start for series in series_list)
+    end = min(series.end for series in series_list)
+    if end <= start:
+        return []
+
+    edges = {start, end}
+    for intervals in per_series:
+        for interval in intervals:
+            if start < interval.start < end:
+                edges.add(interval.start)
+            if start < interval.end < end:
+                edges.add(interval.end)
+    boundaries = sorted(edges)
+
+    # Every interval boundary is a cut, so within a segment each series either
+    # covers it completely or does not overlap it at all — which is what lets a
+    # single forward-moving cursor per series answer the whole sweep.
+    cursors = [0] * len(per_series)
+    aligned: list[AlignedInterval] = []
+
+    for segment_start, segment_end in pairwise(boundaries):
+        values: list[float] = []
+        for index, intervals in enumerate(per_series):
+            while (
+                cursors[index] < len(intervals) and intervals[cursors[index]].end <= segment_start
+            ):
+                cursors[index] += 1
+            cursor = cursors[index]
+            if cursor < len(intervals) and intervals[cursor].start <= segment_start:
+                values.append(intervals[cursor].value)
+            else:
+                break
+        if len(values) == len(per_series):
+            aligned.append(AlignedInterval(segment_start, segment_end, tuple(values)))
+
+    return aligned
+
+
+def aligned_coverage(aligned: Sequence[AlignedInterval], window_seconds: float) -> float:
+    """Share of the window over which every series had data at once."""
+    if window_seconds <= 0:
+        return 0.0
+    covered = sum(interval.seconds for interval in aligned)
+    return min(covered / window_seconds, 1.0)
 
 
 def coverage(series: Series) -> float:
