@@ -25,6 +25,8 @@ def test_household_sensors_never_join_a_cluster():
         "sensor.aqara_motion_sensor_batareia",
         "sensor.printeri_current_consumption",
         "sensor.boiler_current_consumption",
+        "sensor.boiler_today_s_consumption",
+        "sensor.boiler_this_month_s_consumption",
         "sensor.kholodilnik_total_energy",
         "sensor.pv_power_total",
     ):
@@ -61,3 +63,29 @@ def test_a_group_too_small_to_be_an_inverter_is_dropped():
         SensorInfo("sensor.lonely_energy", "energy", "kWh", "total_increasing", device_id=None),
     )
     assert cluster_sensors(sensors) == []
+
+
+def test_a_three_sensor_appliance_is_not_offered_as_an_inverter():
+    """Power plus daily and monthly energy is the shape of any monitored appliance."""
+    appliance = tuple(
+        SensorInfo(f"sensor.dishwasher_{name}", device_class, unit, state_class, device_id=None)
+        for name, device_class, unit, state_class in (
+            ("current_consumption", "power", "W", "measurement"),
+            ("today_s_consumption", "energy", "kWh", "total_increasing"),
+            ("this_month_s_consumption", "energy", "kWh", "total_increasing"),
+        )
+    )
+    assert cluster_sensors(appliance) == []
+
+
+def test_the_same_three_sensors_are_trusted_when_a_device_vouches_for_them():
+    """A registered device is evidence; a shared prefix is only a guess."""
+    vouched = tuple(
+        SensorInfo(f"sensor.dishwasher_{name}", device_class, unit, state_class, device_id="dev9")
+        for name, device_class, unit, state_class in (
+            ("current_consumption", "power", "W", "measurement"),
+            ("today_s_consumption", "energy", "kWh", "total_increasing"),
+            ("this_month_s_consumption", "energy", "kWh", "total_increasing"),
+        )
+    )
+    assert len(cluster_sensors(vouched)) == 1

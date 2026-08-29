@@ -13,11 +13,16 @@ from dataclasses import dataclass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-# An inverter publishes several sensors even in a minimal setup (at least
-# power, one energy total and one more channel). A group smaller than this is
-# far more likely to be a smart plug or a phone than an inverter, and
-# offering it as a candidate would make the discovery step useless noise.
-MIN_CLUSTER_SIZE = 3
+# A registered device is authoritative: Home Assistant itself says these
+# entities belong together, so a small group is still trustworthy.
+MIN_DEVICE_CLUSTER_SIZE = 3
+
+# A shared name prefix is only a guess, and "power + today's energy + this
+# month's energy" is one of the most common shapes in a Home Assistant
+# installation — a printer, a boiler and a fridge all match it. The floor
+# here has to be high enough that a monitored appliance cannot pass for an
+# inverter.
+MIN_PREFIX_CLUSTER_SIZE = 5
 
 _RELEVANT_DEVICE_CLASSES = frozenset({"power", "energy", "battery"})
 
@@ -71,19 +76,35 @@ def cluster_sensors(sensors: Sequence[SensorInfo]) -> list[Cluster]:
 
     A registered device wins over the name, because it is authoritative. The
     prefix fallback exists for YAML-configured integrations that register no
-    device at all — which is the case for the most widely used Solarman module.
+    device at all — which is the case for the most widely used Solarman
+    module. The two sources of evidence carry different weight, so each
+    group is checked against the floor that matches how it was formed:
+    device-backed groups against MIN_DEVICE_CLUSTER_SIZE, name-guessed ones
+    against the higher MIN_PREFIX_CLUSTER_SIZE. Collapsing both onto one
+    constant once let a three-sensor printer (power, today's energy, this
+    month's energy) pass for an inverter — that appliance shape is common
+    enough that no single threshold can both admit a small device-backed
+    cluster and reject it.
     """
     groups: dict[str, list[SensorInfo]] = defaultdict(list)
+    grouped_by_device: set[str] = set()
     for sensor in sensors:
         if sensor.device_class not in _RELEVANT_DEVICE_CLASSES:
             continue
-        groups[sensor.device_id or _prefix(sensor.entity_id)].append(sensor)
+        if sensor.device_id:
+            key = sensor.device_id
+            grouped_by_device.add(key)
+        else:
+            key = _prefix(sensor.entity_id)
+        groups[key].append(sensor)
 
-    clusters = [
-        Cluster(key=key, label=key.replace("_", " ").title(), sensors=tuple(members))
-        for key, members in groups.items()
-        if len(members) >= MIN_CLUSTER_SIZE
-    ]
+    clusters = []
+    for key, members in groups.items():
+        floor = MIN_DEVICE_CLUSTER_SIZE if key in grouped_by_device else MIN_PREFIX_CLUSTER_SIZE
+        if len(members) >= floor:
+            clusters.append(
+                Cluster(key=key, label=key.replace("_", " ").title(), sensors=tuple(members))
+            )
     clusters.sort(key=lambda cluster: (-len(cluster.sensors), cluster.key))
     return clusters
 

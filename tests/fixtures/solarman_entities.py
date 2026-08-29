@@ -50,7 +50,10 @@ _RAW: tuple[tuple[str, str | None, str | None, str | None], ...] = (
     ("sensor.aqara_motion_sensor_batareia", "battery", "%", "measurement"),
     ("sensor.printeri_current_consumption", "power", "W", "measurement"),
     ("sensor.printeri_today_s_consumption", "energy", "kWh", "total_increasing"),
+    ("sensor.printeri_this_month_s_consumption", "energy", "kWh", "total_increasing"),
     ("sensor.boiler_current_consumption", "power", "W", "measurement"),
+    ("sensor.boiler_today_s_consumption", "energy", "kWh", "total_increasing"),
+    ("sensor.boiler_this_month_s_consumption", "energy", "kWh", "total_increasing"),
     ("sensor.kholodilnik_total_energy", "energy", "kWh", "total_increasing"),
     ("sensor.pv_power_total", "power", "W", "measurement"),
 )
