@@ -1,7 +1,7 @@
 """Tests for the WebSocket API."""
 
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -63,6 +63,41 @@ async def test_config_command_lists_entries(
     assert entries[0]["entities"] == {"load_power": ["sensor.load_power"]}
     assert entries[0]["numbers"] == {"rated_power": 8000.0}
     assert "raw_available_from" in response["result"]
+
+
+async def test_config_command_hands_lists_to_send_result(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """The wire cannot show this: JSON renders a tuple and a list identically.
+
+    The explicit conversion only matters on the Python side, so that is where it
+    has to be checked.
+    """
+    from custom_components.inverter_analytics.websocket_api import ws_config
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 3-phase",
+        data={
+            "entities": {
+                "load_power": ["sensor.total"],
+                "load_power_phase": ["sensor.l1", "sensor.l2", "sensor.l3"],
+            },
+            "numbers": {"rated_power": 12000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    connection = MagicMock()
+    ws_config(hass, connection, {"id": 1})
+
+    payload = connection.send_result.call_args[0][1]
+    entities = payload["entries"][0]["entities"]
+    assert isinstance(entities["load_power_phase"], list)
+    assert entities["load_power_phase"] == ["sensor.l1", "sensor.l2", "sensor.l3"]
 
 
 async def test_load_command_returns_analytics(
