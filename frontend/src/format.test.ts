@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { describeError, formatDuration, formatPercent, formatPower, precisionLabel } from "./format";
+import {
+  coverageWarning,
+  describeError,
+  formatDuration,
+  formatPercent,
+  formatPower,
+  precisionLabel,
+} from "./format";
 
 describe("formatPower", () => {
   it("shows watts below a kilowatt", () => {
@@ -76,5 +83,27 @@ describe("precisionLabel", () => {
 
   it("labels mixed precision without a boundary", () => {
     expect(precisionLabel("mixed", null, "en")).toBe("Змішано");
+  });
+});
+
+describe("coverageWarning", () => {
+  it("stays silent when coverage is good", () => {
+    expect(coverageWarning(0.99, "uk")).toBeNull();
+  });
+
+  it("says data exists rather than how much is missing", () => {
+    const text = coverageWarning(0.4, "uk");
+    expect(text).toContain("40%");
+    expect(text).not.toContain("відсутн");
+  });
+
+  it("avoids a bogus 100% when a sliver of data exists", () => {
+    // 30-денне вікно з двома хвилинами історії: раніше писало «відсутні 100%»
+    // поруч із заповненими KPI.
+    expect(coverageWarning(0.00005, "uk")).toBe("Дані є менш ніж за 1% періоду");
+  });
+
+  it("says plainly when there is no data at all", () => {
+    expect(coverageWarning(0, "uk")).toBe("Даних за цей період немає");
   });
 });

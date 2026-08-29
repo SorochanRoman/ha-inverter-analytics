@@ -44,3 +44,18 @@ export function precisionLabel(
   }
   return "Змішано";
 }
+
+/**
+ * Попередження про неповноту даних.
+ *
+ * Формулюємо через те, скільки даних Є, а не скільки бракує: у 30-денному вікні
+ * з двома хвилинами історії «бракує 100% часу» округлялось до сотні й читалось
+ * як «даних немає» — поруч із заповненими KPI. Нижче одного відсотка кажемо
+ * «менш ніж 1%», бо точна цифра там уже нічого не додає.
+ */
+export function coverageWarning(coverage: number, locale: string): string | null {
+  if (coverage >= 0.95) return null;
+  if (coverage <= 0) return "Даних за цей період немає";
+  if (coverage < 0.01) return "Дані є менш ніж за 1% періоду";
+  return `Дані є лише за ${formatPercent(coverage, locale)} періоду`;
+}

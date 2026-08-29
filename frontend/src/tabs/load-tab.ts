@@ -3,7 +3,14 @@ import { customElement, property, state } from "lit/decorators.js";
 import { fetchLoad } from "../api";
 import { bandsOption, durationCurveOption, histogramOption } from "../charts/options";
 import "../charts/echart";
-import { describeError, formatDuration, formatPercent, formatPower, precisionLabel } from "../format";
+import {
+  coverageWarning,
+  describeError,
+  formatDuration,
+  formatPercent,
+  formatPower,
+  precisionLabel,
+} from "../format";
 import { resolveRange, type RangeKey } from "../range";
 import type { HomeAssistant, LoadPayload } from "../types";
 
@@ -19,6 +26,27 @@ export class IaLoadTab extends LitElement {
   @state() private mode: "watts" | "percent" = "watts";
 
   private requestId = 0;
+
+  private themeObserver?: MutationObserver;
+
+  public connectedCallback(): void {
+    super.connectedCallback();
+    // Home Assistant застосовує тему, переписуючи CSS-змінні на <html>.
+    // Опції графіків тримають кольори, зчитані в момент побудови, тож без
+    // перебудови підписи осей лишаються від попередньої теми: після
+    // перемикання на світлу вони стають світло-сірими на білому й зникають.
+    this.themeObserver = new MutationObserver(() => this.requestUpdate());
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+  }
+
+  public disconnectedCallback(): void {
+    this.themeObserver?.disconnect();
+    this.themeObserver = undefined;
+    super.disconnectedCallback();
+  }
 
   protected willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("entryId") || changed.has("range")) {
@@ -111,10 +139,8 @@ export class IaLoadTab extends LitElement {
     return html`
       <div class="status">
         <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
-        ${payload.coverage < 0.95
-          ? html`<span class="warn">
-              Дані відсутні ${formatPercent(1 - payload.coverage, locale)} часу
-            </span>`
+        ${coverageWarning(payload.coverage, locale)
+          ? html`<span class="warn">${coverageWarning(payload.coverage, locale)}</span>`
           : nothing}
         ${payload.clamped
           ? html`<span class="warn">Період скорочено до максимально дозволеного</span>`

@@ -120,3 +120,25 @@ def test_empty_series_yields_null_kpis_not_an_exception():
 def test_rated_power_must_be_positive():
     with pytest.raises(ValueError):
         build_load_payload(flat_series(1000.0), rated_power=0.0)
+
+
+def test_percentiles_never_exceed_the_observed_peak():
+    """Гістограма інтерполює до краю корзини — медіана не сміє перевищити пік.
+
+    Живий запуск показував «Медіана 9.1 кВт» поруч із «Пік 9 кВт»: два
+    самозаперечні числа в одному рядку карток.
+    """
+    payload = build_load_payload(flat_series(9000.0), rated_power=8000.0)
+    kpi = payload["kpi"]
+    assert kpi["max"] == pytest.approx(9000.0)
+    assert kpi["median"] <= kpi["max"]
+    assert kpi["p95"] <= kpi["max"]
+
+
+def test_percentiles_are_not_clamped_away_from_a_real_spread():
+    """Притискання не має зіпсувати нормальний випадок із широким розкидом."""
+    series = Series.of(BASE, at(60), [Sample(BASE, 1000.0), Sample(at(30), 5000.0)])
+    payload = build_load_payload(series, rated_power=8000.0)
+    kpi = payload["kpi"]
+    assert 1000.0 <= kpi["median"] <= 5000.0
+    assert kpi["p95"] <= kpi["max"] == pytest.approx(5000.0)

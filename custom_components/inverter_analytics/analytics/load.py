@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 
 from ..roles import EntryConfig
 from .resample import (
+    Histogram,
     Interval,
     Series,
     coverage,
@@ -46,6 +47,25 @@ def _seconds_between(intervals: Sequence[Interval], low: float, high: float | No
     )
 
 
+def _clamped_percentile(
+    histogram: Histogram, q: float, low: float | None, high: float | None
+) -> float | None:
+    """Перцентиль, притиснутий до спостереженого діапазону.
+
+    Гістограма втрачає розподіл усередині корзини, тому percentile інтерполює
+    до її межі й може повернути значення вище справжнього максимуму. На екрані
+    це давало медіану 9.1 кВт поруч із піком 9.0 кВт — самозаперечні числа.
+    """
+    value = percentile(histogram, q)
+    if value is None:
+        return None
+    if high is not None:
+        value = min(value, high)
+    if low is not None:
+        value = max(value, low)
+    return value
+
+
 def build_load_payload(
     series: Series, rated_power: float, bucket_count: int = 40
 ) -> dict[str, Any]:
@@ -57,6 +77,8 @@ def build_load_payload(
     total_seconds = sum(interval.seconds for interval in intervals)
     bucket_width = rated_power / bucket_count
     histogram = duration_histogram(intervals, bucket_width=bucket_width)
+    observed_min = min((interval.value for interval in intervals), default=None)
+    observed_max = max((interval.value for interval in intervals), default=None)
 
     bands = []
     for index, (key, low_share, high_share) in enumerate(BANDS):
@@ -85,9 +107,9 @@ def build_load_payload(
         "rated_power": rated_power,
         "kpi": {
             "mean": time_weighted_mean(intervals),
-            "median": percentile(histogram, 0.5),
-            "p95": percentile(histogram, 0.95),
-            "max": max((interval.value for interval in intervals), default=None),
+            "median": _clamped_percentile(histogram, 0.5, observed_min, observed_max),
+            "p95": _clamped_percentile(histogram, 0.95, observed_min, observed_max),
+            "max": observed_max,
             "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else None,
             "max_sustained_15m": max_sustained_mean(intervals, SUSTAINED_WINDOW_SECONDS),
         },

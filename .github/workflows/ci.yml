@@ -16,6 +16,11 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          # brands перевіряє наявність іконки в репозиторії home-assistant/brands.
+          # Це вимога для потрапляння в дефолтний каталог HACS, а не для
+          # встановлення через Custom repositories, яким ми користуємось.
+          # Знімати ігнор, коли подамо іконку в brands.
+          ignore: brands
 
   test:
     runs-on: ubuntu-latest
