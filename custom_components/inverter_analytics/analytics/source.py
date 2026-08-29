@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -14,7 +14,7 @@ from homeassistant.components.recorder.statistics import statistics_during_perio
 from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
 
-from .resample import Sample, Series
+from .resample import Sample, Series, coverage
 
 _GAP_STATES = {"unavailable", "unknown", "none", ""}
 
@@ -96,14 +96,19 @@ def statistic_rows_to_samples(rows: Iterable[Mapping[str, Any]], sign: float) ->
     return samples
 
 
-async def _async_raw_samples(
-    hass: HomeAssistant, entity_id: str, window: Window, sign: float
-) -> list[Sample]:
-    """Read raw states from the recorder."""
-    recorder = get_instance(hass)
-    result = await recorder.async_add_executor_job(
-        partial(
-            history.state_changes_during_period,
+def _read_raw_states(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, list[State]]:
+    """Read raw states for several entities inside one executor job.
+
+    The recorder call itself is per-entity, but the round trip to the executor
+    is not: the Balance tab needs six sensors over one window, and paying six
+    thread hand-offs for what is one database session is the cost this exists
+    to avoid.
+    """
+    collected: dict[str, list[State]] = {}
+    for entity_id in entity_ids:
+        result = history.state_changes_during_period(
             hass,
             window.start,
             window.end,
@@ -111,14 +116,24 @@ async def _async_raw_samples(
             no_attributes=True,
             include_start_time_state=True,
         )
+        collected[entity_id] = list(result.get(entity_id, []))
+    return collected
+
+
+async def _async_raw_states(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, list[State]]:
+    """Raw states for several entities."""
+    recorder = get_instance(hass)
+    return await recorder.async_add_executor_job(
+        partial(_read_raw_states, hass, tuple(entity_ids), window)
     )
-    return states_to_samples(result.get(entity_id, []), sign)
 
 
-async def _async_lts_samples(
-    hass: HomeAssistant, entity_id: str, window: Window, sign: float
-) -> list[Sample]:
-    """Read hourly long-term statistics."""
+async def _async_lts_rows(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, list[Mapping[str, Any]]]:
+    """Hourly long-term statistics for several entities in one query."""
     recorder = get_instance(hass)
     result = await recorder.async_add_executor_job(
         partial(
@@ -126,30 +141,92 @@ async def _async_lts_samples(
             hass,
             window.start,
             window.end,
-            {entity_id},
+            set(entity_ids),
             "hour",
             None,
             {"mean"},
         )
     )
-    return statistic_rows_to_samples(result.get(entity_id, []), sign)
+    return {entity_id: list(result.get(entity_id, [])) for entity_id in entity_ids}
+
+
+@dataclass(frozen=True, slots=True)
+class SeriesResult:
+    """One entity's data for a window, with the provenance of that data."""
+
+    series: Series
+    precision: Precision
+    boundary: datetime | None
+
+    @property
+    def coverage(self) -> float:
+        """Share of the window this entity actually has data for."""
+        return coverage(self.series)
+
+
+def _observed_precision(plan: PrecisionPlan, has_lts: bool, has_raw: bool) -> Precision:
+    """What one entity actually got, which need not be what the window planned.
+
+    A sensor without a state_class has no long-term statistics at all, so a
+    window the recorder can only answer from LTS comes back empty for it while
+    its neighbour is fully covered. Reporting the plan for both would state
+    something about this entity that is not true of it.
+    """
+    if plan.precision is not Precision.MIXED:
+        return plan.precision
+    if has_lts and has_raw:
+        return Precision.MIXED
+    if has_lts:
+        return Precision.LTS
+    return Precision.RAW
+
+
+async def async_series_many(
+    hass: HomeAssistant,
+    entity_ids: Sequence[str],
+    window: Window,
+    signs: Mapping[str, float] | None = None,
+) -> dict[str, SeriesResult]:
+    """Build a series per entity over one window, in one pass over the recorder."""
+    unique = list(dict.fromkeys(entity_ids))
+    if not unique:
+        return {}
+
+    plan = plan_precision(hass, window)
+    signs = signs or {}
+
+    lts_rows: dict[str, list[Mapping[str, Any]]] = {}
+    if plan.precision in (Precision.LTS, Precision.MIXED):
+        lts_end = window.end if plan.precision is Precision.LTS else plan.boundary
+        if lts_end is None:
+            raise ValueError("a mixed window has no boundary")
+        lts_rows = await _async_lts_rows(hass, unique, Window(window.start, lts_end))
+
+    raw_states: dict[str, list[State]] = {}
+    if plan.precision in (Precision.RAW, Precision.MIXED):
+        raw_start = window.start if plan.precision is Precision.RAW else plan.boundary
+        if raw_start is None:
+            raise ValueError("a mixed window has no boundary")
+        raw_states = await _async_raw_states(hass, unique, Window(raw_start, window.end))
+
+    results: dict[str, SeriesResult] = {}
+    for entity_id in unique:
+        sign = signs.get(entity_id, 1.0)
+        rows = lts_rows.get(entity_id, [])
+        states = raw_states.get(entity_id, [])
+        samples = statistic_rows_to_samples(rows, sign) + states_to_samples(states, sign)
+        observed = _observed_precision(plan, bool(rows), bool(states))
+        results[entity_id] = SeriesResult(
+            series=Series.of(window.start, window.end, samples),
+            precision=observed,
+            boundary=plan.boundary if observed is Precision.MIXED else None,
+        )
+    return results
 
 
 async def async_series(
     hass: HomeAssistant, entity_id: str, window: Window, sign: float = 1.0
 ) -> Series:
     """Build a series of states for a window, automatically choosing the source."""
-    plan = plan_precision(hass, window)
-    samples: list[Sample] = []
-
-    if plan.precision in (Precision.LTS, Precision.MIXED):
-        lts_end = window.end if plan.precision is Precision.LTS else plan.boundary
-        assert lts_end is not None
-        samples += await _async_lts_samples(hass, entity_id, Window(window.start, lts_end), sign)
-
-    if plan.precision in (Precision.RAW, Precision.MIXED):
-        raw_start = window.start if plan.precision is Precision.RAW else plan.boundary
-        assert raw_start is not None
-        samples += await _async_raw_samples(hass, entity_id, Window(raw_start, window.end), sign)
-
-    return Series.of(window.start, window.end, samples)
+    results = await async_series_many(hass, [entity_id], window, {entity_id: sign})
+    return results[entity_id].series

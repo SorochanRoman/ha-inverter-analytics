@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { SERIES } from "../theme";
-import type { LoadPayload } from "../types";
-import { bandsOption, durationCurveOption, histogramOption } from "./options";
+import { SUPPORTED_OPTION_KEYS } from "./registry";
+import type { Imbalance, LoadPayload, PartSummary } from "../types";
+import {
+  bandsOption,
+  durationCurveOption,
+  histogramOption,
+  imbalanceOption,
+  partsOption,
+} from "./options";
 
 const payload: LoadPayload = {
   coverage: 1,
@@ -28,6 +35,7 @@ const payload: LoadPayload = {
     { key: "100+", from: 1, to: null, seconds: 2700, fraction: 0.75 },
   ],
   overloads: [],
+  series: {},
   precision: "raw",
   boundary: null,
   window: { start: "2026-08-01T00:00:00+00:00", end: "2026-08-29T00:00:00+00:00" },
@@ -79,5 +87,101 @@ describe("bandsOption", () => {
     // After the reversal, index zero is "100+".
     expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
     expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
+  });
+});
+
+describe("imbalanceOption", () => {
+  const imbalance: Imbalance = {
+    mean: 0.2,
+    p95: 0.5,
+    fraction_above: 0.1,
+    analysed_seconds: 3600,
+    coverage: 0.9,
+    threshold: 0.3,
+    floor_w: 400,
+    below_floor_seconds: 600,
+    aligned_coverage: 0.95,
+    histogram: [
+      { start: 0, end: 0.2, fraction: 0.6 },
+      { start: 0.2, end: 0.4, fraction: 0.3 },
+      { start: 0.4, end: 0.6, fraction: 0.1 },
+    ],
+  };
+
+  it("labels the axis in percent and plots the share of time", () => {
+    const option = imbalanceOption(imbalance) as any;
+    expect(option.xAxis.data).toEqual(["0", "20", "40"]);
+    expect(option.series[0].data).toEqual([60, 30, 10]);
+  });
+
+  it("colours only the buckets at or above the threshold as a problem", () => {
+    const option = imbalanceOption(imbalance) as any;
+    const colourOf = option.series[0].itemStyle.color;
+    expect(colourOf({ dataIndex: 0 })).toBe(SERIES.load);
+    expect(colourOf({ dataIndex: 1 })).toBe(SERIES.load);
+    // The 0.4 bucket starts above the 0.3 threshold.
+    expect(colourOf({ dataIndex: 2 })).toBe(SERIES.overload);
+  });
+
+  it("survives an empty distribution", () => {
+    const option = imbalanceOption({ ...imbalance, histogram: [] }) as any;
+    expect(option.series[0].data).toEqual([]);
+  });
+});
+
+describe("partsOption", () => {
+  const parts: PartSummary[] = [
+    { key: "pv_s1", label: "PV1", index: 1, mean: 1200.4, p95: 3000, peak: 3400, share: 0.6 },
+    { key: "pv_s2", label: "PV2", index: 2, mean: 800, p95: 2000, peak: 2600, share: 0.4 },
+  ];
+
+  it("plots mean against peak for each part", () => {
+    const option = partsOption(parts, SERIES.pv) as any;
+    expect(option.xAxis.data).toEqual(["PV1", "PV2"]);
+    expect(option.series[0].data).toEqual([1200.4, 800]);
+    expect(option.series[1].data).toEqual([3400, 2600]);
+  });
+
+  it("keeps a part with no data as a hole rather than a zero", () => {
+    const option = partsOption([{ ...parts[0], mean: null, peak: null }], SERIES.pv) as any;
+    expect(option.series[0].data).toEqual([null]);
+    expect(option.series[1].data).toEqual([null]);
+  });
+});
+
+describe("partsOption legend", () => {
+  it("names the two bars and leaves the plot room for the legend", () => {
+    const option = partsOption(
+      [{ key: "pv_s1", label: "PV1", index: 1, mean: 1, p95: 2, peak: 3, share: 1 }],
+      SERIES.pv,
+    ) as any;
+    expect(option.legend.data).toEqual(["Mean", "Peak"]);
+    expect(option.grid.top).toBeGreaterThan(option.legend.top);
+  });
+});
+
+describe("option builders against what the bundle registers", () => {
+  const parts: PartSummary[] = [
+    { key: "pv_s1", label: "PV1", index: 1, mean: 1, p95: 2, peak: 3, share: 1 },
+  ];
+  const imbalance: Imbalance = {
+    mean: 0.2, p95: 0.5, fraction_above: 0.1, analysed_seconds: 60, coverage: 1,
+    threshold: 0.3, floor_w: 400, below_floor_seconds: 0, aligned_coverage: 1,
+    histogram: [{ start: 0, end: 0.2, fraction: 1 }],
+  };
+
+  const built: [string, Record<string, unknown>][] = [
+    ["histogram", histogramOption(payload, "watts")],
+    ["durationCurve", durationCurveOption(payload)],
+    ["bands", bandsOption(payload)],
+    ["imbalance", imbalanceOption(imbalance)],
+    ["parts", partsOption(parts, SERIES.pv)],
+  ];
+
+  it.each(built)("%s uses only keys a registered component can render", (_name, option) => {
+    // ECharts ignores an option whose component was never registered, without
+    // a word. That is how a legend shipped as two unlabelled bar colours.
+    const unsupported = Object.keys(option).filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
+    expect(unsupported).toEqual([]);
   });
 });

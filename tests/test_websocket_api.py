@@ -12,7 +12,11 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 
 from custom_components.inverter_analytics.analytics.load import async_load_analytics
 from custom_components.inverter_analytics.const import DOMAIN
-from custom_components.inverter_analytics.websocket_api import MAX_WINDOW_DAYS, clamp_window
+from custom_components.inverter_analytics.websocket_api import (
+    MAX_WINDOW_DAYS,
+    async_register,
+    clamp_window,
+)
 
 
 def _entry() -> MockConfigEntry:
@@ -243,3 +247,31 @@ async def test_second_identical_request_is_served_from_cache(
     assert computed.call_count == 1
     cache = hass.data[DOMAIN][entry.entry_id]["cache"]
     assert cache.size == 1
+
+
+def test_a_window_of_exactly_the_limit_is_not_shortened():
+    """The comparison is strictly greater, and the boundary is where that shows."""
+    end = dt_util.utcnow()
+    window, clamped = clamp_window(end - timedelta(days=MAX_WINDOW_DAYS), end)
+    assert clamped is False
+    assert window.end - window.start == timedelta(days=MAX_WINDOW_DAYS)
+
+
+async def test_the_commands_are_registered_once_for_the_whole_instance(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Registration is per Home Assistant, not per entry.
+
+    Every entry's setup calls async_register, and Home Assistant treats
+    registering the same command name twice as a programming error. This is
+    the call each additional inverter makes, without the HTTP stack that
+    setting one up would otherwise start.
+    """
+    with patch(
+        "custom_components.inverter_analytics.websocket_api.websocket_api.async_register_command"
+    ) as register:
+        async_register(hass)
+        async_register(hass)
+
+    registered = [call.args[1].__name__ for call in register.call_args_list]
+    assert registered == ["ws_config", "ws_load"]

@@ -1,5 +1,7 @@
 """Tests for the result TTL cache."""
 
+import pytest
+
 from custom_components.inverter_analytics.analytics.cache import ResultCache
 
 
@@ -62,3 +64,39 @@ def test_clear_empties_the_cache():
     cache.set(("a",), 1, ttl=600.0)
     cache.clear()
     assert cache.size == 0
+
+
+def test_a_cache_that_can_hold_nothing_is_a_configuration_error():
+    """Evicting on every write is a silent no-op that reads as recomputation."""
+    for size in (0, -1):
+        with pytest.raises(ValueError, match="at least 1"):
+            ResultCache(max_entries=size)
+
+
+def test_rewriting_a_key_makes_it_the_newest_not_the_oldest():
+    """Eviction is by insertion order, so a refreshed entry must move.
+
+    Without the delete-then-insert, a key rewritten every minute would keep its
+    original position and be evicted before entries nobody has touched.
+    """
+    clock = FakeClock()
+    cache = ResultCache(max_entries=2, time_fn=clock)
+    cache.set("a", 1, ttl=60)
+    cache.set("b", 2, ttl=60)
+    cache.set("a", 10, ttl=60)
+    cache.set("c", 3, ttl=60)
+
+    assert cache.get("a") == 10
+    assert cache.get("c") == 3
+    assert cache.get("b") is None
+
+
+def test_an_entry_expires_at_its_deadline_not_after_it():
+    clock = FakeClock()
+    cache = ResultCache(max_entries=4, time_fn=clock)
+    cache.set("k", "v", ttl=60)
+
+    clock.now = 59.999
+    assert cache.get("k") == "v"
+    clock.now = 60.0
+    assert cache.get("k") is None

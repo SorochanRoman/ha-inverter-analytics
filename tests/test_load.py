@@ -155,3 +155,20 @@ def test_duration_curve_never_rises_above_the_reported_peak():
     peak = payload["kpi"]["max"]
     assert peak == pytest.approx(9000.0)
     assert all(point["value"] <= peak for point in payload["duration_curve"])
+
+
+def test_high_load_share_is_measured_against_covered_time_not_the_window():
+    """The denominator is the time there is data for, not the period asked about.
+
+    Half an hour at full load inside a window that only has half an hour of
+    data is all of the measured time, not a quarter of it — reading it against
+    the window would understate every partial period by however much is missing.
+    """
+    series = Series.of(
+        BASE,
+        at(120),
+        [Sample(at(0), 9000.0), Sample(at(30), None)],
+    )
+    payload = build_load_payload(series, rated_power=9000.0)
+    assert payload["coverage"] == 0.25
+    assert payload["kpi"]["fraction_above_80pct"] == 1.0

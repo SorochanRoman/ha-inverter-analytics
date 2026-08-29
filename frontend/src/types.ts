@@ -29,6 +29,65 @@ export interface Overload {
   peak: number;
 }
 
+export interface SeriesInfo {
+  entity_id: string;
+  precision: Precision;
+  boundary: string | null;
+  coverage: number;
+}
+
+export interface PartSummary {
+  key: string;
+  label: string;
+  index: number | null;
+  mean: number | null;
+  p95: number | null;
+  peak: number | null;
+  share: number | null;
+}
+
+export interface PhasePart extends PartSummary {
+  headroom: number | null;
+}
+
+export interface ImbalanceEpisode {
+  start: string;
+  end: string;
+  seconds: number;
+  peak_imbalance: number;
+  mean_imbalance: number;
+  phases: number[];
+}
+
+export interface Imbalance {
+  mean: number | null;
+  p95: number | null;
+  fraction_above: number | null;
+  analysed_seconds: number;
+  coverage: number;
+  histogram: { start: number; end: number; fraction: number }[];
+  threshold: number;
+  floor_w: number;
+  below_floor_seconds: number;
+  aligned_coverage: number;
+}
+
+export interface Phases {
+  per_phase: PhasePart[];
+  rating_per_phase: number;
+  rating_per_phase_derived: boolean;
+  rating_per_phase_divisor: number;
+  imbalance: Imbalance;
+  episodes: ImbalanceEpisode[];
+}
+
+export interface Strings {
+  parts: PartSummary[];
+  aligned_coverage: number;
+}
+
+export type Precision = "raw" | "lts" | "mixed";
+
 export interface LoadPayload {
   coverage: number;
   rated_power: number;
@@ -42,10 +101,15 @@ export interface LoadPayload {
   duration_curve: { fraction: number; value: number }[];
   bands: Band[];
   overloads: Overload[];
-  precision: "raw" | "lts" | "mixed";
+  precision: Precision;
   boundary: string | null;
   window: { start: string; end: string };
   clamped: boolean;
+  series: Record<string, SeriesInfo>;
+  /** Absent unless at least two phase sensors are mapped. */
+  phases?: Phases;
+  /** Absent unless at least two PV strings are mapped. */
+  strings?: Strings;
 }
 
 export interface EntryInfo {

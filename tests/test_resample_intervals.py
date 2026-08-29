@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from custom_components.inverter_analytics.analytics.resample import (
     Sample,
     Series,
@@ -84,3 +86,26 @@ def test_zero_length_window_has_zero_coverage():
     series = Series.of(BASE, BASE, [Sample(at(-10), 100.0)])
     assert coverage(series) == 0.0
     assert to_intervals(series) == []
+
+
+def test_a_series_built_out_of_order_is_rejected_rather_than_quietly_wrong():
+    """to_intervals reads each sample's successor as its end moment.
+
+    Out of order that yields negative and overlapping intervals with no error
+    anywhere, so the invariant is enforced where it is established.
+    """
+    with pytest.raises(ValueError, match="ordered by time"):
+        Series(BASE, at(60), (Sample(at(30), 1.0), Sample(at(10), 2.0)))
+
+
+def test_naive_timestamps_are_rejected_at_the_boundary():
+    naive = datetime(2026, 1, 1)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        Series(naive, naive + timedelta(hours=1), ())
+    with pytest.raises(ValueError, match="timezone-aware"):
+        Series(BASE, at(60), (Sample(naive, 1.0),))
+
+
+def test_series_of_still_accepts_unordered_input_because_it_sorts():
+    series = Series.of(BASE, at(60), [Sample(at(30), 2.0), Sample(at(0), 1.0)])
+    assert [sample.value for sample in series.samples] == [1.0, 2.0]

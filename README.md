@@ -13,13 +13,27 @@ beyond pointing the integration at the ones you already have.
   level, a load duration curve, a breakdown across rated-power bands, and
   a table of overload episodes. The period picker (24 h / 7 days /
   30 days / this month / year) and the inverter selector live in the same
-  header, and the selected tab and period are kept in the URL, so a
-  reload or a shared link lands where you left off.
-- **Manual sensor mapping** through the config flow. There are no
-  vendor presets yet: you tell the integration which of your entities is
-  the load power, what the inverter's rated power is, and so on. The
-  mapping can be changed later from the integration's options, including
-  renaming the inverter.
+  header, and the selected tab, period and inverter are kept in the URL,
+  so a reload or a shared link lands where you left off.
+- **Three-phase analytics.** Map your per-phase load sensors and the Load
+  tab gains a Phases section: mean, P95, peak, share of load and headroom
+  against the per-phase limit for each phase, the distribution of the
+  imbalance between them, how much time it spent above a threshold, and
+  the sustained episodes with each phase's power at the worst moment.
+  Imbalance is measured only while total load is above a floor — at
+  standby power a few watts of difference is a large percentage and means
+  nothing — and the page says how much time that excluded.
+- **PV string comparison.** With more than one string mapped, each one's
+  mean, peak and share of production side by side. A string consistently
+  below its neighbour points at shading, orientation or a fault.
+- **Sensor detection.** The wizard looks at what is already in your
+  installation, offers the inverters it recognises, and fills the mapping
+  in for you — including phases in the right order and PV strings. Where
+  the data genuinely cannot settle a question, such as which set of
+  current transformers faces the grid, it asks instead of guessing. Every
+  field explains what it is for, and manual mapping is always available.
+  The mapping can be changed later from the integration's options,
+  including renaming the inverter and the imbalance thresholds.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -39,14 +53,24 @@ and this is deliberate rather than incidental:
   edge bucket, it says that the bucket's label no longer describes where
   that time was;
 - when there is no data, a KPI shows a dash — not a zero. "Zero watts"
-  and "we don't know" are different statements.
+  and "we don't know" are different statements;
+- when one phase has less history than the others — a sensor without a
+  `state_class` keeps no long-term statistics at all — its card says so
+  rather than hiding behind the page's overall figure;
+- the imbalance between phases can only be read at moments when *every*
+  phase is known, so its coverage is reported as its own number and never
+  interpolated across a gap;
+- when no per-phase rating is configured, the headroom figures say the
+  total was split and by how many phases, instead of presenting a derived
+  number as a known one.
 
 ## Not built yet
 
 The Battery, Seasonality and Energy balance tabs are placeholders; their
-analytics are not implemented. Brand presets for specific inverter models
-do not exist yet either — see `docs/known-gaps.md` for the full list of
-what is deliberately missing and what remains unverified.
+analytics are not implemented. Detection covers the naming scheme of the
+StephanJoubert Solarman integration, read off a live instance; other
+vendors fall back to manual mapping. See `docs/known-gaps.md` for the
+full list of what is deliberately missing and what remains unverified.
 
 ## Requirements
 
@@ -75,10 +99,12 @@ what is deliberately missing and what remains unverified.
    Integration.
 3. Find "Inverter Analytics" in the HACS integration list and install it.
 4. Restart Home Assistant.
-5. Add the integration from **Settings → Devices & Services → Add Integration**
-   and map your entities to the roles it asks for. Only load power and
-   rated power are required; everything else is optional and feeds tabs
-   that are not built yet.
+5. Add the integration from **Settings → Devices & Services → Add Integration**.
+   It will offer the inverters it found; pick yours and check what it filled
+   in, or choose manual mapping. Only load power and rated power are
+   required. Per-phase load sensors enable the Phases section and PV
+   strings the string comparison; the rest is optional and feeds tabs that
+   are not built yet.
 
 ## Documentation
 

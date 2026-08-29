@@ -1,14 +1,20 @@
 """Tests for the setup wizard."""
 
+from unittest.mock import patch
+
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
-from custom_components.inverter_analytics.config_flow import CT_CHOICE, pack, unpack
-from custom_components.inverter_analytics.const import DOMAIN
+from custom_components.inverter_analytics.config_flow import pack, unpack
+from custom_components.inverter_analytics.const import DEFAULT_IMBALANCE_FLOOR_PCT, DOMAIN
+from custom_components.inverter_analytics.detect import CT_CHOICE, Ambiguity, Detection
 from custom_components.inverter_analytics.roles import EntryConfig
+
+MODULE = "custom_components.inverter_analytics.config_flow"
 
 
 def test_pack_splits_flat_form_into_entities_numbers_and_inverted():
@@ -393,3 +399,276 @@ async def test_the_grid_power_phase_picker_is_absent_when_a_ct_question_covers_i
     field_names = {str(getattr(key, "schema", key)) for key in result["data_schema"].schema}
     assert "grid_power_phase" not in field_names
     assert CT_CHOICE in field_names
+
+
+def _power_states(hass, entity_ids):
+    for entity_id in entity_ids:
+        hass.states.async_set(
+            entity_id,
+            "100",
+            {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+        )
+
+
+async def test_two_questions_do_not_overwrite_each_other(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """One field per question, one answer per role.
+
+    A single shared field would bind the second question over the first and
+    then apply one answer to both roles. Only one ambiguity exists today, so
+    both faults are latent until a second question is ever added — which is
+    exactly when nobody would think to check.
+    """
+    # Five sensors: a name prefix is only a guess, so a smaller group does not
+    # clear the floor and the wizard would skip straight to manual mapping.
+    _power_states(
+        hass,
+        ["sensor.solarman_total_load_power"]
+        + [f"sensor.solarman_load_l{phase}_power" for phase in (1, 2, 3)]
+        + ["sensor.solarman_pv1_power"],
+    )
+    await hass.async_block_till_done()
+
+    detection = Detection(
+        mapping={"load_power": ("sensor.solarman_total_load_power",)},
+        ambiguities=(
+            Ambiguity(
+                key="ct_choice",
+                role="grid_power_phase",
+                question="Which CTs?",
+                options={"external_ct": ("sensor.ext_l1",), "internal_ct": ("sensor.int_l1",)},
+            ),
+            Ambiguity(
+                key="string_choice",
+                role="pv_power_string",
+                question="Which strings?",
+                options={"roof": ("sensor.roof_1",), "garage": ("sensor.garage_1",)},
+            ),
+        ),
+        without_statistics=(),
+        cluster_key="solarman",
+        cluster_label="Solarman",
+    )
+
+    with patch(f"{MODULE}.classify", return_value=detection):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"source": "solarman"}
+        )
+        field_names = {str(getattr(key, "schema", key)) for key in result["data_schema"].schema}
+        assert {"ct_choice", "string_choice"} <= field_names
+        assert "grid_power_phase" not in field_names
+        assert "pv_power_string" not in field_names
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "Deye",
+                "rated_power": 12000,
+                "load_power": "sensor.solarman_total_load_power",
+                "ct_choice": "internal_ct",
+                "string_choice": "roof",
+            },
+        )
+    await hass.async_block_till_done()
+
+    entities = result["result"].data["entities"]
+    assert entities["grid_power_phase"] == ["sensor.int_l1"]
+    assert entities["pv_power_string"] == ["sensor.roof_1"]
+
+
+async def test_a_question_sits_where_its_picker_was(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Appending it instead would strand the role's invert checkbox.
+
+    The checkbox still applies to whatever the answer assigns, so it is correct
+    to render it — but a checkbox reading "invert grid power per phase" with no
+    such field anywhere above it reads as a bug.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    entity_ids += [
+        f"sensor.solarman_{kind}_l{phase}_power"
+        for kind in ("external_ct", "internal_ct")
+        for phase in (1, 2, 3)
+    ]
+    _power_states(hass, entity_ids)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+
+    names = [str(getattr(key, "schema", key)) for key in result["data_schema"].schema]
+    assert names.index(CT_CHOICE) < names.index("invert_grid_power_phase")
+
+
+async def test_the_ct_options_say_how_many_sensors_each_set_has(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """An incomplete clamp set still raises the question.
+
+    Picking it silently carries only the phases that exist, so the count is the
+    one thing that tells the two options apart.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    entity_ids += [f"sensor.solarman_external_ct_l{phase}_power" for phase in (1, 2, 3)]
+    entity_ids += ["sensor.solarman_internal_ct_l1_power"]
+    _power_states(hass, entity_ids)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+
+    field = next(
+        value
+        for key, value in result["data_schema"].schema.items()
+        if str(getattr(key, "schema", key)) == CT_CHOICE
+    )
+    labels = [option["label"] for option in field.config["options"]]
+    assert any("(3 sensors)" in label for label in labels)
+    assert any("(1 sensors)" in label for label in labels)
+
+
+async def test_a_cluster_with_no_load_sensor_says_so_in_its_label(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Five battery sensors clear the prefix floor on their own.
+
+    Setup cannot be completed from that group, because the load sensor is
+    required and is not in it, so the option must not read like a recognised
+    inverter.
+    """
+    for name in ("soc", "voltage", "current", "temperature", "power"):
+        hass.states.async_set(
+            f"sensor.deye2_battery_{name}",
+            "50",
+            {"device_class": "battery", "state_class": "measurement"},
+        )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    field = next(iter(result["data_schema"].schema.values()))
+    labels = [option["label"] for option in field.config["options"]]
+    assert any("no load sensor found" in label for label in labels)
+
+
+async def test_renaming_an_inverter_reloads_it_once(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Two writes fire the update listener twice for one rename.
+
+    Serialised by the setup lock, so nothing corrupts — but the integration
+    tears down and rebuilds twice, and its cache is dropped twice, for a change
+    of name.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Old name",
+        data={
+            "entities": {"load_power": ["sensor.load"]},
+            "numbers": {"rated_power": 9000},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch.object(
+        hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+    ) as reload:
+        await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"name": "New name", "rated_power": 9000, "load_power": "sensor.load"},
+        )
+        await hass.async_block_till_done()
+
+    assert entry.title == "New name"
+    assert reload.call_count == 1
+
+
+async def test_an_inverted_role_survives_the_wizard_end_to_end(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """The checkbox is packed, stored and read back as a sign of -1.
+
+    Every part of that chain was tested on its own; nothing checked that a box
+    ticked in the form actually flips the sign the analytics uses.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["step_id"] == "manual"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "name": "Deye",
+            "rated_power": 8000,
+            "load_power": "sensor.load",
+            "battery_power": "sensor.battery",
+            "invert_battery_power": True,
+        },
+    )
+    await hass.async_block_till_done()
+
+    config = EntryConfig.from_entry(result["result"])
+    assert config.sign("battery_power") == -1.0
+    assert config.sign("load_power") == 1.0
+
+
+async def test_the_options_form_arrives_filled_in_with_what_is_stored(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """An empty form would read as "nothing configured" and invite retyping."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye",
+        data={
+            "entities": {
+                "load_power": ["sensor.load"],
+                "load_power_phase": ["sensor.l1", "sensor.l2"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": ["battery_power"],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    suggested = {
+        str(getattr(key, "schema", key)): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+        if getattr(key, "description", None)
+    }
+    # A marker with no default carries the UNDEFINED sentinel, not None, and
+    # calling it raises rather than returning nothing.
+    defaults = {
+        str(getattr(key, "schema", key)): key.default()
+        for key in result["data_schema"].schema
+        if getattr(key, "default", vol.UNDEFINED) is not vol.UNDEFINED
+    }
+
+    assert suggested["load_power"] == "sensor.load"
+    assert suggested["load_power_phase"] == ["sensor.l1", "sensor.l2"]
+    assert suggested["rated_power"] == 8000.0
+    assert defaults["name"] == "Deye"
+    assert defaults["invert_battery_power"] is True
+    # The tuning thresholds are pre-filled with the value actually in force.
+    assert suggested["imbalance_floor_pct"] == DEFAULT_IMBALANCE_FLOOR_PCT

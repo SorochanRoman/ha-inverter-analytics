@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveRange } from "./range";
+import { RANGE_KEYS, resolveRange } from "./range";
 
 const NOW = new Date("2026-08-29T12:00:00Z");
 
@@ -37,5 +37,23 @@ describe("resolveRange", () => {
     const a = resolveRange("24h", new Date("2026-08-29T12:00:00.100Z"));
     const b = resolveRange("24h", new Date("2026-08-29T12:00:00.750Z"));
     expect(a.end.getTime()).toBe(b.end.getTime());
+  });
+});
+
+describe("resolveRange end", () => {
+  it("ends at the quantised present for every range", () => {
+    // Checked once for all keys: the span assertions pass whatever the end is,
+    // so a range that ended a day late would have gone unnoticed.
+    const now = new Date("2026-08-29T12:00:30.500Z");
+    const expected = new Date("2026-08-29T12:00:00Z").toISOString();
+    for (const key of RANGE_KEYS) {
+      expect(resolveRange(key, now).end.toISOString(), key).toBe(expected);
+    }
+  });
+
+  it("month ends now rather than at the end of the month", () => {
+    const { start, end } = resolveRange("month", NOW);
+    expect(end.toISOString()).toBe(NOW.toISOString());
+    expect(start.getTime()).toBeLessThan(end.getTime());
   });
 });

@@ -21,6 +21,10 @@ class ResultCache:
     def __init__(
         self, max_entries: int = 50, time_fn: Callable[[], float] = time.monotonic
     ) -> None:
+        if max_entries < 1:
+            # Zero or negative would evict on every write, turning the cache
+            # into a silent no-op that only shows up as recomputation.
+            raise ValueError("max_entries must be at least 1")
         self._entries: OrderedDict[Hashable, _Entry] = OrderedDict()
         self._max_entries = max_entries
         self._time_fn = time_fn
