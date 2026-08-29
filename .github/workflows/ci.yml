@@ -6,20 +6,28 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  # Перевіряє маніфест інтеграції — це властивість коду, тож ганяємо на всьому.
+  hassfest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Hassfest
-        uses: home-assistant/actions/hassfest@master
-      - name: HACS
-        uses: hacs/action@main
+      - uses: home-assistant/actions/hassfest@master
+
+  # HACS перевіряє метадані самого репозиторію — ліцензію, опис, теми — а
+  # GitHub віддає їх лише з дефолтної гілки. На гілці ці перевірки нічого не
+  # міряють: ліцензію, покладену в гілку, GitHub не побачить, доки її не злито
+  # в main, тож червоний результат там неминучий і неінформативний.
+  hacs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
         with:
           category: integration
-          # brands перевіряє наявність іконки в репозиторії home-assistant/brands.
-          # Це вимога для потрапляння в дефолтний каталог HACS, а не для
-          # встановлення через Custom repositories, яким ми користуємось.
-          # Знімати ігнор, коли подамо іконку в brands.
+          # brands вимагає іконки в репозиторії home-assistant/brands. Це умова
+          # потрапляння в дефолтний каталог HACS, а не встановлення через
+          # Custom repositories. Знімати, коли подамо іконку в brands.
           ignore: brands
 
   test:
