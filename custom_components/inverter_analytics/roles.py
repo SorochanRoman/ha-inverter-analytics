@@ -61,6 +61,8 @@ ROLES: tuple[Role, ...] = (
     Role("grid_export_total", RoleKind.ENERGY, "kWh"),
     Role("imbalance_floor_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("imbalance_threshold_pct", RoleKind.NUMBER, "%", advanced=True),
+    Role("battery_low_pct", RoleKind.NUMBER, "%", advanced=True),
+    Role("battery_idle_w", RoleKind.NUMBER, "W", advanced=True),
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}

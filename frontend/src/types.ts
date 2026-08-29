@@ -88,6 +88,14 @@ export interface Strings {
 
 export type Precision = "raw" | "lts" | "mixed";
 
+export interface Consistency {
+  total_mean: number;
+  parts_mean: number;
+  mismatch: number;
+  beyond_margin: boolean;
+  margin: number;
+}
+
 export interface LoadPayload {
   coverage: number;
   rated_power: number;
@@ -110,6 +118,8 @@ export interface LoadPayload {
   phases?: Phases;
   /** Absent unless at least two PV strings are mapped. */
   strings?: Strings;
+  /** Present per group only when there was something to compare. */
+  consistency: { load?: Consistency; pv?: Consistency };
 }
 
 export interface EntryInfo {
@@ -128,4 +138,63 @@ export interface ConfigResult {
 export interface HomeAssistant {
   connection: { sendMessagePromise<T>(message: unknown): Promise<T> };
   locale: { language: string };
+}
+
+export interface BatteryKpi {
+  mean_soc: number | null;
+  min_soc: number | null;
+  seconds_below_low: number;
+  dip_count: number;
+  mean_low_point: number | null;
+}
+
+export interface Dip {
+  start: string;
+  end: string;
+  seconds: number;
+  lowest: number;
+  recovered_to: number | null;
+}
+
+export interface ChargeFlow {
+  idle_w: number;
+  mean_charge_w: number | null;
+  mean_discharge_w: number | null;
+  share_charging: number | null;
+  share_discharging: number | null;
+  share_idle: number | null;
+  energy_in_kwh: number;
+  energy_out_kwh: number;
+  cycles_per_day: number | null;
+  /** null when the battery barely moved and there was nothing to conclude. */
+  sign_looks_inverted: boolean | null;
+}
+
+export interface BatteryPayload {
+  coverage: number;
+  low_pct: number;
+  /** Where raw states begin; null when the whole window is raw. */
+  raw_from: string | null;
+  raw_seconds: number;
+  /** False when the window lies entirely in hourly statistics, which cannot show a dip. */
+  dips_measurable: boolean;
+  /** True only when the cutoff actually held data back, rather than merely existing. */
+  dips_restricted: boolean;
+  has_capacity: boolean;
+  kpi: BatteryKpi;
+  histogram: {
+    bucket_width: number;
+    clipped_low_seconds: number;
+    clipped_high_seconds: number;
+    buckets: HistogramBucket[];
+  };
+  bands: Band[];
+  episodes: Dip[];
+  /** Absent when no battery-power sensor is mapped. */
+  power: ChargeFlow | null;
+  series: Record<string, SeriesInfo>;
+  precision: Precision;
+  boundary: string | null;
+  window: { start: string; end: string };
+  clamped: boolean;
 }

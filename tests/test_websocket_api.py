@@ -274,4 +274,105 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         async_register(hass)
 
     registered = [call.args[1].__name__ for call in register.call_args_list]
-    assert registered == ["ws_config", "ws_load"]
+    assert registered == ["ws_config", "ws_load", "ws_battery"]
+
+
+async def test_battery_command_returns_analytics(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {"battery_soc": ["sensor.battery_soc"]},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("sensor.battery_soc", "80")
+    await async_wait_recording_done(hass)
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/battery",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(hours=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["low_pct"] == 20.0
+    assert len(result["bands"]) == 5
+    assert result["power"] is None
+    assert "battery_soc" in result["series"]
+
+
+async def test_battery_command_says_what_is_missing_without_a_charge_sensor(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The Load tab can be configured without ever mapping a battery."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/battery",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(hours=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "invalid_config"
+    assert "battery_soc" in response["error"]["message"]
+
+
+async def test_load_and_battery_do_not_share_a_cache_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Same entry, same window, two commands — the kind has to key the cache."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {"load_power": ["sensor.load_power"], "battery_soc": ["sensor.soc"]},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.load_power", "1000")
+    hass.states.async_set("sensor.soc", "55")
+    await async_wait_recording_done(hass)
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    window = {
+        "entry_id": entry.entry_id,
+        "start": (end - timedelta(hours=1)).isoformat(),
+        "end": end.isoformat(),
+    }
+    await client.send_json_auto_id({"type": "inverter_analytics/load", **window})
+    load = (await client.receive_json())["result"]
+    await client.send_json_auto_id({"type": "inverter_analytics/battery", **window})
+    battery = (await client.receive_json())["result"]
+
+    assert "rated_power" in load and "rated_power" not in battery
+    assert "low_pct" in battery and "low_pct" not in load

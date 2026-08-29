@@ -1,8 +1,10 @@
 """Tests for panel registration."""
 
+import hashlib
+import pathlib
+
 from homeassistant.components import frontend
 from homeassistant.core import HomeAssistant
-from homeassistant.loader import async_get_loaded_integration
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.inverter_analytics.const import (
@@ -65,14 +67,15 @@ async def test_panel_survives_while_another_entry_remains(
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS]
 
 
-async def test_the_bundle_url_carries_the_integration_version(
+async def test_the_bundle_url_changes_when_the_bundle_does(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
-    """An unversioned URL leaves an upgraded browser running the old panel.
+    """An unchanging URL leaves an upgraded browser running the old panel.
 
     The file is served from one fixed path, so nothing tells the browser its
-    contents changed. The user sees the previous release's panel, with no
-    error and no hint that a reload would help.
+    contents changed. The user sees the previous release's panel, with no error
+    and no hint that a reload would help. Keyed on content rather than the
+    manifest version, which does not move for anyone tracking a branch.
     """
     entry = _entry("Inverter")
     entry.add_to_hass(hass)
@@ -81,7 +84,10 @@ async def test_the_bundle_url_carries_the_integration_version(
 
     panel = hass.data[frontend.DATA_PANELS][PANEL_URL_PATH]
     module_url = panel.config["_panel_custom"]["module_url"]
-    version = async_get_loaded_integration(hass, DOMAIN).version
 
-    assert module_url.startswith(f"{STATIC_URL_BASE}/{PANEL_BUNDLE}")
-    assert module_url.endswith(f"?v={version}")
+    bundle = (
+        pathlib.Path("custom_components/inverter_analytics/frontend/dist") / PANEL_BUNDLE
+    ).read_bytes()
+    digest = hashlib.sha256(bundle).hexdigest()[:12]
+
+    assert module_url == f"{STATIC_URL_BASE}/{PANEL_BUNDLE}?v={digest}"

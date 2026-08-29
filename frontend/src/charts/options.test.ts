@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { SERIES } from "../theme";
 import { SUPPORTED_OPTION_KEYS } from "./registry";
-import type { Imbalance, LoadPayload, PartSummary } from "../types";
+import type { Band, BatteryPayload, Imbalance, LoadPayload, PartSummary } from "../types";
 import {
   bandsOption,
   durationCurveOption,
   histogramOption,
   imbalanceOption,
   partsOption,
+  socBandsOption,
+  socHistogramOption,
 } from "./options";
 
 const payload: LoadPayload = {
@@ -36,6 +38,7 @@ const payload: LoadPayload = {
   ],
   overloads: [],
   series: {},
+  consistency: {},
   precision: "raw",
   boundary: null,
   window: { start: "2026-08-01T00:00:00+00:00", end: "2026-08-29T00:00:00+00:00" },
@@ -183,5 +186,48 @@ describe("option builders against what the bundle registers", () => {
     // a word. That is how a legend shipped as two unlabelled bar colours.
     const unsupported = Object.keys(option).filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
     expect(unsupported).toEqual([]);
+  });
+});
+
+describe("battery charts", () => {
+  const battery = {
+    low_pct: 20,
+    histogram: {
+      bucket_width: 5,
+      clipped_low_seconds: 0,
+      clipped_high_seconds: 0,
+      buckets: [
+        { start: 0, end: 5, seconds: 60, fraction: 0.1 },
+        { start: 15, end: 20, seconds: 60, fraction: 0.2 },
+        { start: 20, end: 25, seconds: 60, fraction: 0.7 },
+      ],
+    },
+  } as unknown as BatteryPayload;
+
+  const bands: Band[] = [
+    { key: "0-20", from: 0, to: 20, seconds: 60, fraction: 0.1 },
+    { key: "80-100", from: 80, to: null, seconds: 540, fraction: 0.9 },
+  ];
+
+  it("colours only the buckets at or below the low mark as a warning", () => {
+    const option = socHistogramOption(battery) as any;
+    const colourOf = option.series[0].itemStyle.color;
+    expect(colourOf({ dataIndex: 0 })).toBe(SERIES.overload);
+    // Ends exactly at the threshold, so it is still below it.
+    expect(colourOf({ dataIndex: 1 })).toBe(SERIES.overload);
+    expect(colourOf({ dataIndex: 2 })).toBe(SERIES.battery);
+  });
+
+  it("reverses the bands so the highest charge sits at the top", () => {
+    const option = socBandsOption(bands) as any;
+    expect(option.yAxis.data).toEqual(["80-100", "0-20"]);
+    expect(option.series[0].data).toEqual([90, 10]);
+    expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.overload);
+  });
+
+  it("uses only keys a registered component can render", () => {
+    for (const option of [socHistogramOption(battery), socBandsOption(bands)]) {
+      expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
+    }
   });
 });

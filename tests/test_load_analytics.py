@@ -139,3 +139,79 @@ async def test_a_lone_phase_sensor_is_not_read_at_all():
         await async_load_analytics(None, config(load_power_phase=[L1]), WINDOW)
 
     assert captured["ids"] == [TOTAL]
+
+
+PV_TOTAL = "sensor.pv_power"
+
+
+async def test_a_total_matching_its_phases_raises_nothing():
+    payload = await run(
+        config(load_power_phase=[L1, L2, L3]),
+        {
+            TOTAL: result(6000.0),
+            L1: result(2000.0),
+            L2: result(2000.0),
+            L3: result(2000.0),
+        },
+    )
+    assert payload["consistency"]["load"]["beyond_margin"] is False
+
+
+async def test_a_total_that_cannot_be_its_phases_is_reported():
+    """The grid clamp mapped as the load total: every field validates.
+
+    No wizard can catch this — the user picked a real power sensor of the right
+    device class. Only the two readings disagreeing can.
+    """
+    payload = await run(
+        config(load_power_phase=[L1, L2, L3]),
+        {
+            TOTAL: result(9000.0),
+            L1: result(1000.0),
+            L2: result(1000.0),
+            L3: result(1000.0),
+        },
+    )
+    check = payload["consistency"]["load"]
+    assert check["beyond_margin"] is True
+    assert check["total_mean"] == 9000.0
+    assert check["parts_mean"] == 3000.0
+
+
+async def test_a_small_difference_is_not_worth_saying_anything_about():
+    """A total may legitimately include something its parts do not."""
+    payload = await run(
+        config(load_power_phase=[L1, L2]),
+        {TOTAL: result(2200.0), L1: result(1000.0), L2: result(1000.0)},
+    )
+    assert payload["consistency"]["load"]["beyond_margin"] is False
+
+
+async def test_two_near_zero_readings_are_not_compared():
+    """Both averaging a few watts differ by large percentages meaning nothing."""
+    payload = await run(
+        config(load_power_phase=[L1, L2]),
+        {TOTAL: result(10.0), L1: result(1.0), L2: result(1.0)},
+    )
+    assert "load" not in payload["consistency"]
+
+
+async def test_pv_strings_are_checked_against_the_pv_total():
+    payload = await run(
+        config(pv_power_string=[PV1, PV2], pv_power=[PV_TOTAL]),
+        {
+            TOTAL: result(3000.0),
+            PV_TOTAL: result(5000.0),
+            PV1: result(1000.0),
+            PV2: result(1000.0),
+        },
+    )
+    assert payload["consistency"]["pv"]["beyond_margin"] is True
+
+
+async def test_without_a_pv_total_there_is_nothing_to_check_against():
+    payload = await run(
+        config(pv_power_string=[PV1, PV2]),
+        {TOTAL: result(3000.0), PV1: result(1000.0), PV2: result(1000.0)},
+    )
+    assert "pv" not in payload["consistency"]

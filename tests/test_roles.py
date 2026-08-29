@@ -160,7 +160,12 @@ def test_a_repeated_entity_is_dropped_not_counted_twice():
 
 def test_the_tuning_numbers_stay_out_of_the_first_run():
     advanced = {role.key for role in ROLES if role.advanced}
-    assert advanced == {"imbalance_floor_pct", "imbalance_threshold_pct"}
+    assert advanced == {
+        "imbalance_floor_pct",
+        "imbalance_threshold_pct",
+        "battery_low_pct",
+        "battery_idle_w",
+    }
     assert not any(role.advanced for role in ROLES if role.required)
 
 

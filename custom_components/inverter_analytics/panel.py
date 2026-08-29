@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
-from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
 
 from .const import (
     DOMAIN,
@@ -22,31 +22,39 @@ from .const import (
 _DATA_STATIC_REGISTERED = "static_registered"
 
 
-def _bundle_url(hass: HomeAssistant) -> str:
-    """The panel bundle's URL, carrying the version that produced it.
+def _bundle_fingerprint(dist: Path) -> str | None:
+    """A short digest of the bundle's contents.
 
-    Without it the URL never changes, so a browser that has the file cached
-    keeps running the previous release's panel after an upgrade — silently,
-    with no error and no hint that a reload is needed. Home Assistant's own
-    frontend versions its assets for the same reason.
+    The URL has to change when the file does, or a browser holding the old copy
+    keeps running the previous panel after an upgrade — silently, with no error
+    and no hint that a reload would help.
 
-    The version is read from the manifest, which is what an upgrade bumps.
-    Falling back to the plain URL keeps the panel working if it cannot be
-    read; a stale bundle is better than no panel.
+    Content rather than the manifest version: the version only moves between
+    releases, so it does nothing for anyone tracking a branch, and nothing
+    during development. This was found by twice failing to see a fix take
+    effect, once after a hard reload.
     """
+    bundle = dist / PANEL_BUNDLE
     try:
-        version = async_get_loaded_integration(hass, DOMAIN).version
-    except (IntegrationNotLoaded, KeyError):
-        version = None
-    return f"{STATIC_URL_BASE}/{PANEL_BUNDLE}" + (f"?v={version}" if version else "")
+        return hashlib.sha256(bundle.read_bytes()).hexdigest()[:12]
+    except OSError:
+        # A missing or unreadable bundle is the static handler's problem to
+        # report; serving the panel unversioned beats not serving it.
+        return None
+
+
+def _bundle_url(dist: Path) -> str:
+    """The panel bundle's URL, carrying a fingerprint of what it contains."""
+    fingerprint = _bundle_fingerprint(dist)
+    return f"{STATIC_URL_BASE}/{PANEL_BUNDLE}" + (f"?v={fingerprint}" if fingerprint else "")
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the static files and the sidebar entry. Idempotent."""
     domain_data = hass.data.setdefault(DOMAIN, {})
+    dist = Path(__file__).parent / "frontend" / "dist"
 
     if not domain_data.get(_DATA_STATIC_REGISTERED):
-        dist = Path(__file__).parent / "frontend" / "dist"
         await hass.http.async_register_static_paths(
             [StaticPathConfig(STATIC_URL_BASE, str(dist), False)]
         )
@@ -65,7 +73,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         config={
             "_panel_custom": {
                 "name": PANEL_ELEMENT,
-                "module_url": _bundle_url(hass),
+                "module_url": _bundle_url(dist),
                 "embed_iframe": False,
                 "trust_external": False,
             }

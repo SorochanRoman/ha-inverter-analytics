@@ -1,42 +1,36 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { fetchLoad } from "../api";
-import { bandsOption, durationCurveOption, histogramOption } from "../charts/options";
+import { fetchBattery } from "../api";
+import { socBandsOption, socHistogramOption } from "../charts/options";
 import "../charts/echart";
-import "../sections/phases-section";
-import "../sections/strings-section";
+import "../sections/charge-section";
 import {
   coverageWarning,
   describeError,
   formatDuration,
   formatPercent,
-  formatPower,
   precisionLabel,
 } from "../format";
 import { resolveRange, type RangeKey } from "../range";
-import type { Consistency, HomeAssistant, LoadPayload } from "../types";
+import type { BatteryPayload, HomeAssistant } from "../types";
 
-@customElement("ia-load-tab")
-export class IaLoadTab extends LitElement {
+@customElement("ia-battery-tab")
+export class IaBatteryTab extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ type: String }) public entryId?: string;
   @property({ type: String }) public range: RangeKey = "30d";
 
-  @state() private payload?: LoadPayload;
+  @state() private payload?: BatteryPayload;
   @state() private error?: string;
   @state() private loading = false;
-  @state() private mode: "watts" | "percent" = "watts";
 
   private requestId = 0;
-
   private themeObserver?: MutationObserver;
 
   public connectedCallback(): void {
     super.connectedCallback();
-    // Home Assistant applies a theme by rewriting CSS variables on <html>.
     // Chart options bake in the colours read at build time, so without a
-    // rebuild the axis labels stay stuck with the previous theme: after
-    // switching to a light theme they turn light grey on white and vanish.
+    // rebuild the axis labels stay stuck with the previous theme.
     this.themeObserver = new MutationObserver(() => this.requestUpdate());
     this.themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -58,15 +52,14 @@ export class IaLoadTab extends LitElement {
 
   private async load(): Promise<void> {
     if (!this.entryId) return;
-    // Each request gets a number. While it's in flight, the user may have
-    // already switched periods — in that case the response is stale and
-    // must not be shown.
+    // While a request is in flight the user may have switched periods; the
+    // older response must not overwrite the newer one.
     const requestId = ++this.requestId;
     this.loading = true;
     this.error = undefined;
     try {
       const { start, end } = resolveRange(this.range, new Date());
-      const payload = await fetchLoad(this.hass, this.entryId, start, end);
+      const payload = await fetchBattery(this.hass, this.entryId, start, end);
       if (requestId !== this.requestId) return;
       this.payload = payload;
     } catch (err) {
@@ -79,34 +72,33 @@ export class IaLoadTab extends LitElement {
     }
   }
 
-  /**
-   * A total and its parts that cannot both be right.
-   *
-   * Phrased as a question rather than a verdict: a legitimate installation can
-   * have a total that covers more than the parts, so this is evidence the user
-   * should look at, not a fault we have proved.
-   */
-  private renderConsistency(check: Consistency | undefined, whole: string, parts: string) {
-    if (!check?.beyond_margin) return nothing;
+  private renderKpi(payload: BatteryPayload) {
     const locale = this.hass.locale.language;
-    return html`<span class="warn">
-      ${whole} averages ${formatPower(check.total_mean, locale)} while ${parts} add up to
-      ${formatPower(check.parts_mean, locale)}. Is one of them mapped to the wrong sensor?
-    </span>`;
-  }
-
-  private renderKpi(payload: LoadPayload) {
-    const locale = this.hass.locale.language;
-    const share = (value: number | null) =>
-      value === null ? "" : formatPercent(value / payload.rated_power, locale) + " of rated";
+    const measurable = payload.dips_measurable;
+    const dash = "—";
 
     const cells: [string, string, string][] = [
-      ["Mean", formatPower(payload.kpi.mean, locale), share(payload.kpi.mean)],
-      ["Median", formatPower(payload.kpi.median, locale), ""],
-      ["P95", formatPower(payload.kpi.p95, locale), ""],
-      ["Peak", formatPower(payload.kpi.max, locale), share(payload.kpi.max)],
-      ["Sustained 15 min", formatPower(payload.kpi.max_sustained_15m, locale), ""],
-      [">80% of rated", formatPercent(payload.kpi.fraction_above_80pct, locale), "of time"],
+      ["Mean charge", formatPercent(pct(payload.kpi.mean_soc), locale), "over the whole period"],
+      [
+        "Lowest charge",
+        measurable ? formatPercent(pct(payload.kpi.min_soc), locale) : dash,
+        measurable ? "exact data only" : "needs exact data",
+      ],
+      [
+        `Below ${formatPercent(pct(payload.low_pct), locale)}`,
+        measurable ? formatDuration(payload.kpi.seconds_below_low) : dash,
+        measurable ? "exact data only" : "needs exact data",
+      ],
+      [
+        "Dips",
+        measurable ? String(payload.kpi.dip_count) : dash,
+        measurable ? "lasting over a minute" : "needs exact data",
+      ],
+      [
+        "Mean low point",
+        measurable ? formatPercent(pct(payload.kpi.mean_low_point), locale) : dash,
+        measurable ? "across those dips" : "needs exact data",
+      ],
     ];
 
     return html`<div class="kpi">
@@ -120,21 +112,35 @@ export class IaLoadTab extends LitElement {
     </div>`;
   }
 
-  private renderOverloads(payload: LoadPayload) {
-    if (!payload.overloads.length) {
-      return html`<p class="empty">No overloads in this period.</p>`;
-    }
+  private renderEpisodes(payload: BatteryPayload) {
     const locale = this.hass.locale.language;
+
+    if (!payload.dips_measurable) {
+      return html`<p class="empty">
+        This period is covered only by hourly averages, which record the mean charge across each
+        hour. A fall to 8% for twenty minutes shows up there as a comfortable number, so dips
+        cannot be counted at all — an empty table would read as "none happened". Pick a shorter
+        period to see them.
+      </p>`;
+    }
+    if (!payload.episodes.length) {
+      return html`<p class="empty">
+        The charge never stayed below ${formatPercent(pct(payload.low_pct), locale)} for more than
+        a minute in this period.
+      </p>`;
+    }
+
     return html`<table>
       <thead>
-        <tr><th>Start</th><th>Duration</th><th>Peak</th></tr>
+        <tr><th>Start</th><th>Duration</th><th>Lowest</th><th>Recovered to</th></tr>
       </thead>
       <tbody>
-        ${payload.overloads.map(
-          (item) => html`<tr>
-            <td>${new Date(item.start).toLocaleString(locale)}</td>
-            <td>${formatDuration(item.seconds)}</td>
-            <td>${formatPower(item.peak, locale)}</td>
+        ${payload.episodes.map(
+          (dip) => html`<tr>
+            <td>${new Date(dip.start).toLocaleString(locale)}</td>
+            <td>${formatDuration(dip.seconds)}</td>
+            <td>${formatPercent(pct(dip.lowest), locale)}</td>
+            <td>${formatPercent(pct(dip.recovered_to), locale)}</td>
           </tr>`,
         )}
       </tbody>
@@ -154,68 +160,54 @@ export class IaLoadTab extends LitElement {
 
     const payload = this.payload;
     const locale = this.hass.locale.language;
+    const warning = coverageWarning(payload.coverage, locale);
 
     return html`
       <div class="status">
         <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
-        ${coverageWarning(payload.coverage, locale)
-          ? html`<span class="warn">${coverageWarning(payload.coverage, locale)}</span>`
-          : nothing}
+        ${warning ? html`<span class="warn">${warning}</span>` : nothing}
         ${payload.clamped
           ? html`<span class="warn">Period shortened to the maximum allowed</span>`
           : nothing}
-        ${payload.histogram.clipped_low_seconds + payload.histogram.clipped_high_seconds > 0
+        ${payload.raw_from && payload.dips_restricted && payload.dips_measurable
           ? html`<span class="warn">
-              Some values fell outside the histogram range and are shown in its edge buckets
+              Dips counted from ${new Date(payload.raw_from).toLocaleDateString(locale)}, where
+              exact data begins
             </span>`
           : nothing}
-        ${this.renderConsistency(payload.consistency.load, "Total load", "the phases")}
-        ${this.renderConsistency(payload.consistency.pv, "Total PV power", "the strings")}
         ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
       </div>
 
       ${this.renderKpi(payload)}
 
       <section>
-        <header>
-          <h2>Time spent at each power level</h2>
-          <button @click=${() => {
-            this.mode = this.mode === "watts" ? "percent" : "watts";
-          }}>${this.mode === "watts" ? "as % of rated" : "in watts"}</button>
-        </header>
-        <ia-chart .option=${histogramOption(payload, this.mode)}></ia-chart>
+        <h2>Time spent at each state of charge</h2>
+        <ia-chart .option=${socHistogramOption(payload)}></ia-chart>
       </section>
 
       <section>
-        <h2>Load duration curve</h2>
-        <ia-chart .option=${durationCurveOption(payload)}></ia-chart>
+        <h2>Distribution across charge bands</h2>
+        <ia-chart .option=${socBandsOption(payload.bands)} height="220px"></ia-chart>
       </section>
 
       <section>
-        <h2>Distribution across rated-power bands</h2>
-        <ia-chart .option=${bandsOption(payload)} height="220px"></ia-chart>
+        <h2>Low-charge episodes</h2>
+        ${this.renderEpisodes(payload)}
       </section>
 
-      <section>
-        <h2>Overload episodes</h2>
-        ${this.renderOverloads(payload)}
-      </section>
-
-      ${payload.phases
-        ? html`<ia-phases-section
-            .phases=${payload.phases}
-            .series=${payload.series}
+      ${payload.power
+        ? html`<ia-charge-section
+            .flow=${payload.power}
+            .hasCapacity=${payload.has_capacity}
             .locale=${locale}
-          ></ia-phases-section>`
-        : nothing}
-
-      ${payload.strings
-        ? html`<ia-strings-section
-            .strings=${payload.strings}
-            .series=${payload.series}
-            .locale=${locale}
-          ></ia-strings-section>`
-        : nothing}
+          ></ia-charge-section>`
+        : html`<section>
+            <h2>Charging and discharging</h2>
+            <p class="empty">
+              Map a battery power sensor in the integration's options to see how much moves in and
+              out, and how much of the time the battery is working.
+            </p>
+          </section>`}
     `;
   }
 
@@ -253,9 +245,7 @@ export class IaLoadTab extends LitElement {
       padding: 16px;
       margin-bottom: 16px;
     }
-    section header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     h2 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
-    section header h2 { margin-bottom: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); }
     .empty { color: var(--secondary-text-color); margin: 0; }
@@ -272,8 +262,13 @@ export class IaLoadTab extends LitElement {
   `;
 }
 
+/** The payload carries a state of charge as 0-100; formatPercent wants 0-1. */
+function pct(value: number | null): number | null {
+  return value === null ? null : value / 100;
+}
+
 declare global {
   interface HTMLElementTagNameMap {
-    "ia-load-tab": IaLoadTab;
+    "ia-battery-tab": IaBatteryTab;
   }
 }

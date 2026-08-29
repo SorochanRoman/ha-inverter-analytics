@@ -26,6 +26,13 @@ imbalance — produced two episodes with their per-phase values, and 60 s
 correctly excluded as below the load floor. Both had only ever been exercised
 by unit tests against hand-built data.
 
+**Battery analytics.** A history built for it — a charge, a hard discharge, a
+70-second fall to 12%, a 15-second one that must not count, and a recovery —
+produced exactly one episode with its lowest point and recovery, while the time
+below the threshold counted both. The sign check reached a verdict once it had
+enough evidence and correctly reported the wiring as right. The consistency
+check raised nothing on a correctly mapped inverter.
+
 **Phase and string analytics.** The payload carries `load_l1`/`load_l2`/
 `load_l3` and `pv_s1`/`pv_s2` with their own coverage; the per-phase shares sum
 to one; the Phases section renders the cards, the derived-rating note, the
@@ -77,7 +84,18 @@ the defect was only visible on screen.
     release's panel — no error, no hint that a reload would help. Found while
     trying to see a fix take effect and failing, twice, including after a hard
     reload. The URL now carries the manifest version.
-11. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
+11. **"Exact data" beside "dips counted from 19 August".** Both true — the
+    entity had no statistics, and the recorder's retention still bounds where
+    raw states can exist — and together reading as a contradiction. The cutoff
+    is now announced only when data actually exists before it.
+12. **Version-based cache-busting did not bust the cache.** The fix for defect
+    10 keyed the panel URL on the manifest version, which does not move between
+    releases — so it did nothing during development or for anyone tracking a
+    branch, and the very next verification hit the same stale bundle. Keyed on
+    a digest of the file's contents instead.
+13. **A card titled "Energy in / out" showed the out figure.** Its sub-row was
+    labelled "Charged", so the title's order contradicted what was on screen.
+14. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
    ignores an option whose component was not registered, so the string
    comparison drew two unlabelled colours — while a unit test asserted
    `legend.data` was present and passed. Every option builder is now checked
@@ -110,9 +128,6 @@ the defect was only visible on screen.
 
 ## 4. Seams to widen before the next tabs
 
-- **`ws_load` is roughly 30 lines of boilerplate** — entry lookup, window
-  validation, clamping, cache, merge. Extract it when the second command lands,
-  not before.
 - **Cross-role phase counts are unvalidated.** `load_power_phase` and
   `grid_power_phase` may hold different numbers of entities. Nothing combines
   them yet, so nothing is wrong today; the Balance tab is where that stops
@@ -124,7 +139,22 @@ the defect was only visible on screen.
 
 ## 5. Deliberately deferred
 
-**Tabs.** Battery, Seasonality and Energy balance are placeholders.
+**Tabs.** Seasonality and Energy balance are placeholders.
+
+**Metered battery energy.** `battery_charge_total` and `battery_discharge_total`
+are `total_increasing`, which needs `sum`/`state` statistics, and `source.py`
+asks only for `mean`. The Battery tab integrates power instead and says so on
+screen. Round-trip efficiency waits for that extension, which the Balance tab
+needs anyway for six sensors at once.
+
+**A real depth-of-discharge figure.** Measured across dip episodes it would be
+the threshold minus the minimum, since every episode starts at the threshold by
+construction. A true figure needs discharge runs detected from the charge
+itself, which is noise-sensitive work no current tab needs.
+
+**The units guard.** `SensorInfo.unit` is still collected and still unread. A
+kW-reporting sensor mapped to a W role is off by a thousand, and detection could
+refuse it or convert it; neither is written.
 
 **Detection breadth.** The patterns were read off a live StephanJoubert
 Solarman instance. Other vendors fall back to manual mapping. A shared name
