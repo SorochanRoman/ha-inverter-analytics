@@ -58,6 +58,19 @@ ROLES: tuple[Role, ...] = (
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
 
 
+def normalise_entity_ids(value: object) -> tuple[str, ...]:
+    """Read a stored entity mapping in either shape.
+
+    Entries created before roles could hold several entities store a bare
+    string. Nothing migrates an entry the user never reopens, so both shapes
+    stay readable for as long as the integration exists — and every reader of
+    the stored shape must go through here, or the guarantee holds in one place
+    and silently fails in another.
+    """
+    raw = [value] if isinstance(value, str) else list(value or ())
+    return tuple(item for item in raw if item)
+
+
 def entity_roles() -> tuple[Role, ...]:
     """Roles that map to an entity."""
     return tuple(role for role in ROLES if role.kind is not RoleKind.NUMBER)
@@ -71,11 +84,6 @@ def number_roles() -> tuple[Role, ...]:
 def required_role_keys() -> frozenset[str]:
     """Keys of the required roles."""
     return frozenset(role.key for role in ROLES if role.required)
-
-
-def multiple_roles() -> tuple[Role, ...]:
-    """Roles that can hold more than one entity."""
-    return tuple(role for role in ROLES if role.multiple)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,11 +101,7 @@ class EntryConfig:
         for key, value in (data.get(CONF_ENTITIES) or {}).items():
             if key not in ROLES_BY_KEY:
                 raise KeyError(f"Unknown role: {key}")
-            # Entries created before roles could hold several entities store a
-            # bare string. Nothing migrates an entry the user never reopens, so
-            # both shapes stay readable for as long as the integration exists.
-            raw = [value] if isinstance(value, str) else list(value or ())
-            cleaned = tuple(item for item in raw if item)
+            cleaned = normalise_entity_ids(value)
             if cleaned:
                 entities[key] = cleaned
 

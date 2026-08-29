@@ -13,7 +13,7 @@ import voluptuous as vol
 from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS, DOMAIN
 from .detect import Detection, classify, cluster_sensors, collect_sensors
 from .presets import CT_CHOICES
-from .roles import ROLES_BY_KEY, RoleKind, entity_roles, number_roles
+from .roles import ROLES_BY_KEY, RoleKind, entity_roles, normalise_entity_ids, number_roles
 
 CONF_NAME = "name"
 INVERT_PREFIX = "invert_"
@@ -149,6 +149,7 @@ def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
         role = ROLES_BY_KEY.get(key)
         if role is None:
             continue
+        ids = normalise_entity_ids(ids)
         flat[key] = list(ids) if role.multiple else (ids[0] if ids else None)
     flat.update(config.get(CONF_NUMBERS) or {})
     for key in config.get(CONF_INVERTED) or ():
@@ -222,7 +223,14 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
         for role_key, ids in detection.mapping.items():
             defaults[role_key] = list(ids) if ROLES_BY_KEY[role_key].multiple else ids[0]
 
-        fields = dict(build_schema(defaults).schema)
+        ambiguous_roles = {ambiguity.role for ambiguity in detection.ambiguities}
+        fields = {
+            key: value
+            for key, value in build_schema(defaults).schema.items()
+            # A role settled by a question must not also get a picker: whatever
+            # the user typed there would be overwritten by the answer.
+            if str(getattr(key, "schema", key)) not in ambiguous_roles
+        }
         for ambiguity in detection.ambiguities:
             fields[vol.Required(CT_CHOICE)] = selector.SelectSelector(
                 selector.SelectSelectorConfig(

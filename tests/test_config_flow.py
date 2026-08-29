@@ -187,6 +187,61 @@ def test_unpack_round_trips_a_multiple_role():
     assert unpack(pack(flat)) == flat
 
 
+def test_unpack_reads_a_legacy_entry_that_stores_a_bare_string():
+    """Entries created before roles held lists store {"role": "sensor.x"}.
+
+    unpack used to index into that string with ids[0], yielding "s" instead
+    of the entity id.
+    """
+    flat = unpack({"entities": {"load_power": "sensor.load"}, "numbers": {}, "inverted": []})
+    assert flat["load_power"] == "sensor.load"
+
+
+async def test_the_options_form_pre_fills_from_a_legacy_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """An entry written before roles held lists stores a bare string.
+
+    unpack used to index into it, offering "s" as the suggested entity and
+    making the options form unsubmittable.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Legacy",
+        data={
+            "entities": {"load_power": "sensor.load", "pv_power": "sensor.pv"},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+
+    # The bug lived in the suggested_value the form pre-fills, not in
+    # whether a hand-typed submission succeeds — a real user relies on the
+    # pre-filled value being correct, since it is what they see and resubmit
+    # unchanged.
+    suggested = {
+        str(getattr(key, "schema", key)): getattr(key, "description", None) or {}
+        for key in result["data_schema"].schema
+    }
+    assert suggested["load_power"].get("suggested_value") == "sensor.load"
+    assert suggested["pv_power"].get("suggested_value") == "sensor.pv"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"name": "Legacy", "load_power": "sensor.load", "rated_power": 8000},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert EntryConfig.from_entry(entry).entity_id("load_power") == "sensor.load"
+
+
 async def test_discovery_offers_the_detected_inverter(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
@@ -305,3 +360,36 @@ async def test_confirm_resolves_the_ct_ambiguity_to_the_chosen_set(
     assert entities["grid_power_phase"] == [
         f"sensor.solarman_{choice}_l{phase}_power" for phase in (1, 2, 3)
     ]
+
+
+async def test_the_grid_power_phase_picker_is_absent_when_a_ct_question_covers_it(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """A role settled by a question must not also offer a picker.
+
+    Otherwise a value the user hand-picks there is silently replaced by the
+    CT answer with no indication that it happened.
+    """
+    entity_ids = ["sensor.solarman_total_load_power"]
+    for kind in ("external_ct", "internal_ct"):
+        for phase in (1, 2, 3):
+            entity_ids.append(f"sensor.solarman_{kind}_l{phase}_power")
+    for entity_id in entity_ids:
+        hass.states.async_set(
+            entity_id,
+            "100",
+            {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+        )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+    assert result["step_id"] == "confirm"
+
+    field_names = {str(getattr(key, "schema", key)) for key in result["data_schema"].schema}
+    assert "grid_power_phase" not in field_names
+    assert CT_CHOICE in field_names
