@@ -1,3 +1,5 @@
+import type { Precision } from "./types";
+
 const DASH = "—";
 
 export function formatPower(value: number | null, locale: string): string {
@@ -33,7 +35,7 @@ export function describeError(error: unknown): string {
 }
 
 export function precisionLabel(
-  precision: "raw" | "lts" | "mixed",
+  precision: Precision,
   boundary: string | null,
   locale: string,
 ): string {

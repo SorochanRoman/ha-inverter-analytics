@@ -3,6 +3,8 @@ import { customElement, property, state } from "lit/decorators.js";
 import { fetchLoad } from "../api";
 import { bandsOption, durationCurveOption, histogramOption } from "../charts/options";
 import "../charts/echart";
+import "../sections/phases-section";
+import "../sections/strings-section";
 import {
   coverageWarning,
   describeError,
@@ -180,6 +182,22 @@ export class IaLoadTab extends LitElement {
         <h2>Overload episodes</h2>
         ${this.renderOverloads(payload)}
       </section>
+
+      ${payload.phases
+        ? html`<ia-phases-section
+            .phases=${payload.phases}
+            .series=${payload.series}
+            .locale=${locale}
+          ></ia-phases-section>`
+        : nothing}
+
+      ${payload.strings
+        ? html`<ia-strings-section
+            .strings=${payload.strings}
+            .series=${payload.series}
+            .locale=${locale}
+          ></ia-strings-section>`
+        : nothing}
     `;
   }
 
