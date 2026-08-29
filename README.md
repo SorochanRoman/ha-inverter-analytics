@@ -34,6 +34,14 @@ beyond pointing the integration at the ones you already have.
   field explains what it is for, and manual mapping is always available.
   The mapping can be changed later from the integration's options,
   including renaming the inverter and the imbalance thresholds.
+- **A Battery tab.** How much time the battery spends at each state of
+  charge, a band breakdown, and a table of every episode where it fell
+  below your low mark — with what it bottomed out at and what it recovered
+  to. Charge and discharge power, how much of the time it is working at
+  all, energy moved each way and equivalent full cycles per day. Anything
+  that can only be answered from exact data says so on its own card, and a
+  period covered only by hourly averages explains why dips cannot be
+  counted there rather than showing an empty table.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -62,12 +70,19 @@ and this is deliberate rather than incidental:
   interpolated across a gap;
 - when no per-phase rating is configured, the headroom figures say the
   total was split and by how many phases, instead of presenting a derived
-  number as a known one.
+  number as a known one;
+- a total and the parts it is supposed to be made of are checked against
+  each other — if the load total and its phases cannot both be right, the
+  page asks whether one of them is mapped to the wrong sensor;
+- the battery power sensor's direction is checked against the charge
+  itself, because answering that question wrongly during setup would
+  silently swap charging and discharging everywhere.
 
 ## Not built yet
 
-The Battery, Seasonality and Energy balance tabs are placeholders; their
-analytics are not implemented. Detection covers the naming scheme of the
+The Seasonality and Energy balance tabs are placeholders; their analytics
+are not implemented. The Battery tab integrates power rather than reading
+the energy meters, so round-trip efficiency is not among its figures. Detection covers the naming scheme of the
 StephanJoubert Solarman integration, read off a live instance; other
 vendors fall back to manual mapping. See `docs/known-gaps.md` for the
 full list of what is deliberately missing and what remains unverified.

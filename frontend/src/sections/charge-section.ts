@@ -48,7 +48,7 @@ export class IaChargeSection extends LitElement {
             </span>
           </div>
           <div class="card">
-            <span class="name">Energy in / out</span>
+            <span class="name">Discharged</span>
             <span class="value">${formatEnergy(flow.energy_out_kwh, this.locale)}</span>
             <span class="row">
               <span>Charged</span><span>${formatEnergy(flow.energy_in_kwh, this.locale)}</span>
