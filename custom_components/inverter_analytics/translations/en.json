@@ -4,7 +4,9 @@
       "user": {
         "title": "Inverter Analytics",
         "description": "Pick the inverter to analyse. Sensors are grouped by the integration that created them.",
-        "data": { "source": "Inverter" }
+        "data": {
+          "source": "Inverter"
+        }
       },
       "confirm": {
         "title": "Confirm the detected sensors",
@@ -35,7 +37,29 @@
           "invert_grid_power_phase": "Invert per-phase grid power sign"
         },
         "data_description": {
-          "ct_choice": "Which current transformers face the grid. This depends on how they were installed."
+          "ct_choice": "Which current transformers face the grid. This depends on how they were installed.",
+          "name": "Shown in the sidebar page when you have more than one inverter.",
+          "rated_power": "The inverter's continuous rated power in watts, from its nameplate. Load bands and overload episodes are measured against it. For a SUN-12K this is 12000.",
+          "rated_power_per_phase": "Optional. The per-phase limit in watts. Leave empty to assume a third of the rated power — the analytics will say when it has assumed.",
+          "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",
+          "load_power": "Total consumption on the inverter's output. If you also have per-phase sensors, map them below to get imbalance analysis.",
+          "load_power_phase": "One sensor per phase, in order L1, L2, L3. Only used for the per-phase section; the totals above stay the source for headline figures.",
+          "pv_power": "Total solar production in watts, as the inverter reports it. If you also have per-string sensors, map them below; the total stays the source for headline figures.",
+          "pv_power_string": "One sensor per string. Stored now; per-string charts arrive with the solar tab.",
+          "battery_power": "Charge and discharge power on one sensor. Use the inversion switch below if the sign runs the other way.",
+          "grid_power": "Exchange with the grid. Positive usually means import.",
+          "grid_power_phase": "One sensor per phase, in order L1, L2, L3. Positive usually means import — use the inversion switch below if yours runs the other way.",
+          "battery_soc": "State of charge in percent. This drives the dip analysis — how often and how deeply the battery is drawn down.",
+          "grid_connected": "A binary sensor that is on while grid power is present. Used to measure outages.",
+          "pv_energy_total": "A lifetime kWh counter, not a daily one. Daily counters reset and would be read as a drop to zero.",
+          "load_energy_total": "A lifetime kWh counter for consumption.",
+          "battery_charge_total": "A lifetime kWh counter for energy into the battery.",
+          "battery_discharge_total": "A lifetime kWh counter for energy out of the battery.",
+          "grid_import_total": "A lifetime kWh counter for energy bought.",
+          "grid_export_total": "A lifetime kWh counter for energy sold.",
+          "invert_battery_power": "Enable if your sensor reports discharge as a positive number. Easy to check: look at the sign while the battery is charging.",
+          "invert_grid_power": "Enable if your sensor reports import as a negative number.",
+          "invert_grid_power_phase": "Same, for the per-phase grid sensors."
         }
       },
       "manual": {
@@ -72,12 +96,12 @@
           "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",
           "load_power": "Total consumption on the inverter's output. If you also have per-phase sensors, map them below to get imbalance analysis.",
           "load_power_phase": "One sensor per phase, in order L1, L2, L3. Only used for the per-phase section; the totals above stay the source for headline figures.",
-          "pv_power": "Total solar production as the inverter reports it.",
+          "pv_power": "Total solar production in watts, as the inverter reports it. If you also have per-string sensors, map them below; the total stays the source for headline figures.",
           "pv_power_string": "One sensor per string. Stored now; per-string charts arrive with the solar tab.",
           "battery_power": "Charge and discharge power on one sensor. Use the inversion switch below if the sign runs the other way.",
           "grid_power": "Exchange with the grid. Positive usually means import.",
-          "grid_power_phase": "One sensor per phase for the grid connection.",
-          "battery_soc": "State of charge in percent.",
+          "grid_power_phase": "One sensor per phase, in order L1, L2, L3. Positive usually means import — use the inversion switch below if yours runs the other way.",
+          "battery_soc": "State of charge in percent. This drives the dip analysis — how often and how deeply the battery is drawn down.",
           "grid_connected": "A binary sensor that is on while grid power is present. Used to measure outages.",
           "pv_energy_total": "A lifetime kWh counter, not a daily one. Daily counters reset and would be read as a drop to zero.",
           "load_energy_total": "A lifetime kWh counter for consumption.",
@@ -128,12 +152,12 @@
           "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",
           "load_power": "Total consumption on the inverter's output. If you also have per-phase sensors, map them below to get imbalance analysis.",
           "load_power_phase": "One sensor per phase, in order L1, L2, L3. Only used for the per-phase section; the totals above stay the source for headline figures.",
-          "pv_power": "Total solar production as the inverter reports it.",
+          "pv_power": "Total solar production in watts, as the inverter reports it. If you also have per-string sensors, map them below; the total stays the source for headline figures.",
           "pv_power_string": "One sensor per string. Stored now; per-string charts arrive with the solar tab.",
           "battery_power": "Charge and discharge power on one sensor. Use the inversion switch below if the sign runs the other way.",
           "grid_power": "Exchange with the grid. Positive usually means import.",
-          "grid_power_phase": "One sensor per phase for the grid connection.",
-          "battery_soc": "State of charge in percent.",
+          "grid_power_phase": "One sensor per phase, in order L1, L2, L3. Positive usually means import — use the inversion switch below if yours runs the other way.",
+          "battery_soc": "State of charge in percent. This drives the dip analysis — how often and how deeply the battery is drawn down.",
           "grid_connected": "A binary sensor that is on while grid power is present. Used to measure outages.",
           "pv_energy_total": "A lifetime kWh counter, not a daily one. Daily counters reset and would be read as a drop to zero.",
           "load_energy_total": "A lifetime kWh counter for consumption.",

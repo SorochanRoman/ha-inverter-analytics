@@ -37,6 +37,23 @@ def test_the_confirm_step_covers_its_extra_field():
     assert "{no_statistics}" in confirm["description"]
 
 
+def test_every_step_that_renders_the_schema_labels_all_of_it():
+    """A step missing a key renders that field as a raw identifier, and nothing fails.
+
+    confirm and options.init render the same schema as manual, so all three
+    have to be checked or the file can drift for two of them unnoticed.
+    """
+    keys = _schema_keys()
+    for name in ("confirm", "manual", "init"):
+        assert keys <= set(_step(name)["data"]), f"{name} is missing labels"
+
+
+def test_every_step_that_renders_the_schema_describes_all_of_it():
+    keys = _schema_keys()
+    for name in ("confirm", "manual", "init"):
+        assert keys <= set(_step(name)["data_description"]), f"{name} is missing descriptions"
+
+
 def test_rated_power_description_says_where_to_find_the_number():
     description = _step("manual")["data_description"]["rated_power"]
     assert "nameplate" in description.lower()
