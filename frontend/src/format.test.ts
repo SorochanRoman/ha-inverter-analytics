@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  coverageWarning,
-  describeError,
-  formatDuration,
-  formatPercent,
-  formatPower,
-  precisionLabel,
-} from "./format";
+import { coverageWarning, describeError, formatCoverage, formatDuration, formatPercent, formatPower, precisionLabel } from "./format";
 
 describe("formatPower", () => {
   it("shows watts below a kilowatt", () => {
@@ -105,5 +98,25 @@ describe("coverageWarning", () => {
 
   it("says plainly when there is no data at all", () => {
     expect(coverageWarning(0, "uk")).toBe("No data for this period");
+  });
+});
+
+describe("formatCoverage", () => {
+  it("never rounds a real measurement down to a flat zero", () => {
+    // Two minutes inside a thirty-day window. formatPercent gives "0%", which
+    // reads as "there is no data" beside populated cards.
+    expect(formatCoverage(120 / (30 * 24 * 3600), "en")).toBe("<0.1%");
+  });
+
+  it("says zero only when there genuinely is none", () => {
+    expect(formatCoverage(0, "en")).toBe("0%");
+  });
+
+  it("formats an ordinary share normally", () => {
+    expect(formatCoverage(0.412, "en")).toBe("41.2%");
+  });
+
+  it("shows a dash when coverage is unknown", () => {
+    expect(formatCoverage(null, "en")).toBe("—");
   });
 });

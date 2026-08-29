@@ -156,6 +156,12 @@ def _describe(entity_id: str, result: SeriesResult) -> dict[str, Any]:
     }
 
 
+def _parts_worth_reading(config: EntryConfig, role_key: str) -> tuple[str, ...]:
+    """A multiple role's entities, or nothing when there are too few to compare."""
+    entity_ids = config.entity_ids(role_key)
+    return entity_ids if len(entity_ids) >= MIN_PARTS else ()
+
+
 def _aligned_parts(
     role_key: str,
     entity_ids: Sequence[str],
@@ -176,8 +182,11 @@ async def async_load_analytics(
     if total_id is None or rated_power is None:
         raise ValueError("load_power or rated_power is not configured")
 
-    phase_ids = config.entity_ids("load_power_phase")
-    string_ids = config.entity_ids("pv_power_string")
+    # Fetched only when there are enough of them to compare. A lone phase
+    # sensor produces no section, and reading it would be a recorder query
+    # whose result is discarded.
+    phase_ids = _parts_worth_reading(config, "load_power_phase")
+    string_ids = _parts_worth_reading(config, "pv_power_string")
 
     # One entity may legitimately fill two roles — a single-phase inverter
     # whose only phase sensor is also its total. async_series_many reads each
@@ -192,7 +201,7 @@ async def async_load_analytics(
 
     series_block = {"load_total": _describe(total_id, results[total_id])}
 
-    if len(phase_ids) >= MIN_PARTS:
+    if phase_ids:
         aligned, identities = _aligned_parts("load_power_phase", phase_ids, results)
         for identity, entity_id in zip(identities, phase_ids, strict=True):
             series_block[identity.key] = _describe(entity_id, results[entity_id])
@@ -208,7 +217,7 @@ async def async_load_analytics(
             ),
         )
 
-    if len(string_ids) >= MIN_PARTS:
+    if string_ids:
         aligned, identities = _aligned_parts("pv_power_string", string_ids, results)
         for identity, entity_id in zip(identities, string_ids, strict=True):
             series_block[identity.key] = _describe(entity_id, results[entity_id])

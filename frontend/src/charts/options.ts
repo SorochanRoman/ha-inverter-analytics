@@ -119,7 +119,11 @@ export function partsOption(
   const { base, axis } = chartBaseOption();
   return {
     ...base,
-    legend: { data: ["Mean", "Peak"], textStyle: base.textStyle },
+    // Two bar colours with nothing naming them is a guess. The shared grid
+    // starts 24px from the top, which is exactly where the legend draws, so
+    // the plot has to be pushed down to make room for it.
+    legend: { data: ["Mean", "Peak"], top: 0, textStyle: base.textStyle },
+    grid: { ...(base.grid as Record<string, unknown>), top: 48 },
     xAxis: { ...axis, type: "category", data: parts.map((part) => part.label) },
     yAxis: { ...axis, type: "value", name: "W" },
     series: [

@@ -125,3 +125,17 @@ async def test_pv_strings_are_compared_when_more_than_one_is_mapped():
 async def test_a_lone_string_is_not_a_comparison():
     payload = await run(config(pv_power_string=[PV1]), {TOTAL: result(3000.0), PV1: result(3000.0)})
     assert "strings" not in payload
+
+
+async def test_a_lone_phase_sensor_is_not_read_at_all():
+    """No section is produced from it, so the recorder query would be wasted."""
+    captured: dict[str, list[str]] = {}
+
+    async def fake(hass, entity_ids, window, signs=None):
+        captured["ids"] = list(entity_ids)
+        return {entity_id: result(3000.0) for entity_id in entity_ids}
+
+    with patch(f"{MODULE}.async_series_many", side_effect=fake):
+        await async_load_analytics(None, config(load_power_phase=[L1]), WINDOW)
+
+    assert captured["ids"] == [TOTAL]

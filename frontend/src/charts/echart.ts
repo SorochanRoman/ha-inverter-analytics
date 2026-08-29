@@ -1,11 +1,9 @@
-import { BarChart, LineChart } from "echarts/charts";
-import { GridComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
-import { CanvasRenderer } from "echarts/renderers";
 import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { REGISTERED } from "./registry";
 
-echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, CanvasRenderer]);
+echarts.use(REGISTERED);
 
 @customElement("ia-chart")
 export class IaChart extends LitElement {

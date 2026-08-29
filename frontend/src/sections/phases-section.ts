@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { imbalanceOption } from "../charts/options";
 import "../charts/echart";
-import { formatDuration, formatPercent, formatPower } from "../format";
+import { formatCoverage, formatDuration, formatPercent, formatPower } from "../format";
 import type { Phases, SeriesInfo } from "../types";
 import { sectionStyles } from "./shared-styles";
 
@@ -28,7 +28,7 @@ export class IaPhasesSection extends LitElement {
             <span>${formatPercent(phase.headroom, this.locale)}</span>
           </span>
           ${coverage !== undefined && coverage < 0.95
-            ? html`<span class="warn">Covers ${formatPercent(coverage, this.locale)} of the period</span>`
+            ? html`<span class="warn">Covers ${formatCoverage(coverage, this.locale)} of the period</span>`
             : nothing}
         </div>`;
       })}
@@ -62,10 +62,12 @@ export class IaPhasesSection extends LitElement {
       <ia-chart .option=${imbalanceOption(imbalance)}></ia-chart>
       <p class="note">
         Measured over ${formatDuration(imbalance.analysed_seconds)}
-        (${formatPercent(imbalance.coverage, this.locale)} of the period). A further
-        ${formatDuration(imbalance.below_floor_seconds)} sat below
-        ${formatPower(imbalance.floor_w, this.locale)} of total load and is excluded: at standby
-        power a few watts of difference is a large percentage and means nothing.
+        (${formatCoverage(imbalance.coverage, this.locale)} of the period).${imbalance.below_floor_seconds >
+        0
+          ? html` A further ${formatDuration(imbalance.below_floor_seconds)} sat below
+              ${formatPower(imbalance.floor_w, this.locale)} of total load and is excluded: at
+              standby power a few watts of difference is a large percentage and means nothing.`
+          : nothing}
       </p>
     `;
   }
@@ -114,7 +116,7 @@ export class IaPhasesSection extends LitElement {
         ${imbalance.aligned_coverage < 0.95
           ? html`<p class="warn">
               All phases had data at the same moment for only
-              ${formatPercent(imbalance.aligned_coverage, this.locale)} of the period. The spread
+              ${formatCoverage(imbalance.aligned_coverage, this.locale)} of the period. The spread
               cannot be measured while any one phase is unknown.
             </p>`
           : nothing}

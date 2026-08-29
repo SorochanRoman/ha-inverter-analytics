@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SERIES } from "../theme";
+import { SUPPORTED_OPTION_KEYS } from "./registry";
 import type { Imbalance, LoadPayload, PartSummary } from "../types";
 import {
   bandsOption,
@@ -145,5 +146,42 @@ describe("partsOption", () => {
     const option = partsOption([{ ...parts[0], mean: null, peak: null }], SERIES.pv) as any;
     expect(option.series[0].data).toEqual([null]);
     expect(option.series[1].data).toEqual([null]);
+  });
+});
+
+describe("partsOption legend", () => {
+  it("names the two bars and leaves the plot room for the legend", () => {
+    const option = partsOption(
+      [{ key: "pv_s1", label: "PV1", index: 1, mean: 1, p95: 2, peak: 3, share: 1 }],
+      SERIES.pv,
+    ) as any;
+    expect(option.legend.data).toEqual(["Mean", "Peak"]);
+    expect(option.grid.top).toBeGreaterThan(option.legend.top);
+  });
+});
+
+describe("option builders against what the bundle registers", () => {
+  const parts: PartSummary[] = [
+    { key: "pv_s1", label: "PV1", index: 1, mean: 1, p95: 2, peak: 3, share: 1 },
+  ];
+  const imbalance: Imbalance = {
+    mean: 0.2, p95: 0.5, fraction_above: 0.1, analysed_seconds: 60, coverage: 1,
+    threshold: 0.3, floor_w: 400, below_floor_seconds: 0, aligned_coverage: 1,
+    histogram: [{ start: 0, end: 0.2, fraction: 1 }],
+  };
+
+  const built: [string, Record<string, unknown>][] = [
+    ["histogram", histogramOption(payload, "watts")],
+    ["durationCurve", durationCurveOption(payload)],
+    ["bands", bandsOption(payload)],
+    ["imbalance", imbalanceOption(imbalance)],
+    ["parts", partsOption(parts, SERIES.pv)],
+  ];
+
+  it.each(built)("%s uses only keys a registered component can render", (_name, option) => {
+    // ECharts ignores an option whose component was never registered, without
+    // a word. That is how a legend shipped as two unlabelled bar colours.
+    const unsupported = Object.keys(option).filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
+    expect(unsupported).toEqual([]);
   });
 });

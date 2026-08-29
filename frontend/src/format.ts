@@ -18,6 +18,21 @@ export function formatPercent(value: number | null, locale: string): string {
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value * 100)}%`;
 }
 
+/**
+ * A coverage share, where rounding to a flat zero would be a lie.
+ *
+ * Two minutes of history inside a thirty-day window is 0.005%, which
+ * formatPercent renders as "0%" — "there is no data" printed beside populated
+ * numbers. This is the same defect coverageWarning was written for, and every
+ * place that shows a coverage figure has to avoid it, not just the header.
+ */
+export function formatCoverage(value: number | null, locale: string): string {
+  if (value === null || Number.isNaN(value)) return DASH;
+  if (value <= 0) return "0%";
+  if (value < 0.001) return "<0.1%";
+  return formatPercent(value, locale);
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)} s`;
   const minutes = Math.round(seconds / 60);

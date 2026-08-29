@@ -142,13 +142,22 @@ export class InverterAnalyticsPanel extends LitElement {
         <h1>Inverter Analytics</h1>
         ${this.config.entries.length > 1
           ? html`<select
-              .value=${this.entryId ?? ""}
               @change=${(event: Event) => {
                 this.selectEntry((event.target as HTMLSelectElement).value);
               }}
             >
               ${this.config.entries.map(
-                (entry) => html`<option value=${entry.entry_id}>${entry.title}</option>`,
+                // ?selected on the option, not .value on the select: Lit sets
+                // properties before the children exist, so on first render the
+                // assignment lands on an empty select and the browser falls
+                // back to the first entry. The page then showed one inverter's
+                // data under another inverter's name.
+                (entry) => html`<option
+                  value=${entry.entry_id}
+                  ?selected=${entry.entry_id === this.entryId}
+                >
+                  ${entry.title}
+                </option>`,
               )}
             </select>`
           : nothing}

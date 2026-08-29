@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { partsOption } from "../charts/options";
 import "../charts/echart";
-import { formatPercent, formatPower } from "../format";
+import { formatCoverage, formatPercent, formatPower } from "../format";
 import { SERIES } from "../theme";
 import type { SeriesInfo, Strings } from "../types";
 import { sectionStyles } from "./shared-styles";
@@ -27,7 +27,7 @@ export class IaStringsSection extends LitElement {
               <span class="row"><span>Peak</span><span>${formatPower(part.peak, this.locale)}</span></span>
               <span class="row"><span>Share of PV</span><span>${formatPercent(part.share, this.locale)}</span></span>
               ${coverage !== undefined && coverage < 0.95
-                ? html`<span class="warn">Covers ${formatPercent(coverage, this.locale)} of the period</span>`
+                ? html`<span class="warn">Covers ${formatCoverage(coverage, this.locale)} of the period</span>`
                 : nothing}
             </div>`;
           })}
@@ -36,7 +36,7 @@ export class IaStringsSection extends LitElement {
         ${aligned_coverage < 0.95
           ? html`<p class="warn">
               All strings had data at the same moment for only
-              ${formatPercent(aligned_coverage, this.locale)} of the period, so the shares are of
+              ${formatCoverage(aligned_coverage, this.locale)} of the period, so the shares are of
               that time rather than the whole window.
             </p>`
           : nothing}
