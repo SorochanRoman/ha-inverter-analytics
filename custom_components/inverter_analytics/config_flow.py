@@ -10,7 +10,14 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 import voluptuous as vol
 
-from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS, DOMAIN
+from .const import (
+    CONF_ENTITIES,
+    CONF_INVERTED,
+    CONF_NUMBERS,
+    DEFAULT_IMBALANCE_FLOOR_PCT,
+    DEFAULT_IMBALANCE_THRESHOLD_PCT,
+    DOMAIN,
+)
 from .detect import Detection, classify, cluster_sensors, collect_sensors
 from .presets import CT_CHOICES
 from .roles import ROLES_BY_KEY, RoleKind, entity_roles, normalise_entity_ids, number_roles
@@ -20,6 +27,13 @@ INVERT_PREFIX = "invert_"
 CONF_SOURCE = "source"
 CT_CHOICE = "ct_choice"
 MANUAL = "manual"
+
+# Shown pre-filled so the options form states the value actually in force,
+# rather than an empty box the user has to guess the meaning of.
+_TUNING_DEFAULTS = {
+    "imbalance_floor_pct": DEFAULT_IMBALANCE_FLOOR_PCT,
+    "imbalance_threshold_pct": DEFAULT_IMBALANCE_THRESHOLD_PCT,
+}
 
 _DEVICE_CLASS_BY_KIND = {
     RoleKind.POWER: "power",
@@ -57,8 +71,13 @@ def _entity_selector(kind: RoleKind, multiple: bool = False) -> selector.EntityS
     )
 
 
-def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
-    """Build the flat mapping-form schema."""
+def build_schema(defaults: Mapping[str, Any] | None = None, advanced: bool = False) -> vol.Schema:
+    """Build the flat mapping-form schema.
+
+    Advanced fields are the tuning thresholds: they have defensible defaults
+    and nobody should have to answer them before seeing a single chart, so
+    they appear only when reconfiguring an inverter that already works.
+    """
     defaults = defaults or {}
     fields: dict[Any, Any] = {
         vol.Required(
@@ -67,6 +86,8 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
     }
 
     for role in number_roles():
+        if role.advanced and not advanced:
+            continue
         marker = vol.Required if role.required else vol.Optional
         # `suggested_value`, not `default=`, matters here: the frontend omits
         # an optional field from the submission precisely when the user
@@ -274,5 +295,7 @@ class InverterAnalyticsOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data=pack(user_input))
 
         current = self.config_entry.options or self.config_entry.data
-        defaults = unpack(current) | {CONF_NAME: self.config_entry.title}
-        return self.async_show_form(step_id="init", data_schema=build_schema(defaults))
+        defaults = _TUNING_DEFAULTS | unpack(current) | {CONF_NAME: self.config_entry.title}
+        return self.async_show_form(
+            step_id="init", data_schema=build_schema(defaults, advanced=True)
+        )

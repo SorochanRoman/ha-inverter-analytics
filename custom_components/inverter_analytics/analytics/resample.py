@@ -288,6 +288,31 @@ def percentile(hist: Histogram, q: float) -> float | None:
     return hist.offset + len(hist.seconds) * hist.bucket_width
 
 
+def clamp(value: float, low: float | None, high: float | None) -> float:
+    """Clamp a value to a range, ignoring either bound when it is None."""
+    if high is not None:
+        value = min(value, high)
+    if low is not None:
+        value = max(value, low)
+    return value
+
+
+def percentile_in_range(
+    hist: Histogram, q: float, low: float | None, high: float | None
+) -> float | None:
+    """Percentile clamped to the observed range.
+
+    The histogram loses the distribution within a bucket, so percentile
+    interpolates up to its edge and can return a value above the true
+    maximum. On screen this produced a median of 9.1 kW next to a peak of
+    9.0 kW — self-contradicting numbers.
+    """
+    value = percentile(hist, q)
+    if value is None:
+        return None
+    return clamp(value, low, high)
+
+
 def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]:
     """Load duration curve: the value exceeded for a given fraction of time."""
     if points < 2 or hist.total_seconds <= 0:

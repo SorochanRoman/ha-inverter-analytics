@@ -9,15 +9,15 @@ from homeassistant.core import HomeAssistant
 
 from ..roles import EntryConfig
 from .resample import (
-    Histogram,
     Interval,
     Series,
+    clamp,
     coverage,
     duration_curve,
     duration_histogram,
     episodes_above,
     max_sustained_mean,
-    percentile,
+    percentile_in_range,
     time_weighted_mean,
     to_intervals,
 )
@@ -45,31 +45,6 @@ def _seconds_between(intervals: Sequence[Interval], low: float, high: float | No
         for interval in intervals
         if interval.value >= low and (high is None or interval.value < high)
     )
-
-
-def _clamp(value: float, low: float | None, high: float | None) -> float:
-    """Clamp a value to the observed range."""
-    if high is not None:
-        value = min(value, high)
-    if low is not None:
-        value = max(value, low)
-    return value
-
-
-def _clamped_percentile(
-    histogram: Histogram, q: float, low: float | None, high: float | None
-) -> float | None:
-    """Percentile clamped to the observed range.
-
-    The histogram loses the distribution within a bucket, so percentile
-    interpolates up to its edge and can return a value above the true
-    maximum. On screen this produced a median of 9.1 kW next to a peak of
-    9.0 kW — self-contradicting numbers.
-    """
-    value = percentile(histogram, q)
-    if value is None:
-        return None
-    return _clamp(value, low, high)
 
 
 def build_load_payload(
@@ -113,8 +88,8 @@ def build_load_payload(
         "rated_power": rated_power,
         "kpi": {
             "mean": time_weighted_mean(intervals),
-            "median": _clamped_percentile(histogram, 0.5, observed_min, observed_max),
-            "p95": _clamped_percentile(histogram, 0.95, observed_min, observed_max),
+            "median": percentile_in_range(histogram, 0.5, observed_min, observed_max),
+            "p95": percentile_in_range(histogram, 0.95, observed_min, observed_max),
             "max": observed_max,
             "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else None,
             "max_sustained_15m": max_sustained_mean(intervals, SUSTAINED_WINDOW_SECONDS),
@@ -140,7 +115,7 @@ def build_load_payload(
         # it the same way: otherwise its leftmost point would draw a peak higher
         # than the "Peak" card on the same screen.
         "duration_curve": [
-            {"fraction": fraction, "value": _clamp(value, observed_min, observed_max)}
+            {"fraction": fraction, "value": clamp(value, observed_min, observed_max)}
             for fraction, value in duration_curve(histogram, points=DURATION_CURVE_POINTS)
         ],
         "bands": bands,
