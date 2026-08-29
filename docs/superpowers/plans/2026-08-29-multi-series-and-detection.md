@@ -225,7 +225,14 @@ Expected: PASS
 - [ ] **Step 6: Run everything, since EntryConfig has other consumers**
 
 Run: `.venv/bin/pytest -q`
-Expected: all pass. `analytics/load.py` calls `entity_id("load_power")`, whose signature and behaviour are unchanged; `websocket_api.py` sends `dict(config.entities)`, which now carries tuples — Task 2 handles that.
+Expected: one failure. `analytics/load.py` calls `entity_id("load_power")`, whose
+signature and behaviour are unchanged, so it is fine. But `websocket_api.py`
+sends `dict(config.entities)`, which now carries tuples, and
+`tests/test_websocket_api.py::test_config_command_lists_entries` asserts a bare
+string. Update that one assertion to `{"load_power": ["sensor.load_power"]}` —
+the break is an intrinsic consequence of this task, and leaving the suite red
+for a later task would violate the rule that every task ends green. Task 2 then
+finds it already done, which is expected.
 
 - [ ] **Step 7: Commit**
 
