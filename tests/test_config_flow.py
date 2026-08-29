@@ -21,7 +21,7 @@ def test_pack_splits_flat_form_into_entities_numbers_and_inverted():
             "invert_grid_power": False,
         }
     )
-    assert packed["entities"] == {"load_power": "sensor.load", "battery_power": "sensor.batt"}
+    assert packed["entities"] == {"load_power": ["sensor.load"], "battery_power": ["sensor.batt"]}
     assert packed["numbers"] == {"rated_power": 8000.0}
     assert packed["inverted"] == ["battery_power"]
     assert "name" not in packed["entities"]
@@ -49,14 +49,16 @@ def test_pack_drops_unset_inversion_flags():
     assert "invert_battery_power" not in unpack(packed)
 
 
-async def test_user_flow_creates_entry(
+async def test_manual_flow_creates_entry(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
+    # No sensors are registered, so nothing can be clustered and the flow
+    # lands straight on manual mapping.
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "manual"
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -66,7 +68,7 @@ async def test_user_flow_creates_entry(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Deye 8kW"
-    assert result["data"]["entities"] == {"load_power": "sensor.load"}
+    assert result["data"]["entities"] == {"load_power": ["sensor.load"]}
     assert result["data"]["numbers"] == {"rated_power": 8000.0}
 
 
@@ -100,7 +102,7 @@ async def test_options_flow_overrides_data(
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options["entities"] == {"load_power": "sensor.new"}
+    assert entry.options["entities"] == {"load_power": ["sensor.new"]}
     assert entry.options["numbers"] == {"rated_power": 12000.0}
 
     # The form pre-fills the name with the current title and invites editing
@@ -121,3 +123,86 @@ async def test_options_flow_overrides_data(
     assert config.entity_id("load_power") == "sensor.new"
     assert config.number("rated_power") == 12000.0
     assert "legacy_role" not in config.entities
+
+
+def test_pack_keeps_several_entities_for_a_multiple_role():
+    packed = pack(
+        {
+            "name": "Deye",
+            "load_power": "sensor.total",
+            "load_power_phase": ["sensor.l1", "sensor.l2", "sensor.l3"],
+            "rated_power": 12000,
+        }
+    )
+    assert packed["entities"]["load_power"] == ["sensor.total"]
+    assert packed["entities"]["load_power_phase"] == ["sensor.l1", "sensor.l2", "sensor.l3"]
+
+
+def test_pack_drops_an_empty_multiple_role():
+    packed = pack({"load_power": "sensor.total", "pv_power_string": [], "rated_power": 8000})
+    assert "pv_power_string" not in packed["entities"]
+
+
+def test_unpack_round_trips_a_multiple_role():
+    flat = {
+        "load_power": "sensor.total",
+        "load_power_phase": ["sensor.l1", "sensor.l2"],
+        "rated_power": 12000.0,
+    }
+    assert unpack(pack(flat)) == flat
+
+
+async def test_discovery_offers_the_detected_inverter(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    for entity_id in (
+        "sensor.solarman_total_load_power",
+        "sensor.solarman_load_l1_power",
+        "sensor.solarman_load_l2_power",
+        "sensor.solarman_load_l3_power",
+        "sensor.solarman_battery_power",
+        "sensor.solarman_battery_soc",
+    ):
+        hass.states.async_set(
+            entity_id,
+            "100",
+            {
+                "device_class": "battery" if entity_id.endswith("soc") else "power",
+                "unit_of_measurement": "%" if entity_id.endswith("soc") else "W",
+                "state_class": "measurement",
+            },
+        )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"source": "solarman"}
+    )
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"name": "Deye", "rated_power": 12000}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    entities = result["result"].data["entities"]
+    assert entities["load_power"] == ["sensor.solarman_total_load_power"]
+    assert entities["load_power_phase"] == [
+        "sensor.solarman_load_l1_power",
+        "sensor.solarman_load_l2_power",
+        "sensor.solarman_load_l3_power",
+    ]
+
+
+async def test_manual_is_reachable_when_nothing_is_detected(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["step_id"] == "manual"
