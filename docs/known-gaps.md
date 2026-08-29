@@ -1,157 +1,126 @@
-# Відомі прогалини після етапів 1-3
+# Known gaps after phases 1-3
 
-Складено за фінальним рев'ю гілки `feat/core-analytics`. Це не беклог побажань,
-а перелік того, що свідомо не зроблено або не перевірено — щоб наступні плани
-писалися з відкритими очима, а не наштовхувалися на це в процесі.
+Compiled from the final review of `feat/core-analytics` and from running the
+integration in a live Home Assistant. This is not a wish list — it records what
+was deliberately left out and what has not been proven, so that the next plans
+are written with open eyes instead of discovering it mid-flight.
 
-## 1. Перевірено в живому Home Assistant
+## 1. Verified in a live Home Assistant
 
-Панель піднімали на реальному інстансі HA 2025.1.4 (Python 3.12) із recorder,
-справжнім config flow і сенсором навантаження. Доведено:
+The panel was brought up against a real HA 2025.1.4 instance (Python 3.12) with
+`recorder`, the real config flow, and a load-power sensor. Proven:
 
-- інтеграція завантажується (`state: loaded`), у логах жодної помилки;
-- статика віддається: HTTP 200, `text/javascript`;
-- майстер налаштування пропонує всі 17 полів і створює запис;
-- пункт «Аналітика інвертора» з'являється в бічному меню з іконкою;
-- вкладка рендериться повністю: KPI, гістограма, крива тривалості, смуги
-  номіналу з червоним `100+`, таблиця епізодів перевантаження;
-- перемикання періоду перезапитує дані; бейдж точності коректно змінюється
-  з «Змішано з <дата>» на 30 днях на «Точні дані» на 7 днях;
-- перемикач ват/відсотків перебудовує вісь;
-- стан переживає перезавантаження сторінки (`?range=7d`);
-- `hassfest` і `integration_manifest` проходять у CI.
+- the integration loads (`state: loaded`) with no errors in the log;
+- the bundle is served: HTTP 200, `text/javascript`;
+- the setup wizard offers all 17 fields and creates an entry;
+- the "Inverter Analytics" item appears in the sidebar with its icon;
+- the tab renders in full: KPIs, histogram, load duration curve, rated-power
+  bands with `100+` in the overload colour, and the overload episode table;
+- switching the period refetches; the precision badge correctly changes from
+  "Mixed since <date>" over 30 days to "Exact data" over 7 days;
+- the watts/percent toggle rebuilds the axis;
+- tab and period survive a page reload (`?range=7d`);
+- `hassfest` and `integration_manifest` pass in CI.
 
-**Знайдено й виправлено чотири дефекти, яких не бачив жоден тест** — див.
-розділ 2.
+**Five defects that no test caught were found and fixed** — see section 2.
 
-## 2. Що показав живий запуск
+## 2. What the live run exposed
 
-1. **`ReferenceError: process is not defined` — панель була мертва повністю.**
-   Vite у library mode навмисно не підставляє `process.env.NODE_ENV`, а ECharts
-   на нього спирається. Typecheck, 29 тестів і збірка при цьому були зелені:
-   vitest працює в Node, де `process` існує. Лікується `define` у
-   `vite.config.ts`.
-2. **Медіана 9.1 кВт поруч із піком 9.0 кВт.** `percentile` інтерполює до межі
-   корзини й перевищував справжній максимум. На екрані — два самозаперечні
-   числа в одному рядку. Перцентилі тепер притискаються до спостереженого
-   діапазону.
-3. **«Дані відсутні 100% часу» поруч із заповненими KPI.** Округлення 99.99%
-   до сотні читалось як «даних немає». Попередження переформульоване через те,
-   скільки даних **є**.
-4. **Підписи осей лишались від старої теми.** Після перемикання на світлу
-   світло-сірий текст на білому зникав. Вкладка тепер перебудовує опції
-   графіків, коли HA переписує CSS-змінні.
+1. **`ReferenceError: process is not defined` — the panel did not render at
+   all.** Vite in library mode deliberately does not substitute
+   `process.env.NODE_ENV`, and ECharts depends on it. Typecheck, 29 tests and
+   the build were all green at the time: vitest runs under Node, where
+   `process` exists. Fixed with `define` in `vite.config.ts`.
+2. **Median 9.1 kW displayed next to a peak of 9.0 kW.** `percentile`
+   interpolates to the bucket edge and could exceed the true maximum, putting
+   two self-contradictory numbers in one row of cards. Percentiles are now
+   clamped to the observed range.
+3. **The load duration curve had the same overshoot.** Its leftmost point drew
+   a peak above the one the KPI card reported — the same contradiction moved
+   from card-versus-card to card-versus-chart. The curve is clamped too.
+4. **"Data missing 100% of the time" next to populated KPIs.** Rounding 99.99% up to
+   a flat hundred read as "there is no data", contradicting the numbers beside
+   it. The warning now states how much data there *is*.
+5. **Chart axis labels kept the previous theme's colours.** After switching to
+   the light theme, light grey text on white simply vanished. The tab now
+   rebuilds chart options when Home Assistant rewrites its CSS variables.
 
-## 3. Лишається неперевіреним
+## 3. Still unverified
 
-- **Встановлення через HACS** — інтеграцію копіювали в конфіг напряму.
-- **HACS-валідація в CI їде тільки для `main`.** Вона перевіряє метадані
-  репозиторію (ліцензія, опис, теми), а GitHub віддає їх лише з дефолтної
-  гілки — на гілці ці перевірки нічого не міряють і не можуть бути виправлені
-  комітом у гілку. `hassfest` натомість ганяється скрізь, бо валідує маніфест.
-  Наслідок: ліцензія, додана в цій гілці, зарахується аж після мержу в `main`.
-- **Реальна довгострокова статистика.** Гібридний шлях raw+LTS працює за
-  кодом і за тестами, але жива база мала лише хвилини історії, тож гілка LTS
-  на справжніх погодинних даних не виконувалась.
-- **Поява пункту меню без перезавантаження браузера** — сторінку щоразу
-  перезавантажували.
-- **Штатне перемикання теми через профіль HA** — перевіряли підміною
-  CSS-змінних, що відтворює механізм, але не UI.
-- **Форматування дат** іде за мовою HA, а не за нашими рядками: в
-  англомовному інтерфейсі виходить «8/19/2026» поруч з українським текстом.
-  Це наслідок відкладеної локалізації.
+- **Installation through HACS.** The integration was copied into the config
+  directory directly.
+- **HACS validation in CI runs only for `main`.** It checks repository
+  metadata — licence, description, topics — and GitHub exposes those from the
+  default branch only. On a feature branch those checks measure nothing and
+  cannot be fixed by a commit to that branch. `hassfest` runs everywhere,
+  because it validates the manifest, which is code.
+- **Real long-term statistics.** The hybrid raw+LTS path is correct by code and
+  by tests, but the live database held only minutes of history, so the LTS
+  branch never ran against genuine hourly data.
+- **Whether a typical load sensor carries `state_class` at all.** Without it
+  there is no LTS, and a 30-day window on a 10-day recorder will honestly
+  report roughly 33% coverage — which a user is likely to read as a bug.
+- **The sidebar item appearing without a browser reload.** The page was
+  reloaded every time.
+- **Switching themes through the HA profile UI.** Verified by substituting the
+  CSS variables, which reproduces the mechanism but not the interface.
+- **Date formatting follows the Home Assistant language, not our strings**, so
+  an English interface shows "8/19/2026" beside Ukrainian text. A consequence
+  of localisation being deferred.
 
+## 4. Seams to widen before the next tabs
 
+- **`source.py` handles one entity at a time.** `async_series` takes a single
+  `entity_id`. The Balance tab needs six energy sensors over one window, which
+  would mean six separate executor round trips, even though
+  `statistics_during_period` already accepts a set of ids. Widen it *before*
+  the balance plan, not after.
+- **`precision` / `coverage` / `boundary` are flat, per-payload fields.**
+  Correct for a single-series tab. For Battery (SoC plus power) or Balance (six
+  sensors) a single `precision` becomes a lie: a sensor without `state_class`
+  has no long-term statistics at all, so two series over the same window
+  genuinely differ in provenance and in coverage. The next plan should be
+  written against a per-series contract rather than inheriting this one.
+- **`ws_load` is roughly 30 lines of boilerplate** — entry lookup, window
+  validation, clamping, cache, merge. Extract it when the second command lands,
+  not before.
 
-Панель жодного разу не відкривали. Обидва Lit-компоненти (`panel.ts`,
-`load-tab.ts`) і обгортка ECharts (`charts/echart.ts`) не виконувались ані в
-тестах, ані в браузері — 29 фронтенд-тестів покривають лише чисті функції.
+## 5. Parked findings from the final fix wave
 
-Конкретно лишається недоведеним:
+Both were introduced by the fixes themselves; neither corrupts state.
 
-- **Контракт хоста панелі.** Чи присвоюється `hass` до `connectedCallback`; чи
-  надходять `narrow` і `route`; чи `route.path` був би правильнішим джерелом
-  маршруту, ніж `window.location`.
-- **Віддача статики.** Чи справді `/inverter_analytics_static/inverter-analytics-panel.js`
-  віддається з коректним content-type і чи резолвиться `module_url`.
-- **Рендер і тема.** KPI на реальних даних; перемикач ват/відсотків; ініціалізація
-  ECharts усередині shadow DOM; читабельність палітри в світлій і темній темах.
-  Окремо: `chartBaseOption()` читає CSS-змінні **один раз** при побудові опцій,
-  тож жива зміна теми майже напевно лишить графіки в старих кольорах.
-- **Кругообіг стану.** Збереження вкладки й періоду через перезавантаження
-  (частково зламане за задумом: `writeLocation` спрацьовує лише на клік, тож
-  свіже відкриття ніколи не пише `?range=`); чи приймає `cv.datetime` рівно той
-  формат, який шле `Date.toISOString()`.
-- **Реальність recorder.** Шляхи LTS і MIXED проти живої бази зі справжньою
-  довгостроковою статистикою — досі лише синтетичні словники. Чи має типовий
-  сенсор навантаження `state_class` узагалі: без нього LTS не існує, і
-  30-денне вікно на 10-денному recorder чесно покаже ~33% покриття, що
-  користувач прочитає як баг.
-- **Шлях встановлення.** HACS Custom repositories; чи приймає `hassfest` наш
-  маніфест; чи з'являється пункт меню без перезавантаження браузера.
-- **CI.** `.github/workflows/ci.yml` створений у цій гілці й **жодного разу не
-  виконувався**. Кроки `hassfest` і `hacs/action` не перевірялись.
+- **A duplicate `fetchConfig()` on an ordinary panel mount.** Home Assistant
+  assigns `hass` before `connectedCallback`, so both the guard and `willUpdate`
+  fire. Both calls write the same data and `entryId ??=` is a no-op on the
+  second. Curable with a request counter in the style of `load-tab.ts`.
+- **A double integration reload when an inverter is renamed.** The title update
+  and the options update each wake the listener. Serialised by `setup_lock`;
+  only happens on rename.
 
-Критерії готовності 3, 5, 6 і 7 з плану цілком лежать усередині цього списку.
+## 6. Deliberately deferred
 
-## 4. Шви, які доведеться розширити перед наступними вкладками
+**Test coverage gaps.** End-to-end assertion of `inverted` in the wizard; the
+options form pre-fill; key reordering in `ResultCache.set`; the `<=` expiry
+boundary; `max_entries < 0`; the `fraction_above_80pct` denominator under
+partial coverage; WebSocket registration idempotency across two entries; the
+boundary at exactly `MAX_WINDOW_DAYS`; `end` in the month/30d `resolveRange`
+tests; LTS and MIXED against a live recorder. All of this is logic that was
+verified by hand but is not pinned by a test. Separately: **three of the four
+`describeError` tests would have passed before the fix** — only the
+HA-shaped-object case discriminates.
 
-- **`source.py` працює з однією сутністю.** `async_series` бере один `entity_id`.
-  Вкладці «Баланс» потрібні шість сенсорів енергії за одне вікно — це шість
-  окремих походів у executor, хоча `statistics_during_period` уже приймає
-  множину ідентифікаторів. Розширити **до** плану балансу, а не після.
-- **`precision` / `coverage` / `boundary` — плоскі поля payload.** Для вкладки з
-  однією серією це правильно. Для акумулятора (SoC + потужність) чи балансу
-  (шість сенсорів) єдиний `precision` стає неправдою: сенсор без `state_class`
-  не має довгострокової статистики взагалі, тож дві серії за одне вікно мають
-  різне походження й різне покриття. Наступний план має писатися під контракт
-  «на кожну серію», а не успадковувати цей.
-- **`ws_load` — приблизно 30 рядків шаблону** (пошук запису, валідація вікна,
-  обрізання, кеш, злиття). Виносити в спільний хелпер, коли з'явиться друга
-  команда, не раніше.
+**Style and robustness in pure code.** Inconsistent validation in
+`EntryConfig.from_dict`; a bare `KeyError` from `has()`; `Series` can be
+constructed around `Series.of()` and lose its sort invariant; no runtime check
+that datetimes are timezone-aware; an unreachable branch in `percentile`;
+`duration_curve` rebuilding buckets per point; seven linear scans for the
+bands; the deliberately unreachable guard in hour bucketing, kept as
+documentation of the termination invariant.
 
-## 5. Парковані знахідки фінальної хвилі
+**Test harness.** The swallowed `SocketBlockedError` during frontend setup, and
+the global `ThreadedResolver` substitution in `conftest.py`. Both are
+documented at the site with their reasoning.
 
-Обидві внесені самими виправленнями, обидві не псують стан.
-
-- **Подвійний `fetchConfig()` при звичайному відкритті панелі.** `hass`
-  присвоюється до `connectedCallback`, тож спрацьовують і охоронець, і
-  `willUpdate`. Обидва виклики пишуть ті самі дані, `entryId ??=` при другому
-  не робить нічого. Лікується лічильником запитів у стилі `load-tab.ts`.
-- **Подвійне перезавантаження інтеграції при перейменуванні.** `async_update_entry`
-  для назви й окреме оновлення опцій кожне будять слухач. Серіалізується через
-  `setup_lock`; трапляється тільки при зміні назви.
-
-## 6. Свідомо відкладені дрібниці
-
-**Прогалини покриття тестами.** Наскрізна перевірка `inverted` у майстрі;
-префіл форми options flow; перевпорядкування ключа в `ResultCache.set`; межа
-протухання `<=`; `max_entries < 0`; знаменник `fraction_above_80pct` на
-неповному покритті; ідемпотентність реєстрації WS для двох записів; межа рівно
-на `MAX_WINDOW_DAYS`; `end` у тестах `resolveRange` для month/30d; LTS і MIXED
-проти живого recorder. Усе це — логіка, перевірена руками, але не закріплена
-тестом. Окремо: **три з чотирьох тестів `describeError` пройшли б і до
-виправлення** — дискримінує лише випадок з HA-подібним об'єктом.
-
-**Стиль і надійність у чистому коді.** Непослідовна валідація в
-`EntryConfig.from_dict`; голий `KeyError` у `has()`; `Series` можна зібрати в
-обхід `Series.of()` і втратити сортування; нема перевірки, що дати
-timezone-aware; недосяжна гілка в `percentile`; `duration_curve` перебудовує
-корзини на кожну точку; сім лінійних проходів для смуг; навмисно недосяжний
-охоронець у бакетизації годин, лишений як документація інваріанта.
-
-**Тестовий каркас.** Проковтнутий `SocketBlockedError` під час підйому
-frontend; глобальна підміна `ThreadedResolver` в `conftest.py`. Обидва
-задокументовані на місці з поясненням.
-
-**Підтвердити намір.** `replaceState` означає, що кнопка «назад» не скасовує
-перемикання вкладки. `entryId` не потрапляє в URL, тож перезавантаження при
-кількох інверторах мовчки повертає до першого.
-
-## 7. Виправлено, згадано щоб не шукали двічі
-
-Крива тривалості малює пік на межі корзини — до 2.5% номіналу вище за
-справжній максимум, тоді як картка «Пік» показує точне значення. Два числа на
-одному екрані розходяться на видиму величину. **Не виправлено**: це властивість
-інтерполяції перцентилів, і виправлення потребує рішення, яке число вважати
-правильним для кривої.
+**Confirm the intent.** `replaceState` means the Back button does not undo a
+tab switch. `entryId` is not in the URL, so a reload with several inverters
+configured silently reverts to the first.

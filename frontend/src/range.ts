@@ -2,11 +2,11 @@ export const RANGE_KEYS = ["24h", "7d", "30d", "month", "year"] as const;
 export type RangeKey = (typeof RANGE_KEYS)[number];
 
 export const RANGE_LABELS: Record<RangeKey, string> = {
-  "24h": "24 год",
-  "7d": "7 днів",
-  "30d": "30 днів",
-  month: "Цей місяць",
-  year: "Рік",
+  "24h": "24 h",
+  "7d": "7 days",
+  "30d": "30 days",
+  month: "This month",
+  year: "Year",
 };
 
 const DAY_MS = 24 * 3600 * 1000;

@@ -1,51 +1,79 @@
 # Inverter Analytics
 
-Кастомна інтеграція Home Assistant (HACS), яка додає в бічну панель
-сторінку аналітики сонячного інвертора на основі даних `recorder`.
+A Home Assistant custom integration (HACS) that adds a sidebar page with
+solar-inverter analytics, computed from data already in your `recorder`
+database. No extra polling, no cloud, no additional sensors to configure
+beyond pointing the integration at the ones you already have.
 
-## Що вже є
+## What works today
 
-- **Сторінка в бічній панелі** з вкладкою **Навантаження**: рядок
-  ключових показників (середнє, медіана, P95, пік, стійкий максимум за
-  15 хв, частка часу понад 80% номіналу), гістограма розподілу
-  потужності, крива тривалості навантаження, розподіл по діапазонах
-  номіналу та таблиця епізодів перевантаження. Перемикання періоду
-  (24 год / 7 днів / 30 днів / поточний місяць / рік) і кількох
-  інверторів — з одного екрана.
-- **Ручний маппінг сенсорів** через майстер налаштування (config flow) —
-  без готових пресетів під конкретні бренди: ви самі вказуєте, які
-  сенсори HA відповідають потужності навантаження, номінальній
-  потужності тощо. Маппінг можна редагувати пізніше через
-  налаштування інтеграції, включно з перейменуванням інвертора.
-- **Автоматичний вибір джерела даних**: інтеграція сама вирішує, брати
-  сирі стани `recorder` чи погодинні довготривалі статистики (LTS),
-  залежно від того, наскільки далеко в минуле сягає вікно аналізу.
-  Якщо вікно перетинає межу — де сирі дані вже видалено, а лишились
-  тільки погодинні середні — інтерфейс чесно про це повідомляє: коли
-  дані змішані, з якої дати, і яка частка періоду взагалі відсутня.
+- **A sidebar page with a Load tab.** A KPI row (mean, median, P95, peak,
+  highest sustained 15-minute load, share of time above 80% of rated
+  power), a histogram of how much time the inverter spends at each power
+  level, a load duration curve, a breakdown across rated-power bands, and
+  a table of overload episodes. The period picker (24 h / 7 days /
+  30 days / this month / year) and the inverter selector live in the same
+  header, and the selected tab and period are kept in the URL, so a
+  reload or a shared link lands where you left off.
+- **Manual sensor mapping** through the config flow. There are no
+  vendor presets yet: you tell the integration which of your entities is
+  the load power, what the inverter's rated power is, and so on. The
+  mapping can be changed later from the integration's options, including
+  renaming the inverter.
+- **Automatic source selection.** Home Assistant keeps two records of the
+  past: precise raw states, purged after `purge_keep_days`, and hourly
+  long-term statistics kept forever. The integration decides which to
+  read from the requested window, and reads both when the window straddles
+  the boundary.
 
-## Чого ще немає
+## What it will not pretend to know
 
-Акумулятор, сезонність і енергобаланс — вкладки-заглушки, аналітика
-для них ще не реалізована. Готових пресетів під конкретні бренди
-інверторів теж поки немає.
+The interface refuses to show confident numbers it cannot substantiate,
+and this is deliberate rather than incidental:
 
-## Вимоги
+- when a window crosses into long-term statistics, the precision badge
+  says so **and gives the date** the transition happens;
+- when part of the period has no data at all, it says how much of it
+  actually has data;
+- when a value fell outside the histogram's range and was pressed into an
+  edge bucket, it says that the bucket's label no longer describes where
+  that time was;
+- when there is no data, a KPI shows a dash — not a zero. "Zero watts"
+  and "we don't know" are different statements.
 
-- Home Assistant 2024.11.0 або новіше.
-- Увімкнений компонент `recorder` (використовується для історичних даних).
+## Not built yet
 
-## Встановлення через HACS
+The Battery, Seasonality and Energy balance tabs are placeholders; their
+analytics are not implemented. Brand presets for specific inverter models
+do not exist yet either — see `docs/known-gaps.md` for the full list of
+what is deliberately missing and what remains unverified.
 
-1. Відкрийте HACS → **Integrations** → меню (три крапки) → **Custom repositories**.
-2. Додайте URL цього репозиторію з категорією **Integration**.
-3. Знайдіть "Inverter Analytics" у списку інтеграцій HACS і встановіть.
-4. Перезапустіть Home Assistant.
-5. Додайте інтеграцію через **Settings → Devices & Services → Add Integration**
-   і вкажіть, які сенсори відповідають яким ролям (потужність
-   навантаження, номінальна потужність тощо).
+## Requirements
 
-## Специфікація
+- Home Assistant 2024.11.0 or newer.
+- The `recorder` component enabled — it is the sole source of history.
+- A load-power sensor that `recorder` actually records. If your sensor is
+  excluded from recorder, the page will be empty no matter how the
+  integration is configured.
 
-Технічна специфікація та план реалізації етапів знаходяться в
-`docs/superpowers/plans/`.
+## Installing through HACS
+
+1. Open HACS → **Integrations** → the three-dot menu → **Custom repositories**.
+2. Add this repository's URL with the **Integration** category.
+3. Find "Inverter Analytics" in the HACS integration list and install it.
+4. Restart Home Assistant.
+5. Add the integration from **Settings → Devices & Services → Add Integration**
+   and map your entities to the roles it asks for. Only load power and
+   rated power are required; everything else is optional and feeds tabs
+   that are not built yet.
+
+## Documentation
+
+- `docs/known-gaps.md` — what is verified, what is not, and what the next
+  phases will need to change.
+- `docs/superpowers/specs/` — the design specification.
+- `docs/superpowers/plans/` — the implementation plan that was executed.
+
+## License
+
+MIT — see `LICENSE`.

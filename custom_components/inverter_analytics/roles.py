@@ -82,21 +82,21 @@ class EntryConfig:
         entities: dict[str, str] = {}
         for key, value in (data.get(CONF_ENTITIES) or {}).items():
             if key not in ROLES_BY_KEY:
-                raise KeyError(f"Невідома роль: {key}")
+                raise KeyError(f"Unknown role: {key}")
             if value:
                 entities[key] = value
 
         numbers: dict[str, float] = {}
         for key, value in (data.get(CONF_NUMBERS) or {}).items():
             if key not in ROLES_BY_KEY:
-                raise KeyError(f"Невідома роль: {key}")
+                raise KeyError(f"Unknown role: {key}")
             if value is not None:
                 numbers[key] = float(value)
 
         inverted = frozenset(data.get(CONF_INVERTED) or ())
         unknown = inverted - set(ROLES_BY_KEY)
         if unknown:
-            raise KeyError(f"Невідомі ролі в inverted: {sorted(unknown)}")
+            raise KeyError(f"Unknown roles in inverted: {sorted(unknown)}")
 
         return cls(entities=entities, numbers=numbers, inverted=inverted)
 

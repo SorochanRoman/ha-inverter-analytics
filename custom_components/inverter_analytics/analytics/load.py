@@ -47,6 +47,15 @@ def _seconds_between(intervals: Sequence[Interval], low: float, high: float | No
     )
 
 
+def _clamp(value: float, low: float | None, high: float | None) -> float:
+    """Притиснути значення до спостереженого діапазону."""
+    if high is not None:
+        value = min(value, high)
+    if low is not None:
+        value = max(value, low)
+    return value
+
+
 def _clamped_percentile(
     histogram: Histogram, q: float, low: float | None, high: float | None
 ) -> float | None:
@@ -59,11 +68,7 @@ def _clamped_percentile(
     value = percentile(histogram, q)
     if value is None:
         return None
-    if high is not None:
-        value = min(value, high)
-    if low is not None:
-        value = max(value, low)
-    return value
+    return _clamp(value, low, high)
 
 
 def build_load_payload(
@@ -71,7 +76,7 @@ def build_load_payload(
 ) -> dict[str, Any]:
     """Порахувати всю аналітику навантаження з готової серії."""
     if rated_power <= 0:
-        raise ValueError("rated_power має бути додатним")
+        raise ValueError("rated_power must be positive")
 
     intervals = to_intervals(series)
     total_seconds = sum(interval.seconds for interval in intervals)
@@ -130,8 +135,11 @@ def build_load_payload(
                 for bucket in histogram.buckets()
             ],
         },
+        # Крива будується з тих самих перцентилів, що й KPI, тож притискаємо
+        # її так само: інакше найлівіша точка малює пік вище за картку «Пік»
+        # на тому ж екрані.
         "duration_curve": [
-            {"fraction": fraction, "value": value}
+            {"fraction": fraction, "value": _clamp(value, observed_min, observed_max)}
             for fraction, value in duration_curve(histogram, points=DURATION_CURVE_POINTS)
         ],
         "bands": bands,
@@ -154,7 +162,7 @@ async def async_load_analytics(
     entity_id = config.entity_id("load_power")
     rated_power = config.number("rated_power")
     if entity_id is None or rated_power is None:
-        raise ValueError("Не задано load_power або rated_power")
+        raise ValueError("load_power or rated_power is not configured")
 
     series = await async_series(hass, entity_id, window, sign=config.sign("load_power"))
     payload = build_load_payload(series, rated_power=rated_power)

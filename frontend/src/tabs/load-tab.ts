@@ -79,15 +79,15 @@ export class IaLoadTab extends LitElement {
   private renderKpi(payload: LoadPayload) {
     const locale = this.hass.locale.language;
     const share = (value: number | null) =>
-      value === null ? "" : formatPercent(value / payload.rated_power, locale) + " ном.";
+      value === null ? "" : formatPercent(value / payload.rated_power, locale) + " of rated";
 
     const cells: [string, string, string][] = [
-      ["Середнє", formatPower(payload.kpi.mean, locale), share(payload.kpi.mean)],
-      ["Медіана", formatPower(payload.kpi.median, locale), ""],
+      ["Mean", formatPower(payload.kpi.mean, locale), share(payload.kpi.mean)],
+      ["Median", formatPower(payload.kpi.median, locale), ""],
       ["P95", formatPower(payload.kpi.p95, locale), ""],
-      ["Пік", formatPower(payload.kpi.max, locale), share(payload.kpi.max)],
-      ["Стійке 15 хв", formatPower(payload.kpi.max_sustained_15m, locale), ""],
-      [">80% номіналу", formatPercent(payload.kpi.fraction_above_80pct, locale), "часу"],
+      ["Peak", formatPower(payload.kpi.max, locale), share(payload.kpi.max)],
+      ["Sustained 15 min", formatPower(payload.kpi.max_sustained_15m, locale), ""],
+      [">80% of rated", formatPercent(payload.kpi.fraction_above_80pct, locale), "of time"],
     ];
 
     return html`<div class="kpi">
@@ -103,12 +103,12 @@ export class IaLoadTab extends LitElement {
 
   private renderOverloads(payload: LoadPayload) {
     if (!payload.overloads.length) {
-      return html`<p class="empty">Перевантажень за цей період не було.</p>`;
+      return html`<p class="empty">No overloads in this period.</p>`;
     }
     const locale = this.hass.locale.language;
     return html`<table>
       <thead>
-        <tr><th>Початок</th><th>Тривалість</th><th>Пік</th></tr>
+        <tr><th>Start</th><th>Duration</th><th>Peak</th></tr>
       </thead>
       <tbody>
         ${payload.overloads.map(
@@ -125,12 +125,12 @@ export class IaLoadTab extends LitElement {
   protected render() {
     if (this.error) {
       return html`<div class="notice">
-        Не вдалося завантажити дані: ${this.error}
-        <button @click=${() => this.load()}>Спробувати ще</button>
+        Could not load data: ${this.error}
+        <button @click=${() => this.load()}>Try again</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Розрахунок…</div>`;
+      return html`<div class="notice">Computing…</div>`;
     }
 
     const payload = this.payload;
@@ -143,40 +143,40 @@ export class IaLoadTab extends LitElement {
           ? html`<span class="warn">${coverageWarning(payload.coverage, locale)}</span>`
           : nothing}
         ${payload.clamped
-          ? html`<span class="warn">Період скорочено до максимально дозволеного</span>`
+          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
           : nothing}
         ${payload.histogram.clipped_low_seconds + payload.histogram.clipped_high_seconds > 0
           ? html`<span class="warn">
-              Частина значень вийшла за діапазон гістограми й показана в крайніх корзинах
+              Some values fell outside the histogram range and are shown in its edge buckets
             </span>`
           : nothing}
-        ${this.loading ? html`<span class="warn">Оновлення…</span>` : nothing}
+        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
       </div>
 
       ${this.renderKpi(payload)}
 
       <section>
         <header>
-          <h2>Скільки часу на якій потужності</h2>
+          <h2>Time spent at each power level</h2>
           <button @click=${() => {
             this.mode = this.mode === "watts" ? "percent" : "watts";
-          }}>${this.mode === "watts" ? "у % від номіналу" : "у ватах"}</button>
+          }}>${this.mode === "watts" ? "as % of rated" : "in watts"}</button>
         </header>
         <ia-chart .option=${histogramOption(payload, this.mode)}></ia-chart>
       </section>
 
       <section>
-        <h2>Крива тривалості навантаження</h2>
+        <h2>Load duration curve</h2>
         <ia-chart .option=${durationCurveOption(payload)}></ia-chart>
       </section>
 
       <section>
-        <h2>Розподіл по діапазонах номіналу</h2>
+        <h2>Distribution across rated-power bands</h2>
         <ia-chart .option=${bandsOption(payload)} height="220px"></ia-chart>
       </section>
 
       <section>
-        <h2>Епізоди перевантаження</h2>
+        <h2>Overload episodes</h2>
         ${this.renderOverloads(payload)}
       </section>
     `;

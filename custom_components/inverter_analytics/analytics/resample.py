@@ -153,9 +153,9 @@ def duration_histogram(
     лічильники clipped_* записують мислені діапазони.
     """
     if bucket_width <= 0:
-        raise ValueError("bucket_width має бути додатним")
+        raise ValueError("bucket_width must be positive")
     if max_buckets < 1:
-        raise ValueError("max_buckets має бути щонайменше 1")
+        raise ValueError("max_buckets must be at least 1")
 
     totals: dict[int, float] = {}
     clipped_low = 0.0
@@ -183,7 +183,7 @@ def duration_histogram(
 def percentile(hist: Histogram, q: float) -> float | None:
     """Перцентиль за тривалістю з лінійною інтерполяцією всередину корзини."""
     if not 0.0 <= q <= 1.0:
-        raise ValueError("q має бути в межах від 0.0 до 1.0")
+        raise ValueError("q must be between 0.0 and 1.0")
 
     total = hist.total_seconds
     if total <= 0:
@@ -333,7 +333,7 @@ def max_sustained_mean(intervals: Sequence[Interval], window_seconds: float) -> 
     Вікна, що перетинають розрив у даних, не розглядаються.
     """
     if window_seconds <= 0:
-        raise ValueError("window_seconds має бути додатним")
+        raise ValueError("window_seconds must be positive")
 
     best: float | None = None
     for run in _contiguous_runs(intervals):

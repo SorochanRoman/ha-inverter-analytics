@@ -6,9 +6,9 @@ export function formatPower(value: number | null, locale: string): string {
     const kilowatts = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
       value / 1000,
     );
-    return `${kilowatts} кВт`;
+    return `${kilowatts} kW`;
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} Вт`;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} W`;
 }
 
 export function formatPercent(value: number | null, locale: string): string {
@@ -17,10 +17,10 @@ export function formatPercent(value: number | null, locale: string): string {
 }
 
 export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)} с`;
+  if (seconds < 60) return `${Math.round(seconds)} s`;
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} хв`;
-  return `${Math.floor(minutes / 60)} год ${minutes % 60} хв`;
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
 /** Помилка від Home Assistant приходить об'єктом {code, message}, не рядком. */
@@ -37,12 +37,12 @@ export function precisionLabel(
   boundary: string | null,
   locale: string,
 ): string {
-  if (precision === "raw") return "Точні дані";
-  if (precision === "lts") return "Погодинні середні";
+  if (precision === "raw") return "Exact data";
+  if (precision === "lts") return "Hourly averages";
   if (boundary) {
-    return `Змішано з ${new Date(boundary).toLocaleDateString(locale)}`;
+    return `Mixed since ${new Date(boundary).toLocaleDateString(locale)}`;
   }
-  return "Змішано";
+  return "Mixed";
 }
 
 /**
@@ -55,7 +55,7 @@ export function precisionLabel(
  */
 export function coverageWarning(coverage: number, locale: string): string | null {
   if (coverage >= 0.95) return null;
-  if (coverage <= 0) return "Даних за цей період немає";
-  if (coverage < 0.01) return "Дані є менш ніж за 1% періоду";
-  return `Дані є лише за ${formatPercent(coverage, locale)} періоду`;
+  if (coverage <= 0) return "No data for this period";
+  if (coverage < 0.01) return "Data covers less than 1% of the period";
+  return `Data covers only ${formatPercent(coverage, locale)} of the period`;
 }

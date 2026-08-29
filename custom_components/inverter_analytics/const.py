@@ -7,7 +7,7 @@ from typing import Final
 DOMAIN: Final = "inverter_analytics"
 
 PANEL_URL_PATH: Final = "inverter-analytics"
-PANEL_TITLE: Final = "Аналітика інвертора"
+PANEL_TITLE: Final = "Inverter Analytics"
 PANEL_ICON: Final = "mdi:chart-box-outline"
 
 STATIC_URL_BASE: Final = "/inverter_analytics_static"

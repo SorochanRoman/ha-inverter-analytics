@@ -22,10 +22,10 @@ export function histogramOption(
       ...axis,
       type: "category",
       data: labels,
-      name: mode === "watts" ? "Вт" : "% номіналу",
+      name: mode === "watts" ? "W" : "% of rated",
       nameLocation: "end",
     },
-    yAxis: { ...axis, type: "value", name: "% часу" },
+    yAxis: { ...axis, type: "value", name: "% of time" },
     series: [
       {
         type: "bar",
@@ -41,8 +41,8 @@ export function durationCurveOption(payload: LoadPayload): Record<string, unknow
   const { base, axis } = chartBaseOption();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: "% часу", min: 0, max: 100 },
-    yAxis: { ...axis, type: "value", name: "Вт" },
+    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
+    yAxis: { ...axis, type: "value", name: "W" },
     series: [
       {
         type: "line",
@@ -65,7 +65,7 @@ export function bandsOption(payload: LoadPayload): Record<string, unknown> {
   const bands = [...payload.bands].reverse();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: "% часу", min: 0, max: 100 },
+    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
     yAxis: { ...axis, type: "category", data: bands.map((band) => band.key) },
     series: [
       {

@@ -7,10 +7,10 @@ import type { ConfigResult, HomeAssistant } from "./types";
 import "./tabs/load-tab";
 
 const TABS = [
-  { id: "load", label: "Навантаження" },
-  { id: "battery", label: "Акумулятор" },
-  { id: "seasonal", label: "Сезонність" },
-  { id: "balance", label: "Баланс" },
+  { id: "load", label: "Load" },
+  { id: "battery", label: "Battery" },
+  { id: "seasonal", label: "Seasonality" },
+  { id: "balance", label: "Balance" },
 ] as const;
 
 @customElement("inverter-analytics-panel")
@@ -89,24 +89,24 @@ export class InverterAnalyticsPanel extends LitElement {
   protected render() {
     if (this.error) {
       return html`<div class="notice">
-        Не вдалося завантажити конфігурацію: ${this.error}
+        Could not load configuration: ${this.error}
         <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
-          Спробувати ще
+          Try again
         </button>
       </div>`;
     }
     if (!this.config) {
-      return html`<div class="notice">Завантаження…</div>`;
+      return html`<div class="notice">Loading…</div>`;
     }
     if (!this.config.entries.length) {
       return html`<div class="notice">
-        Жодного інвертора не налаштовано. Додайте інтеграцію Inverter Analytics у налаштуваннях.
+        No inverter is configured yet. Add the Inverter Analytics integration in settings.
       </div>`;
     }
 
     return html`
       <div class="header">
-        <h1>Аналітика інвертора</h1>
+        <h1>Inverter Analytics</h1>
         ${this.config.entries.length > 1
           ? html`<select @change=${(event: Event) => {
               this.entryId = (event.target as HTMLSelectElement).value;
@@ -142,7 +142,7 @@ export class InverterAnalyticsPanel extends LitElement {
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-load-tab>`
-          : html`<div class="notice">Ця вкладка з'явиться в наступних версіях.</div>`}
+          : html`<div class="notice">This tab is not built yet.</div>`}
       </main>
     `;
   }

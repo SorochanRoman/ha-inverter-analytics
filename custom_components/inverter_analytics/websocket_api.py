@@ -94,14 +94,14 @@ async def ws_load(
     # вручну в UI — зникає лише запис, який повністю видалили. Належність до
     # domain_data — це саме умова, за якої існує кеш, який читає цей обробник.
     if entry is None or entry.domain != DOMAIN or entry.entry_id not in domain_data:
-        connection.send_error(msg["id"], "not_found", "Інвертор не знайдено або вимкнений")
+        connection.send_error(msg["id"], "not_found", "Inverter not found or disabled")
         return
 
     start = dt_util.as_utc(msg["start"])
     end = dt_util.as_utc(msg["end"])
     if end <= start:
         connection.send_error(
-            msg["id"], "invalid_window", "Кінець вікна має бути пізніше за початок"
+            msg["id"], "invalid_window", "Window end must be later than its start"
         )
         return
 
