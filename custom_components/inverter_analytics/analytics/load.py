@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from ..roles import EntryConfig
+from ..const import DEFAULT_IMBALANCE_FLOOR_PCT, DEFAULT_IMBALANCE_THRESHOLD_PCT
+from ..roles import EntryConfig, PartIdentity, part_identities
+from .phases import MIN_PHASES as MIN_PARTS
+from .phases import build_parts_summary, build_phase_payload
 from .resample import (
+    AlignedInterval,
     Interval,
     Series,
+    align,
+    aligned_coverage,
     clamp,
     coverage,
     duration_curve,
@@ -21,7 +27,7 @@ from .resample import (
     time_weighted_mean,
     to_intervals,
 )
-from .source import Window, async_series, plan_precision
+from .source import SeriesResult, Window, async_series_many
 
 BANDS: tuple[tuple[str, float, float | None], ...] = (
     ("0-10", 0.0, 0.10),
@@ -131,19 +137,83 @@ def build_load_payload(
     }
 
 
+def _describe(entity_id: str, result: SeriesResult) -> dict[str, Any]:
+    """One entry of the payload's per-series provenance block."""
+    return {
+        "entity_id": entity_id,
+        "precision": result.precision.value,
+        "boundary": result.boundary.isoformat() if result.boundary else None,
+        "coverage": result.coverage,
+    }
+
+
+def _aligned_parts(
+    role_key: str,
+    entity_ids: Sequence[str],
+    results: Mapping[str, SeriesResult],
+) -> tuple[list[AlignedInterval], tuple[PartIdentity, ...]]:
+    """Put one multiple role's entities on a common timeline."""
+    identities = part_identities(role_key, entity_ids)
+    aligned = align([results[entity_id].series for entity_id in entity_ids])
+    return aligned, identities
+
+
 async def async_load_analytics(
     hass: HomeAssistant, config: EntryConfig, window: Window
 ) -> dict[str, Any]:
     """Read the data and compute the load analytics."""
-    entity_id = config.entity_id("load_power")
+    total_id = config.entity_id("load_power")
     rated_power = config.number("rated_power")
-    if entity_id is None or rated_power is None:
+    if total_id is None or rated_power is None:
         raise ValueError("load_power or rated_power is not configured")
 
-    series = await async_series(hass, entity_id, window, sign=config.sign("load_power"))
-    payload = build_load_payload(series, rated_power=rated_power)
+    phase_ids = config.entity_ids("load_power_phase")
+    string_ids = config.entity_ids("pv_power_string")
 
-    plan = plan_precision(hass, window)
-    payload["precision"] = plan.precision.value
-    payload["boundary"] = plan.boundary.isoformat() if plan.boundary else None
+    # One entity may legitimately fill two roles — a single-phase inverter
+    # whose only phase sensor is also its total. async_series_many reads each
+    # entity once, and the sign is a property of the role, so the later role
+    # wins here; the roles that can overlap all share sign 1.0.
+    signs = {total_id: config.sign("load_power")}
+    signs |= {entity_id: config.sign("load_power_phase") for entity_id in phase_ids}
+    signs |= {entity_id: config.sign("pv_power_string") for entity_id in string_ids}
+
+    results = await async_series_many(hass, [total_id, *phase_ids, *string_ids], window, signs)
+    payload = build_load_payload(results[total_id].series, rated_power=rated_power)
+
+    series_block = {"load_total": _describe(total_id, results[total_id])}
+
+    if len(phase_ids) >= MIN_PARTS:
+        aligned, identities = _aligned_parts("load_power_phase", phase_ids, results)
+        for identity, entity_id in zip(identities, phase_ids, strict=True):
+            series_block[identity.key] = _describe(entity_id, results[entity_id])
+        payload["phases"] = build_phase_payload(
+            aligned,
+            identities,
+            rated_power=rated_power,
+            window_seconds=window.seconds,
+            per_phase_rating=config.number("rated_power_per_phase"),
+            floor_pct=config.number("imbalance_floor_pct") or DEFAULT_IMBALANCE_FLOOR_PCT,
+            threshold_pct=(
+                config.number("imbalance_threshold_pct") or DEFAULT_IMBALANCE_THRESHOLD_PCT
+            ),
+        )
+
+    if len(string_ids) >= MIN_PARTS:
+        aligned, identities = _aligned_parts("pv_power_string", string_ids, results)
+        for identity, entity_id in zip(identities, string_ids, strict=True):
+            series_block[identity.key] = _describe(entity_id, results[entity_id])
+        payload["strings"] = {
+            "parts": build_parts_summary(aligned, identities),
+            "aligned_coverage": aligned_coverage(aligned, window.seconds),
+        }
+
+    payload["series"] = series_block
+
+    # The top-level fields describe the primary series, the total load: that is
+    # what the badge shows. Anything reading a different series takes its own
+    # numbers from the series block, where they can genuinely differ.
+    primary = results[total_id]
+    payload["precision"] = primary.precision.value
+    payload["boundary"] = primary.boundary.isoformat() if primary.boundary else None
     return payload

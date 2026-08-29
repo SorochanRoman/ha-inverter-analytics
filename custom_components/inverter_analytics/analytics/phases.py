@@ -42,11 +42,11 @@ def imbalance_of(values: Sequence[float]) -> float | None:
     return (max(values) - min(values)) / average
 
 
-def _phase_intervals(aligned: Sequence[AlignedInterval], index: int) -> list[Interval]:
+def _part_intervals(aligned: Sequence[AlignedInterval], index: int) -> list[Interval]:
     return [Interval(item.start, item.end, item.values[index]) for item in aligned]
 
 
-def _phase_stats(intervals: Sequence[Interval]) -> dict[str, float | None]:
+def _part_stats(intervals: Sequence[Interval]) -> dict[str, float | None]:
     values = [interval.value for interval in intervals]
     observed_min = min(values, default=None)
     observed_max = max(values, default=None)
@@ -58,6 +58,30 @@ def _phase_stats(intervals: Sequence[Interval]) -> dict[str, float | None]:
         "p95": percentile_in_range(histogram, 0.95, observed_min, observed_max),
         "peak": observed_max,
     }
+
+
+def build_parts_summary(
+    aligned: Sequence[AlignedInterval], identities: Sequence[PartIdentity]
+) -> list[dict[str, Any]]:
+    """Mean, p95, peak and share of the total for each part of a multiple role.
+
+    Shared by phases and PV strings: both answer "how does this one compare
+    with its siblings", and both must do it on the aligned timeline so that
+    the shares are of the same instants and actually sum to one.
+    """
+    parts = []
+    means: list[float] = []
+    for index, identity in enumerate(identities):
+        stats = _part_stats(_part_intervals(aligned, index))
+        means.append(stats["mean"] or 0.0)
+        parts.append(
+            {"key": identity.key, "label": identity.label, "index": identity.index, **stats}
+        )
+
+    total = sum(means)
+    for part, mean in zip(parts, means, strict=True):
+        part["share"] = (mean / total) if total > 0 else None
+    return parts
 
 
 def _rating_per_phase(
@@ -101,24 +125,10 @@ def build_phase_payload(
     threshold = threshold_pct / 100.0
     rating, rating_derived, divisor = _rating_per_phase(identities, rated_power, per_phase_rating)
 
-    per_phase = []
-    means: list[float] = []
-    for index, identity in enumerate(identities):
-        stats = _phase_stats(_phase_intervals(aligned, index))
-        means.append(stats["mean"] or 0.0)
-        per_phase.append(
-            {
-                "key": identity.key,
-                "label": identity.label,
-                "index": identity.index,
-                **stats,
-                "headroom": None if stats["peak"] is None else stats["peak"] / rating,
-            }
-        )
-
-    total_mean = sum(means)
-    for entry, mean in zip(per_phase, means, strict=True):
-        entry["share"] = (mean / total_mean) if total_mean > 0 else None
+    per_phase = build_parts_summary(aligned, identities)
+    for entry in per_phase:
+        peak = entry["peak"]
+        entry["headroom"] = None if peak is None else peak / rating
 
     gated: list[tuple[Interval, tuple[float, ...]]] = []
     below_floor_seconds = 0.0
