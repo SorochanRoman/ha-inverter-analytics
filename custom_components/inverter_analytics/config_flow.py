@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
@@ -11,10 +11,15 @@ from homeassistant.helpers import selector
 import voluptuous as vol
 
 from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS, DOMAIN
-from .roles import ROLES_BY_KEY, RoleKind, entity_roles, number_roles
+from .detect import Detection, classify, cluster_sensors, collect_sensors
+from .presets import CT_CHOICES
+from .roles import ROLES_BY_KEY, RoleKind, entity_roles, normalise_entity_ids, number_roles
 
 CONF_NAME = "name"
 INVERT_PREFIX = "invert_"
+CONF_SOURCE = "source"
+CT_CHOICE = "ct_choice"
+MANUAL = "manual"
 
 _DEVICE_CLASS_BY_KIND = {
     RoleKind.POWER: "power",
@@ -23,12 +28,32 @@ _DEVICE_CLASS_BY_KIND = {
 }
 
 
-def _entity_selector(kind: RoleKind) -> selector.EntitySelector:
+def _describe_missing_statistics(entity_ids: Sequence[str]) -> str:
+    """Warn about sensors Home Assistant keeps no long-term statistics for.
+
+    Without a state_class there is no hourly history, so any window longer than
+    the recorder's retention comes back empty. Saying so during setup is much
+    cheaper than the user discovering it a month later.
+    """
+    if not entity_ids:
+        return ""
+    listed = ", ".join(entity_ids)
+    return (
+        "These sensors have no state_class, so Home Assistant keeps no long-term "
+        f"statistics for them and long periods will show no data: {listed}."
+    )
+
+
+def _entity_selector(kind: RoleKind, multiple: bool = False) -> selector.EntitySelector:
     """Entity picker, narrowed by device_class where that makes sense."""
     if kind is RoleKind.BINARY:
-        return selector.EntitySelector(selector.EntitySelectorConfig(domain="binary_sensor"))
+        return selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor", multiple=multiple)
+        )
     return selector.EntitySelector(
-        selector.EntitySelectorConfig(domain="sensor", device_class=_DEVICE_CLASS_BY_KIND[kind])
+        selector.EntitySelectorConfig(
+            domain="sensor", device_class=_DEVICE_CLASS_BY_KIND[kind], multiple=multiple
+        )
     )
 
 
@@ -43,6 +68,12 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
 
     for role in number_roles():
         marker = vol.Required if role.required else vol.Optional
+        # `suggested_value`, not `default=`, matters here: the frontend omits
+        # an optional field from the submission precisely when the user
+        # clears it, and `default=` would then silently restore the old
+        # value instead of accepting the clear (see commit 08fb537). A real
+        # frontend always resubmits an untouched, pre-filled field's current
+        # contents, so `suggested_value` alone is enough for that case.
         key = (
             marker(role.key, description={"suggested_value": defaults[role.key]})
             if role.key in defaults
@@ -64,7 +95,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
             if role.key in defaults
             else marker(role.key)
         )
-        fields[key] = _entity_selector(role.kind)
+        fields[key] = _entity_selector(role.kind, role.multiple)
 
     for role in entity_roles():
         if not role.invertible:
@@ -79,7 +110,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
 
 def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
     """Convert the flat form into the nested ConfigEntry.data format."""
-    entities: dict[str, str] = {}
+    entities: dict[str, list[str]] = {}
     numbers: dict[str, float] = {}
     inverted: list[str] = []
 
@@ -91,12 +122,22 @@ def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
                 inverted.append(key.removeprefix(INVERT_PREFIX))
             continue
         role = ROLES_BY_KEY.get(key)
-        if role is None or value in (None, ""):
+        if role is None:
             continue
         if role.kind is RoleKind.NUMBER:
+            if value in (None, ""):
+                continue
             numbers[key] = float(value)
         else:
-            entities[key] = str(value)
+            # A bare-string picker can submit "" for "nothing chosen"; the brief's
+            # `[value] if isinstance(value, str) else ...` treats that as a
+            # one-item list holding an empty string, which is truthy and would
+            # leak an empty entity id into the packed config. Falling through to
+            # the list branch for a falsy string reuses its `if item` filter and
+            # naturally produces [] instead, since iterating "" yields nothing.
+            ids = [value] if isinstance(value, str) and value else [item for item in value if item]
+            if ids:
+                entities[key] = ids
 
     return {CONF_ENTITIES: entities, CONF_NUMBERS: numbers, CONF_INVERTED: sorted(inverted)}
 
@@ -104,7 +145,12 @@ def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
 def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
     """Convert the nested format back into the flat form."""
     flat: dict[str, Any] = {}
-    flat.update(config.get(CONF_ENTITIES) or {})
+    for key, ids in (config.get(CONF_ENTITIES) or {}).items():
+        role = ROLES_BY_KEY.get(key)
+        if role is None:
+            continue
+        ids = normalise_entity_ids(ids)
+        flat[key] = list(ids) if role.multiple else (ids[0] if ids else None)
     flat.update(config.get(CONF_NUMBERS) or {})
     for key in config.get(CONF_INVERTED) or ():
         flat[f"{INVERT_PREFIX}{key}"] = True
@@ -116,11 +162,98 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        """Hold what discovery found between steps."""
+        self._detection: Detection | None = None
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Manual mapping step."""
+        """Offer the inverters found in this installation."""
+        clusters = cluster_sensors(collect_sensors(self.hass))
+        if not clusters:
+            return await self.async_step_manual()
+
+        if user_input is not None:
+            if user_input[CONF_SOURCE] == MANUAL:
+                return await self.async_step_manual()
+            cluster = next((c for c in clusters if c.key == user_input[CONF_SOURCE]), None)
+            if cluster is None:
+                # The installation changed between rendering the form and
+                # submitting it; ask again rather than raising at the user.
+                return await self.async_step_user()
+            self._detection = classify(cluster)
+            return await self.async_step_confirm()
+
+        options = [
+            selector.SelectOptionDict(
+                value=cluster.key, label=f"{cluster.label} — {len(cluster.sensors)} sensors"
+            )
+            for cluster in clusters
+        ]
+        options.append(selector.SelectOptionDict(value=MANUAL, label="Map sensors manually"))
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SOURCE): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=options)
+                    )
+                }
+            ),
+        )
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show what was detected, ask for what could not be."""
+        # Reaching confirm without a detection would mean the flow was driven
+        # out of order; send the user back to discovery rather than raising.
+        if self._detection is None:
+            return await self.async_step_user()
+        detection = self._detection
+
+        if user_input is not None:
+            packed = pack(user_input)
+            choice = user_input.get(CT_CHOICE)
+            if choice:
+                for ambiguity in detection.ambiguities:
+                    packed[CONF_ENTITIES][ambiguity.role] = list(ambiguity.options[choice])
+            return self.async_create_entry(title=user_input[CONF_NAME], data=packed)
+
+        defaults: dict[str, Any] = {}
+        for role_key, ids in detection.mapping.items():
+            defaults[role_key] = list(ids) if ROLES_BY_KEY[role_key].multiple else ids[0]
+
+        ambiguous_roles = {ambiguity.role for ambiguity in detection.ambiguities}
+        fields = {
+            key: value
+            for key, value in build_schema(defaults).schema.items()
+            # A role settled by a question must not also get a picker: whatever
+            # the user typed there would be overwritten by the answer.
+            if str(getattr(key, "schema", key)) not in ambiguous_roles
+        }
+        for ambiguity in detection.ambiguities:
+            fields[vol.Required(CT_CHOICE)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(value=key, label=CT_CHOICES[key])
+                        for key in ambiguity.options
+                    ]
+                )
+            )
+
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=vol.Schema(fields),
+            description_placeholders={
+                "no_statistics": _describe_missing_statistics(detection.without_statistics)
+            },
+        )
+
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Map every role by hand."""
         if user_input is not None:
             return self.async_create_entry(title=user_input[CONF_NAME], data=pack(user_input))
-        return self.async_show_form(step_id="user", data_schema=build_schema())
+        return self.async_show_form(step_id="manual", data_schema=build_schema())
 
     @staticmethod
     @callback

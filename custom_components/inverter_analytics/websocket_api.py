@@ -63,7 +63,7 @@ def ws_config(
             {
                 "entry_id": entry.entry_id,
                 "title": entry.title,
-                "entities": dict(config.entities),
+                "entities": {role: list(ids) for role, ids in config.entities.items()},
                 "numbers": dict(config.numbers),
                 "inverted": sorted(config.inverted),
             }

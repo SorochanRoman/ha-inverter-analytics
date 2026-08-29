@@ -51,7 +51,7 @@ export interface LoadPayload {
 export interface EntryInfo {
   entry_id: string;
   title: string;
-  entities: Record<string, string>;
+  entities: Record<string, string[]>;
   numbers: Record<string, number>;
   inverted: string[];
 }

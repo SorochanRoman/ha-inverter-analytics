@@ -31,14 +31,19 @@ class Role:
     unit: str
     required: bool = False
     invertible: bool = False
+    multiple: bool = False
 
 
 ROLES: tuple[Role, ...] = (
     Role("load_power", RoleKind.POWER, "W", required=True),
+    Role("load_power_phase", RoleKind.POWER, "W", multiple=True),
     Role("rated_power", RoleKind.NUMBER, "W", required=True),
+    Role("rated_power_per_phase", RoleKind.NUMBER, "W"),
     Role("pv_power", RoleKind.POWER, "W"),
+    Role("pv_power_string", RoleKind.POWER, "W", multiple=True),
     Role("battery_power", RoleKind.POWER, "W", invertible=True),
     Role("grid_power", RoleKind.POWER, "W", invertible=True),
+    Role("grid_power_phase", RoleKind.POWER, "W", multiple=True, invertible=True),
     Role("battery_soc", RoleKind.PERCENT, "%"),
     Role("battery_capacity", RoleKind.NUMBER, "kWh"),
     Role("grid_connected", RoleKind.BINARY, ""),
@@ -51,6 +56,19 @@ ROLES: tuple[Role, ...] = (
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
+
+
+def normalise_entity_ids(value: object) -> tuple[str, ...]:
+    """Read a stored entity mapping in either shape.
+
+    Entries created before roles could hold several entities store a bare
+    string. Nothing migrates an entry the user never reopens, so both shapes
+    stay readable for as long as the integration exists — and every reader of
+    the stored shape must go through here, or the guarantee holds in one place
+    and silently fails in another.
+    """
+    raw = [value] if isinstance(value, str) else list(value or ())
+    return tuple(item for item in raw if item)
 
 
 def entity_roles() -> tuple[Role, ...]:
@@ -72,19 +90,20 @@ def required_role_keys() -> frozenset[str]:
 class EntryConfig:
     """Parsed configuration for a single inverter."""
 
-    entities: Mapping[str, str]
+    entities: Mapping[str, tuple[str, ...]]
     numbers: Mapping[str, float]
     inverted: frozenset[str]
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EntryConfig:
         """Build a config from a dict in the ConfigEntry.data format."""
-        entities: dict[str, str] = {}
+        entities: dict[str, tuple[str, ...]] = {}
         for key, value in (data.get(CONF_ENTITIES) or {}).items():
             if key not in ROLES_BY_KEY:
                 raise KeyError(f"Unknown role: {key}")
-            if value:
-                entities[key] = value
+            cleaned = normalise_entity_ids(value)
+            if cleaned:
+                entities[key] = cleaned
 
         numbers: dict[str, float] = {}
         for key, value in (data.get(CONF_NUMBERS) or {}).items():
@@ -105,9 +124,18 @@ class EntryConfig:
         """Build a config from a config entry; options override data."""
         return cls.from_dict(entry.options or entry.data)
 
+    def entity_ids(self, role_key: str) -> tuple[str, ...]:
+        """Every entity mapped to the role, in the order they were configured."""
+        return self.entities.get(role_key, ())
+
     def entity_id(self, role_key: str) -> str | None:
-        """entity_id for the role, or None."""
-        return self.entities.get(role_key)
+        """The first entity mapped to the role, or None.
+
+        Kept for roles that are single by nature; a caller that may face a
+        multiple role should use entity_ids.
+        """
+        ids = self.entity_ids(role_key)
+        return ids[0] if ids else None
 
     def number(self, role_key: str) -> float | None:
         """Numeric value for the role, or None."""
@@ -122,6 +150,6 @@ class EntryConfig:
         return all(
             (key in self.numbers)
             if ROLES_BY_KEY[key].kind is RoleKind.NUMBER
-            else (key in self.entities)
+            else bool(self.entity_ids(key))
             for key in role_keys
         )
