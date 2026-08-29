@@ -1,4 +1,5 @@
 """Тести перетворення станів на інтервали та зважених середніх."""
+
 from datetime import UTC, datetime, timedelta
 
 from custom_components.inverter_analytics.analytics.resample import (
@@ -51,9 +52,7 @@ def test_samples_after_window_end_are_dropped():
 
 
 def test_unavailable_states_are_excluded_and_reduce_coverage():
-    series = hour_series(
-        Sample(at(0), 100.0), Sample(at(15), None), Sample(at(45), 100.0)
-    )
+    series = hour_series(Sample(at(0), 100.0), Sample(at(15), None), Sample(at(45), 100.0))
     intervals = to_intervals(series)
     assert [iv.seconds for iv in intervals] == [900.0, 900.0]
     assert time_weighted_mean(intervals) == 100.0

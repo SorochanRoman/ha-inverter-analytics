@@ -2,6 +2,10 @@
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+# Логи від залежностей (sqlalchemy, homeassistant.recorder) глушить хук
+# у tests/conftest.py. log_cli = false вимкнено явно, щоб запобігти їх
+# витоку, якщо налаштування буде скасовано глобально.
+log_cli = false
 
 [tool.ruff]
 target-version = "py312"
