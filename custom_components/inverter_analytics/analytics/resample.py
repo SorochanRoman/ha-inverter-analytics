@@ -104,11 +104,19 @@ class Bucket:
 
 @dataclass(frozen=True, slots=True)
 class Histogram:
-    """Розподіл тривалості по корзинах значень."""
+    """Розподіл тривалості по корзинах значень.
+
+    Значення поза діапазоном притискуються до перших або останніх корзин:
+    час не губиться, але його діапазон позначається неправильно.
+    Лічильники clipped_low_seconds і clipped_high_seconds записують,
+    скільки часу мислиться поза своїм діапазоном значень.
+    """
 
     bucket_width: float
     offset: float
     seconds: tuple[float, ...]
+    clipped_low_seconds: float = 0.0
+    clipped_high_seconds: float = 0.0
 
     @property
     def total_seconds(self) -> float:
@@ -140,6 +148,8 @@ def duration_histogram(
 
     Значення нижче offset потрапляють у нульову корзину, вище межі —
     у останню: обрізати хвости мовчки гірше, ніж їх притиснути.
+    Час у прив'язаних значень лишається в кінцевих корзинах, але
+    лічильники clipped_* записують мислені діапазони.
     """
     if bucket_width <= 0:
         raise ValueError("bucket_width має бути додатним")
@@ -147,9 +157,16 @@ def duration_histogram(
         raise ValueError("max_buckets має бути щонайменше 1")
 
     totals: dict[int, float] = {}
+    clipped_low = 0.0
+    clipped_high = 0.0
+
     for interval in intervals:
-        index = int((interval.value - offset) // bucket_width)
-        index = max(0, min(index, max_buckets - 1))
+        raw_index = int((interval.value - offset) // bucket_width)
+        index = max(0, min(raw_index, max_buckets - 1))
+        if raw_index < 0:
+            clipped_low += interval.seconds
+        elif raw_index >= max_buckets:
+            clipped_high += interval.seconds
         totals[index] = totals.get(index, 0.0) + interval.seconds
 
     size = max(totals) + 1 if totals else 0
@@ -157,6 +174,8 @@ def duration_histogram(
         bucket_width=bucket_width,
         offset=offset,
         seconds=tuple(totals.get(index, 0.0) for index in range(size)),
+        clipped_low_seconds=clipped_low,
+        clipped_high_seconds=clipped_high,
     )
 
 

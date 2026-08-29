@@ -88,3 +88,25 @@ def test_duration_curve_of_empty_histogram_is_empty():
 def test_zero_bucket_width_is_rejected():
     with pytest.raises(ValueError):
         duration_histogram([interval(0, 60, 50.0)], bucket_width=0.0)
+
+
+def test_clipped_time_is_reported_separately():
+    """Значення поза діапазоном мають лишати слід, а не зникати в крайніх корзинах."""
+    intervals = [interval(0, 30, -50.0), interval(30, 60, 10_000.0)]
+    hist = duration_histogram(intervals, bucket_width=100.0, max_buckets=10)
+    assert hist.clipped_low_seconds == 1800.0
+    assert hist.clipped_high_seconds == 1800.0
+
+
+def test_values_in_range_report_no_clipping():
+    hist = duration_histogram([interval(0, 60, 50.0)], bucket_width=100.0)
+    assert hist.clipped_low_seconds == 0.0
+    assert hist.clipped_high_seconds == 0.0
+
+
+def test_clipped_time_still_counts_toward_bucket_totals():
+    """Час не губиться: частки корзин лишаються в сумі 1.0."""
+    intervals = [interval(0, 30, 10_000.0), interval(30, 60, 50.0)]
+    hist = duration_histogram(intervals, bucket_width=100.0, max_buckets=10)
+    assert hist.total_seconds == 3600.0
+    assert sum(bucket.fraction for bucket in hist.buckets()) == pytest.approx(1.0)
