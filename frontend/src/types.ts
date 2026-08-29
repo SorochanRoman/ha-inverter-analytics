@@ -178,6 +178,8 @@ export interface BatteryPayload {
   raw_seconds: number;
   /** False when the window lies entirely in hourly statistics, which cannot show a dip. */
   dips_measurable: boolean;
+  /** True only when the cutoff actually held data back, rather than merely existing. */
+  dips_restricted: boolean;
   has_capacity: boolean;
   kpi: BatteryKpi;
   histogram: {

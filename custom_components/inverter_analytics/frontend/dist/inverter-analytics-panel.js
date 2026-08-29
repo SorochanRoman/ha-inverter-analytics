@@ -21733,7 +21733,7 @@ let je = class extends we {
         <span class="badge">${Op(r.precision, r.boundary, t)}</span>
         ${e ? F`<span class="warn">${e}</span>` : X}
         ${r.clamped ? F`<span class="warn">Period shortened to the maximum allowed</span>` : X}
-        ${r.raw_from && r.dips_measurable ? F`<span class="warn">
+        ${r.raw_from && r.dips_restricted && r.dips_measurable ? F`<span class="warn">
               Dips counted from ${new Date(r.raw_from).toLocaleDateString(t)}, where
               exact data begins
             </span>` : X}

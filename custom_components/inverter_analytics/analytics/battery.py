@@ -202,6 +202,11 @@ def build_battery_payload(
 
     raw = soc if raw_from is None else restrict(soc, raw_from)
     raw_intervals = to_intervals(raw) if raw.end > raw.start else []
+    # Whether the restriction actually held anything back. A window may reach
+    # past the recorder's retention and still have no data there, and saying
+    # "dips counted from the 19th" when nothing exists before the 19th reads as
+    # a contradiction of the badge beside it.
+    restricted = raw_from is not None and any(item.start < raw_from for item in to_intervals(soc))
     raw_seconds = sum(item.seconds for item in raw_intervals)
     dips = _dips(raw_intervals, low_pct) if raw_intervals else []
     lows = [dip["lowest"] for dip in dips]
@@ -214,6 +219,7 @@ def build_battery_payload(
         "raw_from": raw_from.isoformat() if raw_from else None,
         "raw_seconds": raw_seconds,
         "dips_measurable": bool(raw_intervals),
+        "dips_restricted": restricted,
         "kpi": {
             "mean_soc": time_weighted_mean(intervals),
             "min_soc": min((item.value for item in raw_intervals), default=None),

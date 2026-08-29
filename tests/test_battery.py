@@ -150,3 +150,20 @@ def test_a_battery_that_barely_moved_gets_no_verdict():
 
 def test_no_power_sensor_means_no_charging_section_rather_than_zeroes():
     assert build(soc_series((0, 50.0)))["power"] is None
+
+
+def test_the_cutoff_is_only_announced_when_it_held_something_back():
+    """A window can reach past the recorder's retention and find nothing there.
+
+    Saying "dips counted from the 19th" beside a badge reading "exact data",
+    when no data exists before the 19th, reads as a contradiction.
+    """
+    soc = Series.of(BASE, at(120), [Sample(at(70), 50.0), Sample(at(90), 10.0)])
+    assert build(soc, raw_from=at(60))["dips_restricted"] is False
+
+    with_earlier = soc_series((0, 50.0), (70, 50.0), (90, 10.0))
+    assert build(with_earlier, raw_from=at(60))["dips_restricted"] is True
+
+
+def test_nothing_is_restricted_when_the_whole_window_is_raw():
+    assert build(soc_series((0, 50.0)))["dips_restricted"] is False

@@ -169,7 +169,7 @@ export class IaBatteryTab extends LitElement {
         ${payload.clamped
           ? html`<span class="warn">Period shortened to the maximum allowed</span>`
           : nothing}
-        ${payload.raw_from && payload.dips_measurable
+        ${payload.raw_from && payload.dips_restricted && payload.dips_measurable
           ? html`<span class="warn">
               Dips counted from ${new Date(payload.raw_from).toLocaleDateString(locale)}, where
               exact data begins
