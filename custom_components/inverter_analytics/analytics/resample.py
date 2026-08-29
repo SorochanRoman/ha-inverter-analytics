@@ -89,3 +89,107 @@ def time_weighted_mean(intervals: Sequence[Interval]) -> float | None:
         return None
     weighted = sum(interval.value * interval.seconds for interval in intervals)
     return weighted / total_seconds
+
+
+@dataclass(frozen=True, slots=True)
+class Bucket:
+    """Одна корзина гістограми з готовими для UI межами й часткою."""
+
+    index: int
+    start: float
+    end: float
+    seconds: float
+    fraction: float
+
+
+@dataclass(frozen=True, slots=True)
+class Histogram:
+    """Розподіл тривалості по корзинах значень."""
+
+    bucket_width: float
+    offset: float
+    seconds: tuple[float, ...]
+
+    @property
+    def total_seconds(self) -> float:
+        """Сумарна тривалість усіх корзин."""
+        return sum(self.seconds)
+
+    def buckets(self) -> list[Bucket]:
+        """Розгорнути корзини з межами та частками."""
+        total = self.total_seconds
+        return [
+            Bucket(
+                index=index,
+                start=self.offset + index * self.bucket_width,
+                end=self.offset + (index + 1) * self.bucket_width,
+                seconds=value,
+                fraction=(value / total) if total > 0 else 0.0,
+            )
+            for index, value in enumerate(self.seconds)
+        ]
+
+
+def duration_histogram(
+    intervals: Sequence[Interval],
+    bucket_width: float,
+    offset: float = 0.0,
+    max_buckets: int = 400,
+) -> Histogram:
+    """Розподіл тривалості по корзинах значень.
+
+    Значення нижче offset потрапляють у нульову корзину, вище межі —
+    у останню: обрізати хвости мовчки гірше, ніж їх притиснути.
+    """
+    if bucket_width <= 0:
+        raise ValueError("bucket_width має бути додатним")
+    if max_buckets < 1:
+        raise ValueError("max_buckets має бути щонайменше 1")
+
+    totals: dict[int, float] = {}
+    for interval in intervals:
+        index = int((interval.value - offset) // bucket_width)
+        index = max(0, min(index, max_buckets - 1))
+        totals[index] = totals.get(index, 0.0) + interval.seconds
+
+    size = max(totals) + 1 if totals else 0
+    return Histogram(
+        bucket_width=bucket_width,
+        offset=offset,
+        seconds=tuple(totals.get(index, 0.0) for index in range(size)),
+    )
+
+
+def percentile(hist: Histogram, q: float) -> float | None:
+    """Перцентиль за тривалістю з лінійною інтерполяцією всередину корзини."""
+    if not 0.0 <= q <= 1.0:
+        raise ValueError("q має бути в межах від 0.0 до 1.0")
+
+    total = hist.total_seconds
+    if total <= 0:
+        return None
+
+    target = q * total
+    cumulative = 0.0
+    for bucket in hist.buckets():
+        if bucket.seconds <= 0:
+            continue
+        if cumulative + bucket.seconds >= target:
+            share = (target - cumulative) / bucket.seconds
+            return bucket.start + share * hist.bucket_width
+        cumulative += bucket.seconds
+
+    return hist.offset + len(hist.seconds) * hist.bucket_width
+
+
+def duration_curve(hist: Histogram, points: int = 100) -> list[tuple[float, float]]:
+    """Крива тривалості навантаження: значення, що перевищується частку часу."""
+    if points < 2 or hist.total_seconds <= 0:
+        return []
+    result: list[tuple[float, float]] = []
+    for index in range(points):
+        fraction = index / (points - 1)
+        value = percentile(hist, 1.0 - fraction)
+        if value is not None:
+            result.append((fraction, value))
+    return result
