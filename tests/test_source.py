@@ -39,6 +39,7 @@ def test_raw_available_from_follows_recorder_keep_days(hass: HomeAssistant, reco
 def test_recent_window_uses_raw_states(hass: HomeAssistant, recorder_keep_days):
     plan = plan_precision(hass, Window(NOW - timedelta(days=3), NOW))
     assert plan.precision is Precision.RAW
+    assert plan.boundary is None
 
 
 @freeze_time(NOW)

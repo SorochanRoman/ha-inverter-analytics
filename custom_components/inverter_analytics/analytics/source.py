@@ -57,7 +57,10 @@ def plan_precision(hass: HomeAssistant, window: Window) -> PrecisionPlan:
     """Обрати джерело даних для вікна."""
     boundary = raw_available_from(hass)
     if window.start >= boundary:
-        return PrecisionPlan(Precision.RAW, window.start)
+        # boundary має сенс лише для змішаного вікна: це мить, де читач
+        # переходить із погодинних середніх на сирі стани. Для однорідних
+        # вікон межі немає, і UI не має малювати позначку.
+        return PrecisionPlan(Precision.RAW, None)
     if window.end <= boundary:
         return PrecisionPlan(Precision.LTS, None)
     return PrecisionPlan(Precision.MIXED, boundary)
