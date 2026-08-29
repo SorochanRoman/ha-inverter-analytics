@@ -5,14 +5,17 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .analytics.cache import ResultCache
+from .const import DATA_CACHE, DOMAIN
 from .panel import async_register_panel, async_remove_panel
+from .websocket_api import async_register
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Налаштувати config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_CACHE: ResultCache()}
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    async_register(hass)
     await async_register_panel(hass)
     return True
 
