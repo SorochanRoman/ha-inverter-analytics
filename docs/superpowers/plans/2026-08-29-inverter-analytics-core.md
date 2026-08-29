@@ -642,6 +642,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.inverter_analytics.config_flow import pack, unpack
 from custom_components.inverter_analytics.const import DOMAIN
+from custom_components.inverter_analytics.roles import EntryConfig
 
 
 def test_pack_splits_flat_form_into_entities_numbers_and_inverted():
@@ -717,6 +718,13 @@ async def test_options_flow_overrides_data(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["entities"] == {"load_power": "sensor.new"}
     assert entry.options["numbers"] == {"rated_power": 12000.0}
+
+    # Контракт EntryConfig: непорожні options повністю перекривають data,
+    # а не зливаються з ними. Перевіряється саме тут, бо options flow —
+    # єдине місце, де ці options з'являються.
+    config = EntryConfig.from_entry(entry)
+    assert config.entity_id("load_power") == "sensor.new"
+    assert config.number("rated_power") == 12000.0
 ```
 
 - [ ] **Step 2: Запустити тест і переконатися, що він падає**
