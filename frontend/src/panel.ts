@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchConfig } from "./api";
+import { describeError } from "./format";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
 import "./tabs/load-tab";
@@ -28,12 +29,25 @@ export class InverterAnalyticsPanel extends LitElement {
     super.connectedCallback();
     this.readLocation();
     window.addEventListener("popstate", this.readLocation);
-    void this.loadConfig();
+    if (this.hass) {
+      void this.loadConfig();
+    }
   }
 
   public disconnectedCallback(): void {
     window.removeEventListener("popstate", this.readLocation);
     super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: Map<string, unknown>): void {
+    // Home Assistant може призначити hass вже після приєднання елемента —
+    // тоді connectedCallback запустив би fetchConfig(undefined). Чекаємо
+    // на перше значення hass і пробуємо ще раз, якщо конфіг ще не
+    // завантажено (і попередня спроба не завершилась помилкою, яку
+    // користувач може повторити кнопкою).
+    if (changed.has("hass") && this.hass && !this.config && !this.error) {
+      void this.loadConfig();
+    }
   }
 
   private readLocation = (): void => {
@@ -58,7 +72,7 @@ export class InverterAnalyticsPanel extends LitElement {
       this.config = await fetchConfig(this.hass);
       this.entryId ??= this.config.entries[0]?.entry_id;
     } catch (err) {
-      this.error = String(err);
+      this.error = describeError(err);
     }
   }
 
@@ -74,7 +88,12 @@ export class InverterAnalyticsPanel extends LitElement {
 
   protected render() {
     if (this.error) {
-      return html`<div class="notice">Не вдалося завантажити конфігурацію: ${this.error}</div>`;
+      return html`<div class="notice">
+        Не вдалося завантажити конфігурацію: ${this.error}
+        <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
+          Спробувати ще
+        </button>
+      </div>`;
     }
     if (!this.config) {
       return html`<div class="notice">Завантаження…</div>`;

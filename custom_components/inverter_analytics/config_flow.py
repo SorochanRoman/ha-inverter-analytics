@@ -44,7 +44,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
     for role in number_roles():
         marker = vol.Required if role.required else vol.Optional
         key = (
-            marker(role.key, default=defaults[role.key])
+            marker(role.key, description={"suggested_value": defaults[role.key]})
             if role.key in defaults
             else marker(role.key)
         )
@@ -60,7 +60,7 @@ def build_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
     for role in entity_roles():
         marker = vol.Required if role.required else vol.Optional
         key = (
-            marker(role.key, default=defaults[role.key])
+            marker(role.key, description={"suggested_value": defaults[role.key]})
             if role.key in defaults
             else marker(role.key)
         )
@@ -135,6 +135,9 @@ class InverterAnalyticsOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Показати форму з поточними значеннями."""
         if user_input is not None:
+            name = user_input[CONF_NAME]
+            if name != self.config_entry.title:
+                self.hass.config_entries.async_update_entry(self.config_entry, title=name)
             return self.async_create_entry(title="", data=pack(user_input))
 
         current = self.config_entry.options or self.config_entry.data

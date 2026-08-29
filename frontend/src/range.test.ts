@@ -26,4 +26,16 @@ describe("resolveRange", () => {
     const { start, end } = resolveRange("year", NOW);
     expect(end.getTime() - start.getTime()).toBe(365 * 24 * 3600 * 1000);
   });
+
+  it("quantises end to the minute", () => {
+    const { end } = resolveRange("24h", new Date("2026-08-29T12:00:47.328Z"));
+    expect(end.getSeconds()).toBe(0);
+    expect(end.getMilliseconds()).toBe(0);
+  });
+
+  it("produces an identical end for calls a few hundred milliseconds apart", () => {
+    const a = resolveRange("24h", new Date("2026-08-29T12:00:00.100Z"));
+    const b = resolveRange("24h", new Date("2026-08-29T12:00:00.750Z"));
+    expect(a.end.getTime()).toBe(b.end.getTime());
+  });
 });

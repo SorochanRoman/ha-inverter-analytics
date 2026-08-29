@@ -95,13 +95,19 @@ async def test_options_flow_overrides_data(
     assert result["type"] is FlowResultType.FORM
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"name": "Deye", "load_power": "sensor.new", "rated_power": 12000}
+        result["flow_id"],
+        {"name": "Deye 8kW", "load_power": "sensor.new", "rated_power": 12000},
     )
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["entities"] == {"load_power": "sensor.new"}
     assert entry.options["numbers"] == {"rated_power": 12000.0}
+
+    # Форма попередньо заповнює назву поточним title і запрошує її
+    # редагувати — редаговане ім'я має потрапити в title запису, а не
+    # загубитися (pack() свідомо відкидає CONF_NAME з даних).
+    assert entry.title == "Deye 8kW"
 
     # Контракт EntryConfig: непорожні options повністю перекривають data,
     # а не зливаються з ними. "legacy_role" був у data, але схема форми

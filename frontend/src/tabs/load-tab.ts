@@ -3,15 +3,9 @@ import { customElement, property, state } from "lit/decorators.js";
 import { fetchLoad } from "../api";
 import { bandsOption, durationCurveOption, histogramOption } from "../charts/options";
 import "../charts/echart";
-import { formatDuration, formatPercent, formatPower } from "../format";
+import { describeError, formatDuration, formatPercent, formatPower, precisionLabel } from "../format";
 import { resolveRange, type RangeKey } from "../range";
 import type { HomeAssistant, LoadPayload } from "../types";
-
-const PRECISION_LABEL: Record<LoadPayload["precision"], string> = {
-  raw: "Точні дані",
-  mixed: "Змішано",
-  lts: "Погодинні середні",
-};
 
 @customElement("ia-load-tab")
 export class IaLoadTab extends LitElement {
@@ -46,7 +40,7 @@ export class IaLoadTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = String(err);
+      this.error = describeError(err);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -116,7 +110,7 @@ export class IaLoadTab extends LitElement {
 
     return html`
       <div class="status">
-        <span class="badge">${PRECISION_LABEL[payload.precision]}</span>
+        <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
         ${payload.coverage < 0.95
           ? html`<span class="warn">
               Дані відсутні ${formatPercent(1 - payload.coverage, locale)} часу
