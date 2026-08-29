@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -32,6 +33,11 @@ class Role:
     required: bool = False
     invertible: bool = False
     multiple: bool = False
+    # Kept out of the setup wizard and offered only when reconfiguring. The
+    # wizard is already long enough that users balk at it, and a threshold with
+    # a defensible default is exactly the kind of field nobody should have to
+    # answer before seeing a single chart.
+    advanced: bool = False
 
 
 ROLES: tuple[Role, ...] = (
@@ -53,6 +59,8 @@ ROLES: tuple[Role, ...] = (
     Role("battery_discharge_total", RoleKind.ENERGY, "kWh"),
     Role("grid_import_total", RoleKind.ENERGY, "kWh"),
     Role("grid_export_total", RoleKind.ENERGY, "kWh"),
+    Role("imbalance_floor_pct", RoleKind.NUMBER, "%", advanced=True),
+    Role("imbalance_threshold_pct", RoleKind.NUMBER, "%", advanced=True),
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
@@ -68,7 +76,97 @@ def normalise_entity_ids(value: object) -> tuple[str, ...]:
     and silently fails in another.
     """
     raw = [value] if isinstance(value, str) else list(value or ())
-    return tuple(item for item in raw if item)
+    # Duplicates are dropped rather than preserved: the same entity listed
+    # twice in a multiple role would be counted twice by every sum over the
+    # parts, and there is no reading of "the same sensor, twice" that a user
+    # could have meant. dict.fromkeys keeps the configured order.
+    return tuple(dict.fromkeys(item for item in raw if item))
+
+
+@dataclass(frozen=True, slots=True)
+class PartIdentity:
+    """How one entity of a multiple role is named in a payload.
+
+    index is the number read out of the entity id, or None when the name
+    revealed nothing and the position in the configured list is all we have.
+    """
+
+    key: str
+    label: str
+    index: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class _PartFamily:
+    """Naming convention for one multiple role."""
+
+    prefix: str
+    letter: str
+    label_prefix: str
+    positional_label: str
+    pattern: re.Pattern[str]
+
+
+# A phase number is written l1 / L1 / phase_1 / ph1 depending on the vendor, and
+# a string as pv1 / string1 / mppt2. Both are anchored on a word boundary so
+# that a digit inside the installation's own name cannot be read as an index:
+# deye12_sun12k_load_l1_power has three numbers in it and only one is the phase.
+_PHASE_PATTERN = re.compile(r"(?:^|_)(?:l|ph|phase)_?(\d+)(?:_|$)", re.IGNORECASE)
+_STRING_PATTERN = re.compile(r"(?:^|_)(?:pv|str|string|mppt)_?(\d+)(?:_|$)", re.IGNORECASE)
+
+_PART_FAMILIES: dict[str, _PartFamily] = {
+    "load_power_phase": _PartFamily("load", "l", "L", "Phase", _PHASE_PATTERN),
+    "grid_power_phase": _PartFamily("grid", "l", "L", "Phase", _PHASE_PATTERN),
+    "pv_power_string": _PartFamily("pv", "s", "PV", "String", _STRING_PATTERN),
+}
+
+
+def _read_index(family: _PartFamily, entity_id: str) -> int | None:
+    match = family.pattern.search(entity_id.split(".", 1)[-1])
+    return int(match.group(1)) if match else None
+
+
+def part_identities(role_key: str, entity_ids: Sequence[str]) -> tuple[PartIdentity, ...]:
+    """Name each entity of a multiple role.
+
+    The index is read from the entity id rather than taken from the position
+    in the list. Detection sorts by the index it parsed and then discards it,
+    so position and index agree only when the mapped phases happen to be
+    contiguous from one: a user who maps L1 and L3 would otherwise get L3's
+    data under a card labelled L2. Where the name reveals nothing, position is
+    genuinely all the information there is, and the label says "Phase 2"
+    without claiming which phase the hardware calls it.
+
+    An index that repeats cannot identify anything, so a single collision
+    drops the whole role back to positional naming rather than leaving some
+    parts named and others not.
+    """
+    family = _PART_FAMILIES.get(role_key)
+    indices = [_read_index(family, entity_id) for entity_id in entity_ids] if family else []
+    usable = family is not None and None not in indices and len(set(indices)) == len(indices)
+
+    identities = []
+    for position in range(len(entity_ids)):
+        if family is None:
+            identities.append(PartIdentity(f"{role_key}_{position + 1}", f"#{position + 1}", None))
+        elif usable:
+            index = indices[position]
+            identities.append(
+                PartIdentity(
+                    f"{family.prefix}_{family.letter}{index}",
+                    f"{family.label_prefix}{index}",
+                    index,
+                )
+            )
+        else:
+            identities.append(
+                PartIdentity(
+                    f"{family.prefix}_p{position + 1}",
+                    f"{family.positional_label} {position + 1}",
+                    None,
+                )
+            )
+    return tuple(identities)
 
 
 def entity_roles() -> tuple[Role, ...]:

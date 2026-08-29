@@ -3,11 +3,13 @@
 import pytest
 
 from custom_components.inverter_analytics.roles import (
+    ROLES,
     ROLES_BY_KEY,
     EntryConfig,
     RoleKind,
     entity_roles,
     number_roles,
+    part_identities,
     required_role_keys,
 )
 
@@ -147,3 +149,54 @@ def test_has_is_true_only_when_a_role_holds_something():
     )
     assert config.has("load_power", "rated_power") is True
     assert config.has("load_power", "load_power_phase") is False
+
+
+def test_a_repeated_entity_is_dropped_not_counted_twice():
+    config = EntryConfig.from_dict(
+        {"entities": {"load_power_phase": ["sensor.a", "sensor.b", "sensor.a"]}}
+    )
+    assert config.entity_ids("load_power_phase") == ("sensor.a", "sensor.b")
+
+
+def test_the_tuning_numbers_stay_out_of_the_first_run():
+    advanced = {role.key for role in ROLES if role.advanced}
+    assert advanced == {"imbalance_floor_pct", "imbalance_threshold_pct"}
+    assert not any(role.advanced for role in ROLES if role.required)
+
+
+def test_a_phase_keeps_the_number_written_in_its_entity_id():
+    identities = part_identities(
+        "load_power_phase", ["sensor.solarman_load_l1_power", "sensor.solarman_load_l3_power"]
+    )
+    # The gap matters: positional naming would label L3's data "L2".
+    assert [item.key for item in identities] == ["load_l1", "load_l3"]
+    assert [item.label for item in identities] == ["L1", "L3"]
+    assert [item.index for item in identities] == [1, 3]
+
+
+def test_an_unreadable_name_falls_back_to_position_without_claiming_a_phase():
+    identities = part_identities("load_power_phase", ["sensor.left_power", "sensor.right_power"])
+    assert [item.key for item in identities] == ["load_p1", "load_p2"]
+    assert [item.label for item in identities] == ["Phase 1", "Phase 2"]
+    assert [item.index for item in identities] == [None, None]
+
+
+def test_one_colliding_index_drops_the_whole_role_to_positions():
+    identities = part_identities(
+        "load_power_phase", ["sensor.a_l1_power", "sensor.b_l1_power", "sensor.c_l2_power"]
+    )
+    assert [item.key for item in identities] == ["load_p1", "load_p2", "load_p3"]
+
+
+def test_the_installation_name_is_not_mistaken_for_a_phase_number():
+    identities = part_identities(
+        "load_power_phase",
+        ["sensor.deye12_sun12k_load_l1_power", "sensor.deye12_sun12k_load_l2_power"],
+    )
+    assert [item.index for item in identities] == [1, 2]
+
+
+def test_pv_strings_are_named_from_their_own_convention():
+    identities = part_identities("pv_power_string", ["sensor.x_pv1_power", "sensor.x_pv2_power"])
+    assert [item.key for item in identities] == ["pv_s1", "pv_s2"]
+    assert [item.label for item in identities] == ["PV1", "PV2"]
