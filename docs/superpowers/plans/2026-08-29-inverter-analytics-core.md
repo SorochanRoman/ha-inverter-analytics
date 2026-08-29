@@ -2482,6 +2482,7 @@ git commit -m "feat: TTL-кеш результатів аналітики"
   "rated_power": 8000.0,
   "kpi": {"mean": 1240.0, "median": 980.0, "p95": 3100.0, "max": 6800.0,
           "fraction_above_80pct": 0.024, "max_sustained_15m": 4200.0},
+  // всі поля kpi нульовані на порожній серії: number | null
   "histogram": {"bucket_width": 200.0,
                 "clipped_low_seconds": 0.0, "clipped_high_seconds": 0.0,
                 "buckets": [{"start": 0.0, "end": 200.0, "seconds": 1200.0, "fraction": 0.05}]},
@@ -2680,8 +2681,12 @@ def build_load_payload(
     histogram = duration_histogram(intervals, bucket_width=bucket_width)
 
     bands = []
-    for key, low_share, high_share in BANDS:
-        low = low_share * rated_power
+    for index, (key, low_share, high_share) in enumerate(BANDS):
+        # Найнижча смуга ловить і від'ємні значення — так само, як гістограма
+        # втискає їх у нульову корзину. Інакше вони зникають із чисельників,
+        # лишаючись у знаменнику, і частки перестають давати одиницю.
+        # Скільки часу було нижче нуля, показує histogram.clipped_low_seconds.
+        low = float("-inf") if index == 0 else low_share * rated_power
         high = None if high_share is None else high_share * rated_power
         seconds = _seconds_between(intervals, low, high)
         bands.append(
@@ -2707,7 +2712,9 @@ def build_load_payload(
             "median": percentile(histogram, 0.5),
             "p95": percentile(histogram, 0.95),
             "max": max((interval.value for interval in intervals), default=None),
-            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else 0.0,
+            # None, а не 0.0: на порожній серії «0% часу вище 80%» — це
+            # впевнене твердження про період, про який нічого не відомо.
+            "fraction_above_80pct": (high_seconds / total_seconds) if total_seconds > 0 else None,
             "max_sustained_15m": max_sustained_mean(intervals, SUSTAINED_WINDOW_SECONDS),
         },
         "histogram": {
@@ -3278,7 +3285,7 @@ export interface Kpi {
   median: number | null;
   p95: number | null;
   max: number | null;
-  fraction_above_80pct: number;
+  fraction_above_80pct: number | null;
   max_sustained_15m: number | null;
 }
 
