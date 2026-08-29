@@ -323,10 +323,16 @@ class InverterAnalyticsOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show the form pre-filled with current values."""
         if user_input is not None:
-            name = user_input[CONF_NAME]
-            if name != self.config_entry.title:
-                self.hass.config_entries.async_update_entry(self.config_entry, title=name)
-            return self.async_create_entry(title="", data=pack(user_input))
+            # Title and options are written together on purpose. Updating the
+            # title separately fires the update listener, and Home Assistant
+            # fires it again for the options write that follows — reloading the
+            # integration twice for one rename. Writing both here means Home
+            # Assistant's own write finds nothing changed and stays quiet.
+            packed = pack(user_input)
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, title=user_input[CONF_NAME], options=packed
+            )
+            return self.async_create_entry(title="", data=packed)
 
         current = self.config_entry.options or self.config_entry.data
         defaults = _TUNING_DEFAULTS | unpack(current) | {CONF_NAME: self.config_entry.title}

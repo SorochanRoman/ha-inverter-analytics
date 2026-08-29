@@ -562,3 +562,39 @@ async def test_a_cluster_with_no_load_sensor_says_so_in_its_label(
     field = next(iter(result["data_schema"].schema.values()))
     labels = [option["label"] for option in field.config["options"]]
     assert any("no load sensor found" in label for label in labels)
+
+
+async def test_renaming_an_inverter_reloads_it_once(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Two writes fire the update listener twice for one rename.
+
+    Serialised by the setup lock, so nothing corrupts — but the integration
+    tears down and rebuilds twice, and its cache is dropped twice, for a change
+    of name.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Old name",
+        data={
+            "entities": {"load_power": ["sensor.load"]},
+            "numbers": {"rated_power": 9000},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch.object(
+        hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+    ) as reload:
+        await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"name": "New name", "rated_power": 9000, "load_power": "sensor.load"},
+        )
+        await hass.async_block_till_done()
+
+    assert entry.title == "New name"
+    assert reload.call_count == 1

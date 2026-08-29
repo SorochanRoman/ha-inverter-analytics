@@ -2,6 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchConfig } from "./api";
 import { describeError } from "./format";
+import { singleFlight } from "./single-flight";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
 import "./tabs/load-tab";
@@ -67,7 +68,11 @@ export class InverterAnalyticsPanel extends LitElement {
     window.history.replaceState(null, "", url);
   }
 
-  private async loadConfig(): Promise<void> {
+  // The connected guard and willUpdate both fire on an ordinary mount, so
+  // without this the panel asks for its configuration twice on every load.
+  private loadConfig = singleFlight(() => this.requestConfig());
+
+  private async requestConfig(): Promise<void> {
     try {
       this.config = await fetchConfig(this.hass);
       this.entryId ??= this.config.entries[0]?.entry_id;
