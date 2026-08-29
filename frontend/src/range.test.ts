@@ -1,0 +1,29 @@
+import { describe, expect, it } from "vitest";
+import { resolveRange } from "./range";
+
+const NOW = new Date("2026-08-29T12:00:00Z");
+
+describe("resolveRange", () => {
+  it("24h ends now and starts a day earlier", () => {
+    const { start, end } = resolveRange("24h", NOW);
+    expect(end.toISOString()).toBe(NOW.toISOString());
+    expect(end.getTime() - start.getTime()).toBe(24 * 3600 * 1000);
+  });
+
+  it("30d spans thirty days", () => {
+    const { start, end } = resolveRange("30d", NOW);
+    expect(end.getTime() - start.getTime()).toBe(30 * 24 * 3600 * 1000);
+  });
+
+  it("month starts at the first day of the current month", () => {
+    const { start } = resolveRange("month", NOW);
+    expect(start.getDate()).toBe(1);
+    expect(start.getHours()).toBe(0);
+    expect(start.getMonth()).toBe(NOW.getMonth());
+  });
+
+  it("year spans 365 days", () => {
+    const { start, end } = resolveRange("year", NOW);
+    expect(end.getTime() - start.getTime()).toBe(365 * 24 * 3600 * 1000);
+  });
+});
