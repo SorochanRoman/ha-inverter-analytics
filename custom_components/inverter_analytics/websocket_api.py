@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -11,6 +12,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
+from .analytics.battery import async_battery_analytics
 from .analytics.load import async_load_analytics
 from .analytics.source import Window, raw_available_from
 from .const import DATA_CACHE, DOMAIN
@@ -47,6 +49,7 @@ def async_register(hass: HomeAssistant) -> None:
         return
     websocket_api.async_register_command(hass, ws_config)
     websocket_api.async_register_command(hass, ws_load)
+    websocket_api.async_register_command(hass, ws_battery)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -75,19 +78,29 @@ def ws_config(
     )
 
 
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "inverter_analytics/load",
-        vol.Required("entry_id"): str,
-        vol.Required("start"): cv.datetime,
-        vol.Required("end"): cv.datetime,
-    }
-)
-@websocket_api.async_response
-async def ws_load(
-    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+_WINDOW_SCHEMA = {
+    vol.Required("entry_id"): str,
+    vol.Required("start"): cv.datetime,
+    vol.Required("end"): cv.datetime,
+}
+
+Compute = Callable[[HomeAssistant, EntryConfig, Window], Awaitable[dict[str, Any]]]
+
+
+async def _async_windowed_response(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    kind: str,
+    compute: Compute,
 ) -> None:
-    """Return the load analytics for a window."""
+    """The shape every analytics command shares.
+
+    Entry lookup, window validation, clamping, the cache and the merge back
+    into the reply were thirty lines duplicated the moment a second command
+    appeared. `kind` keys the cache, so two commands over the same window do
+    not collide.
+    """
     domain_data = hass.data.get(DOMAIN, {})
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     # async_get_entry returns the entry in any state, including one disabled
@@ -107,13 +120,13 @@ async def ws_load(
         return
 
     window, clamped = clamp_window(start, end)
-    cache = hass.data[DOMAIN][entry.entry_id][DATA_CACHE]
-    key = ("load", entry.entry_id, window.start.isoformat(), window.end.isoformat())
+    cache = domain_data[entry.entry_id][DATA_CACHE]
+    key = (kind, entry.entry_id, window.start.isoformat(), window.end.isoformat())
 
     payload = cache.get(key)
     if payload is None:
         try:
-            payload = await async_load_analytics(hass, EntryConfig.from_entry(entry), window)
+            payload = await compute(hass, EntryConfig.from_entry(entry), window)
         except ValueError as err:
             connection.send_error(msg["id"], "invalid_config", str(err))
             return
@@ -127,3 +140,25 @@ async def ws_load(
             "clamped": clamped,
         },
     )
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/load", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_load(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the load analytics for a window."""
+    await _async_windowed_response(hass, connection, msg, "load", async_load_analytics)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/battery", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_battery(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the battery analytics for a window."""
+    await _async_windowed_response(hass, connection, msg, "battery", async_battery_analytics)

@@ -1,7 +1,8 @@
 """Battery analytics: how the charge is used, and how far it falls.
 
-Everything here works from series that have already been read; the module has
-no dependency on Home Assistant.
+build_battery_payload and everything below it work from series that have already
+been read and touch no Home Assistant API; async_battery_analytics is the thin
+layer that reads them, mirroring how load.py is arranged.
 """
 
 from __future__ import annotations
@@ -10,6 +11,10 @@ from datetime import datetime
 from itertools import pairwise
 from typing import Any
 
+from homeassistant.core import HomeAssistant
+
+from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT
+from ..roles import EntryConfig
 from .resample import (
     Interval,
     Series,
@@ -20,6 +25,7 @@ from .resample import (
     time_weighted_mean,
     to_intervals,
 )
+from .source import Precision, Window, async_series_many, describe_series, plan_precision
 
 SOC_BUCKET_WIDTH = 5.0
 SOC_MAX_BUCKETS = 20
@@ -248,3 +254,56 @@ def build_battery_payload(
             else _power_payload(soc, power, idle_w, capacity_kwh, soc.duration)
         ),
     }
+
+
+def _raw_from(hass: HomeAssistant, window: Window) -> datetime | None:
+    """The moment raw states begin inside this window.
+
+    None when the whole window is raw. For a window that lies entirely in
+    long-term statistics the answer is its own end: there is no raw part, and
+    saying so is what stops the tab from presenting hourly means as dips.
+    """
+    plan = plan_precision(hass, window)
+    if plan.precision is Precision.RAW:
+        return None
+    if plan.precision is Precision.LTS:
+        return window.end
+    return plan.boundary
+
+
+async def async_battery_analytics(
+    hass: HomeAssistant, config: EntryConfig, window: Window
+) -> dict[str, Any]:
+    """Read the data and compute the battery analytics."""
+    soc_id = config.entity_id("battery_soc")
+    if soc_id is None:
+        raise ValueError("battery_soc is not configured")
+
+    power_id = config.entity_id("battery_power")
+    signs = {soc_id: 1.0}
+    if power_id:
+        signs[power_id] = config.sign("battery_power")
+
+    results = await async_series_many(
+        hass, [soc_id, *([power_id] if power_id else [])], window, signs
+    )
+    soc = results[soc_id]
+    power = results[power_id] if power_id else None
+
+    payload = build_battery_payload(
+        soc.series,
+        power.series if power else None,
+        capacity_kwh=config.number("battery_capacity"),
+        low_pct=config.number("battery_low_pct") or DEFAULT_BATTERY_LOW_PCT,
+        idle_w=config.number("battery_idle_w") or DEFAULT_BATTERY_IDLE_W,
+        raw_from=_raw_from(hass, window),
+    )
+
+    series_block = {"battery_soc": describe_series(soc_id, soc)}
+    if power_id and power:
+        series_block["battery_power"] = describe_series(power_id, power)
+    payload["series"] = series_block
+    payload["precision"] = soc.precision.value
+    payload["boundary"] = soc.boundary.isoformat() if soc.boundary else None
+    payload["has_capacity"] = config.number("battery_capacity") is not None
+    return payload

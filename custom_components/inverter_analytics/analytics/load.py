@@ -28,7 +28,7 @@ from .resample import (
     time_weighted_mean,
     to_intervals,
 )
-from .source import SeriesResult, Window, async_series_many
+from .source import SeriesResult, Window, async_series_many, describe_series
 
 BANDS: tuple[tuple[str, float, float | None], ...] = (
     ("0-10", 0.0, 0.10),
@@ -146,16 +146,6 @@ def build_load_payload(
     }
 
 
-def _describe(entity_id: str, result: SeriesResult) -> dict[str, Any]:
-    """One entry of the payload's per-series provenance block."""
-    return {
-        "entity_id": entity_id,
-        "precision": result.precision.value,
-        "boundary": result.boundary.isoformat() if result.boundary else None,
-        "coverage": result.coverage,
-    }
-
-
 def _parts_worth_reading(config: EntryConfig, role_key: str) -> tuple[str, ...]:
     """A multiple role's entities, or nothing when there are too few to compare."""
     entity_ids = config.entity_ids(role_key)
@@ -199,12 +189,12 @@ async def async_load_analytics(
     results = await async_series_many(hass, [total_id, *phase_ids, *string_ids], window, signs)
     payload = build_load_payload(results[total_id].series, rated_power=rated_power)
 
-    series_block = {"load_total": _describe(total_id, results[total_id])}
+    series_block = {"load_total": describe_series(total_id, results[total_id])}
 
     if phase_ids:
         aligned, identities = _aligned_parts("load_power_phase", phase_ids, results)
         for identity, entity_id in zip(identities, phase_ids, strict=True):
-            series_block[identity.key] = _describe(entity_id, results[entity_id])
+            series_block[identity.key] = describe_series(entity_id, results[entity_id])
         payload["phases"] = build_phase_payload(
             aligned,
             identities,
@@ -220,7 +210,7 @@ async def async_load_analytics(
     if string_ids:
         aligned, identities = _aligned_parts("pv_power_string", string_ids, results)
         for identity, entity_id in zip(identities, string_ids, strict=True):
-            series_block[identity.key] = _describe(entity_id, results[entity_id])
+            series_block[identity.key] = describe_series(entity_id, results[entity_id])
         payload["strings"] = {
             "parts": build_parts_summary(aligned, identities),
             "aligned_coverage": aligned_coverage(aligned, window.seconds),

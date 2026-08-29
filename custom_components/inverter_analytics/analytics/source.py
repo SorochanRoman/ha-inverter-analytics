@@ -181,6 +181,16 @@ def _observed_precision(plan: PrecisionPlan, has_lts: bool, has_raw: bool) -> Pr
     return Precision.RAW
 
 
+def describe_series(entity_id: str, result: SeriesResult) -> dict[str, Any]:
+    """One entry of a payload's per-series provenance block."""
+    return {
+        "entity_id": entity_id,
+        "precision": result.precision.value,
+        "boundary": result.boundary.isoformat() if result.boundary else None,
+        "coverage": result.coverage,
+    }
+
+
 async def async_series_many(
     hass: HomeAssistant,
     entity_ids: Sequence[str],
