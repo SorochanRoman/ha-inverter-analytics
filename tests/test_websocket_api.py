@@ -59,7 +59,8 @@ async def test_config_command_lists_entries(
     entries = response["result"]["entries"]
     assert len(entries) == 1
     assert entries[0]["title"] == "Deye 8kW"
-    assert entries[0]["entities"] == {"load_power": "sensor.load_power"}
+    # entities is now tuple-valued (roles.py Task 1); JSON encodes the tuple as a list.
+    assert entries[0]["entities"] == {"load_power": ["sensor.load_power"]}
     assert entries[0]["numbers"] == {"rated_power": 8000.0}
     assert "raw_available_from" in response["result"]
 
