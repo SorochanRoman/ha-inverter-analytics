@@ -88,6 +88,14 @@ export interface Strings {
 
 export type Precision = "raw" | "lts" | "mixed";
 
+export interface Consistency {
+  total_mean: number;
+  parts_mean: number;
+  mismatch: number;
+  beyond_margin: boolean;
+  margin: number;
+}
+
 export interface LoadPayload {
   coverage: number;
   rated_power: number;
@@ -110,6 +118,8 @@ export interface LoadPayload {
   phases?: Phases;
   /** Absent unless at least two PV strings are mapped. */
   strings?: Strings;
+  /** Present per group only when there was something to compare. */
+  consistency: { load?: Consistency; pv?: Consistency };
 }
 
 export interface EntryInfo {

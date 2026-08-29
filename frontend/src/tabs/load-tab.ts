@@ -14,7 +14,7 @@ import {
   precisionLabel,
 } from "../format";
 import { resolveRange, type RangeKey } from "../range";
-import type { HomeAssistant, LoadPayload } from "../types";
+import type { Consistency, HomeAssistant, LoadPayload } from "../types";
 
 @customElement("ia-load-tab")
 export class IaLoadTab extends LitElement {
@@ -77,6 +77,22 @@ export class IaLoadTab extends LitElement {
         this.loading = false;
       }
     }
+  }
+
+  /**
+   * A total and its parts that cannot both be right.
+   *
+   * Phrased as a question rather than a verdict: a legitimate installation can
+   * have a total that covers more than the parts, so this is evidence the user
+   * should look at, not a fault we have proved.
+   */
+  private renderConsistency(check: Consistency | undefined, whole: string, parts: string) {
+    if (!check?.beyond_margin) return nothing;
+    const locale = this.hass.locale.language;
+    return html`<span class="warn">
+      ${whole} averages ${formatPower(check.total_mean, locale)} while ${parts} add up to
+      ${formatPower(check.parts_mean, locale)}. Is one of them mapped to the wrong sensor?
+    </span>`;
   }
 
   private renderKpi(payload: LoadPayload) {
@@ -153,6 +169,8 @@ export class IaLoadTab extends LitElement {
               Some values fell outside the histogram range and are shown in its edge buckets
             </span>`
           : nothing}
+        ${this.renderConsistency(payload.consistency.load, "Total load", "the phases")}
+        ${this.renderConsistency(payload.consistency.pv, "Total PV power", "the strings")}
         ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
       </div>
 

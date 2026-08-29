@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from ..const import DEFAULT_IMBALANCE_FLOOR_PCT, DEFAULT_IMBALANCE_THRESHOLD_PCT
 from ..roles import EntryConfig, PartIdentity, part_identities
+from .consistency import compare_total_with_parts
 from .phases import MIN_PHASES as MIN_PARTS
 from .phases import build_parts_summary, build_phase_payload
 from .resample import (
@@ -177,6 +178,9 @@ async def async_load_analytics(
     # whose result is discarded.
     phase_ids = _parts_worth_reading(config, "load_power_phase")
     string_ids = _parts_worth_reading(config, "pv_power_string")
+    # Read only to be checked against its strings; the PV analytics themselves
+    # are not on this tab.
+    pv_total_id = config.entity_id("pv_power") if string_ids else None
 
     # One entity may legitimately fill two roles — a single-phase inverter
     # whose only phase sensor is also its total. async_series_many reads each
@@ -186,7 +190,15 @@ async def async_load_analytics(
     signs |= {entity_id: config.sign("load_power_phase") for entity_id in phase_ids}
     signs |= {entity_id: config.sign("pv_power_string") for entity_id in string_ids}
 
-    results = await async_series_many(hass, [total_id, *phase_ids, *string_ids], window, signs)
+    if pv_total_id:
+        signs[pv_total_id] = config.sign("pv_power")
+
+    results = await async_series_many(
+        hass,
+        [total_id, *phase_ids, *string_ids, *([pv_total_id] if pv_total_id else [])],
+        window,
+        signs,
+    )
     payload = build_load_payload(results[total_id].series, rated_power=rated_power)
 
     series_block = {"load_total": describe_series(total_id, results[total_id])}
@@ -216,6 +228,23 @@ async def async_load_analytics(
             "aligned_coverage": aligned_coverage(aligned, window.seconds),
         }
 
+    checks = {
+        "load": (
+            compare_total_with_parts(
+                results[total_id].series, [results[eid].series for eid in phase_ids]
+            )
+            if phase_ids
+            else None
+        ),
+        "pv": (
+            compare_total_with_parts(
+                results[pv_total_id].series, [results[eid].series for eid in string_ids]
+            )
+            if pv_total_id
+            else None
+        ),
+    }
+    payload["consistency"] = {key: value for key, value in checks.items() if value}
     payload["series"] = series_block
 
     # The top-level fields describe the primary series, the total load: that is

@@ -38,6 +38,7 @@ const payload: LoadPayload = {
   ],
   overloads: [],
   series: {},
+  consistency: {},
   precision: "raw",
   boundary: null,
   window: { start: "2026-08-01T00:00:00+00:00", end: "2026-08-29T00:00:00+00:00" },
