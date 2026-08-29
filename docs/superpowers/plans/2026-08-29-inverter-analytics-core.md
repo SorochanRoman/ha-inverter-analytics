@@ -85,12 +85,15 @@
 `requirements_test.txt`:
 
 ```
-homeassistant>=2024.11.0
+# pytest-homeassistant-custom-component сам пінить точну сумісну версію
+# homeassistant і тягне pytest та pytest-asyncio. Не додавай сюди окремий
+# рядок homeassistant: два джерела правди про версію HA відправляють
+# резолвер pip у багатохвилинний backtracking.
 pytest-homeassistant-custom-component>=0.13.140
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
 ruff>=0.6.0
 ```
+
+Перевірене оточення: Python 3.12.9, HA 2025.1.4, pytest 8.3.4, ruff 0.16.5.
 
 `pyproject.toml`:
 
