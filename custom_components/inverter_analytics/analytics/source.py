@@ -83,16 +83,41 @@ def states_to_samples(states: Iterable[State], sign: float) -> list[Sample]:
     return samples
 
 
+STATISTICS_PERIOD = timedelta(hours=1)
+
+
 def statistic_rows_to_samples(rows: Iterable[Mapping[str, Any]], sign: float) -> list[Sample]:
-    """Convert hourly statistics rows into samples using the mean value."""
+    """Convert hourly statistics rows into samples using the mean value.
+
+    Each row describes exactly one hour, and every hour is closed off after it.
+    A state persists until the next one changes it, but a statistics row does
+    not: an hour with no row means nobody recorded that hour, not that the
+    previous hour continued.
+
+    Without this a fortnight the recorder spent switched off is filled in by
+    whatever value preceded it, and the coverage figure — the one number that
+    says whether a month is comparable with its neighbours — reports the whole
+    month as present. Seen against real imported statistics: four seeded days
+    of June were reported as a complete month with a mean higher than May's.
+    """
     samples: list[Sample] = []
+    expected: datetime | None = None
     for row in rows:
         start = row.get("start")
         moment = dt_util.utc_from_timestamp(start) if isinstance(start, (int, float)) else start
         if moment is None:
             continue
+        # Only where the run of hours breaks: a closer between two adjacent
+        # hours would be replaced immediately, and a year of them would double
+        # the sample count for nothing.
+        if expected is not None and moment > expected:
+            samples.append(Sample(expected, None))
         mean = row.get("mean")
         samples.append(Sample(moment, None if mean is None else float(mean) * sign))
+        expected = moment + STATISTICS_PERIOD
+
+    if expected is not None:
+        samples.append(Sample(expected, None))
     return samples
 
 

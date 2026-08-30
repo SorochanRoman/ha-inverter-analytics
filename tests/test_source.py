@@ -8,6 +8,11 @@ from freezegun import freeze_time
 from homeassistant.core import HomeAssistant, State
 import pytest
 
+from custom_components.inverter_analytics.analytics.resample import (
+    Series,
+    coverage,
+    to_intervals,
+)
 from custom_components.inverter_analytics.analytics.source import (
     Precision,
     Window,
@@ -94,8 +99,13 @@ def test_statistic_rows_accept_float_timestamps():
         {"start": (ts + timedelta(hours=1)).timestamp(), "mean": 700.0},
     ]
     samples = statistic_rows_to_samples(rows, sign=1.0)
-    assert [sample.ts for sample in samples] == [ts, ts + timedelta(hours=1)]
-    assert [sample.value for sample in samples] == [500.0, 700.0]
+    # Two adjacent hours need no closer between them, only one after the last.
+    assert [sample.ts for sample in samples] == [
+        ts,
+        ts + timedelta(hours=1),
+        ts + timedelta(hours=2),
+    ]
+    assert [sample.value for sample in samples] == [500.0, 700.0, None]
 
 
 def test_statistic_rows_accept_datetime_starts():
@@ -108,3 +118,35 @@ def test_statistic_rows_without_mean_become_gaps():
     ts = datetime(2026, 1, 1, tzinfo=UTC)
     samples = statistic_rows_to_samples([{"start": ts, "mean": None}], sign=1.0)
     assert samples[0].value is None
+
+
+def test_a_missing_hour_of_statistics_is_a_gap_not_a_continuation():
+    """A statistics row describes one hour; a state persists, a row does not.
+
+    Without the closer, a fortnight the recorder spent switched off is filled
+    in with whatever value preceded it, and every figure measuring how much of
+    a period has data reports all of it.
+    """
+    ts = datetime(2026, 1, 1, tzinfo=UTC)
+    rows = [
+        {"start": ts, "mean": 500.0},
+        {"start": ts + timedelta(hours=5), "mean": 700.0},
+    ]
+    samples = statistic_rows_to_samples(rows, sign=1.0)
+
+    assert [(sample.ts - ts).total_seconds() / 3600 for sample in samples] == [0, 1, 5, 6]
+    assert [sample.value for sample in samples] == [500.0, None, 700.0, None]
+
+
+def test_statistics_do_not_run_past_the_hour_they_describe():
+    ts = datetime(2026, 1, 1, tzinfo=UTC)
+    series = Series.of(
+        ts,
+        ts + timedelta(hours=10),
+        statistic_rows_to_samples([{"start": ts, "mean": 500.0}], sign=1.0),
+    )
+    intervals = to_intervals(series)
+
+    assert len(intervals) == 1
+    assert intervals[0].seconds == 3600.0
+    assert coverage(series) == 0.1
