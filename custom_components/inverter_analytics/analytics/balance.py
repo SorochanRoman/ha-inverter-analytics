@@ -10,7 +10,11 @@ from collections import defaultdict
 from datetime import datetime, tzinfo
 from typing import Any
 
-from .source import EnergySeries, Window
+from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
+
+from ..roles import EntryConfig
+from .source import EnergySeries, Window, async_energy_many
 
 # The flows, split by which side of the books they belong to. Order is the order
 # they appear on screen.
@@ -118,3 +122,31 @@ def build_balance_payload(
             and covered_end >= window.end
         ),
     }
+
+
+async def async_balance_analytics(
+    hass: HomeAssistant, config: EntryConfig, window: Window
+) -> dict[str, Any]:
+    """Read the counters and compute the energy balance."""
+    mapped = {
+        role: entity_id for role in FLOW_ROLES if (entity_id := config.entity_id(role)) is not None
+    }
+    if not mapped:
+        raise ValueError("no energy counters are configured")
+
+    # One entity may fill two roles on an installation that meters import and
+    # export with a single counter, so the read is deduplicated by id while the
+    # payload stays keyed by role.
+    series = await async_energy_many(hass, list(mapped.values()), window)
+    flows = {role: series[entity_id] for role, entity_id in mapped.items()}
+
+    zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
+    payload = build_balance_payload(flows, tz=zone, window=window)
+    payload["entities"] = mapped
+    payload["timezone"] = str(zone)
+    # Counters are read from statistics whatever the window, so there is no
+    # precision choice to report — but the badge exists on every other tab and
+    # its absence here would look like an omission rather than a decision.
+    payload["precision"] = "lts"
+    payload["boundary"] = None
+    return payload

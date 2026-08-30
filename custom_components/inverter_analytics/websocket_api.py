@@ -12,6 +12,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
+from .analytics.balance import async_balance_analytics
 from .analytics.battery import async_battery_analytics
 from .analytics.load import async_load_analytics
 from .analytics.seasonality import async_seasonality_analytics
@@ -52,6 +53,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_load)
     websocket_api.async_register_command(hass, ws_battery)
     websocket_api.async_register_command(hass, ws_seasonality)
+    websocket_api.async_register_command(hass, ws_balance)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -177,3 +179,14 @@ async def ws_seasonality(
     await _async_windowed_response(
         hass, connection, msg, "seasonality", async_seasonality_analytics
     )
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/balance", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_balance(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy balance for a window."""
+    await _async_windowed_response(hass, connection, msg, "balance", async_balance_analytics)
