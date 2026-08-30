@@ -108,7 +108,11 @@ export class IaSeasonalityTab extends LitElement {
     const payload = this.payload;
     const locale = this.hass.locale.language;
     const warning = coverageWarning(payload.coverage, locale);
-    const partial = payload.months.filter((month) => !month.complete);
+    // Split deliberately: a month with a thin bar and a month with no bar at
+    // all are different problems, and one sentence counting them together said
+    // nine months were "drawn in grey" when one of them was.
+    const thin = payload.months.filter((month) => !month.complete && month.load_mean !== null);
+    const absent = payload.months.filter((month) => month.load_mean === null);
 
     return html`
       <div class="status">
@@ -124,12 +128,24 @@ export class IaSeasonalityTab extends LitElement {
       <section>
         <h2>Mean power by month</h2>
         <ia-chart .option=${monthlyOption(payload.months, payload.has_pv)}></ia-chart>
-        ${partial.length
+        ${thin.length
           ? html`<p class="note">
-              ${partial.length === 1 ? "One month is" : `${partial.length} months are`} covered by
-              less than ${formatPercent(payload.incomplete_below, locale)} of their days and
-              ${partial.length === 1 ? "is" : "are"} drawn in grey. A month the recorder only saw
-              part of is not a lower month; the figures stand, the comparison does not.
+              ${thin.length === 1
+                ? html`One month is covered by less than
+                    ${formatPercent(payload.incomplete_below, locale)} of its days and is drawn in
+                    grey.`
+                : html`${thin.length} months are covered by less than
+                    ${formatPercent(payload.incomplete_below, locale)} of their days and are drawn
+                    in grey.`}
+              A month the recorder only saw part of is not a lower month; the figures stand, the
+              comparison does not.
+            </p>`
+          : nothing}
+        ${absent.length
+          ? html`<p class="note">
+              ${absent.length === 1 ? "One month has" : `${absent.length} months have`} no recorded
+              data at all and ${absent.length === 1 ? "carries" : "carry"} no bar. Home Assistant
+              keeps long-term statistics only from the moment a sensor starts producing them.
             </p>`
           : nothing}
       </section>

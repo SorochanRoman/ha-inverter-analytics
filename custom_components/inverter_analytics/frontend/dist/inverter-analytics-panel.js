@@ -264,7 +264,7 @@ Yi.elementStyles = [], Yi.shadowRootOptions = { mode: "open" }, Yi[na("elementPr
  */
 const Kh = globalThis, dc = (r) => r, es = Kh.trustedTypes, gc = es ? es.createPolicy("lit-html", { createHTML: (r) => r }) : void 0, Cg = "$lit$", Mr = `lit$${Math.random().toFixed(9).slice(2)}$`, Mg = "?" + Mr, S_ = `<${Mg}>`, _i = document, ma = () => _i.createComment(""), _a = (r) => r === null || typeof r != "object" && typeof r != "function", Qh = Array.isArray, b_ = (r) => Qh(r) || typeof r?.[Symbol.iterator] == "function", gl = `[ 	
 \f\r]`, In = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, yc = /-->/g, mc = />/g, $r = RegExp(`>|${gl}(?:([^\\s"'>=/]+)(${gl}*=${gl}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), _c = /'/g, Sc = /"/g, Dg = /^(?:script|style|textarea|title)$/i, w_ = (r) => (t, ...e) => ({ _$litType$: r, strings: t, values: e }), N = w_(1), fn = Symbol.for("lit-noChange"), U = Symbol.for("lit-nothing"), bc = /* @__PURE__ */ new WeakMap(), fi = _i.createTreeWalker(_i, 129);
+\f\r"'\`<>=]|("|')|))|$)`, "g"), _c = /'/g, Sc = /"/g, Dg = /^(?:script|style|textarea|title)$/i, w_ = (r) => (t, ...e) => ({ _$litType$: r, strings: t, values: e }), k = w_(1), fn = Symbol.for("lit-noChange"), U = Symbol.for("lit-nothing"), bc = /* @__PURE__ */ new WeakMap(), fi = _i.createTreeWalker(_i, 129);
 function Ag(r, t) {
   if (!Qh(r) || !r.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return gc !== void 0 ? gc.createHTML(t) : t;
@@ -599,16 +599,16 @@ function N_(r, t, e, i) {
   });
 }
 const Rs = "—";
-function dt(r, t) {
+function gt(r, t) {
   return r === null || Number.isNaN(r) ? Rs : Math.abs(r) >= 1e3 ? `${new Intl.NumberFormat(t, { maximumFractionDigits: 1 }).format(
     r / 1e3
   )} kW` : `${new Intl.NumberFormat(t, { maximumFractionDigits: 0 }).format(r)} W`;
 }
-function gt(r, t) {
+function ct(r, t) {
   return r === null || Number.isNaN(r) ? Rs : `${new Intl.NumberFormat(t, { maximumFractionDigits: 1 }).format(r * 100)}%`;
 }
 function aa(r, t) {
-  return r === null || Number.isNaN(r) ? Rs : r <= 0 ? "0%" : r < 1e-3 ? "<0.1%" : gt(r, t);
+  return r === null || Number.isNaN(r) ? Rs : r <= 0 ? "0%" : r < 1e-3 ? "<0.1%" : ct(r, t);
 }
 const z_ = 10 * 60;
 function wc(r, t) {
@@ -635,7 +635,7 @@ function Jh(r, t, e) {
   return r === "raw" ? "Exact data" : r === "lts" ? "Hourly averages" : t ? `Mixed since ${new Date(t).toLocaleDateString(e)}` : "Mixed";
 }
 function rs(r, t) {
-  return r >= 0.95 ? null : r <= 0 ? "No data for this period" : r < 0.01 ? "Data covers less than 1% of the period" : `Data covers only ${gt(r, t)} of the period`;
+  return r >= 0.95 ? null : r <= 0 ? "No data for this period" : r < 0.01 ? "Data covers less than 1% of the period" : `Data covers only ${ct(r, t)} of the period`;
 }
 function $_(r) {
   let t;
@@ -974,7 +974,7 @@ var Fu = function(r, t) {
     for (var n in i) Object.prototype.hasOwnProperty.call(i, n) && (e[n] = i[n]);
   }, Fu(r, t);
 };
-function B(r, t) {
+function N(r, t) {
   if (typeof t != "function" && t !== null)
     throw new TypeError("Class extends value " + String(t) + " is not a constructor or null");
   Fu(r, t);
@@ -1112,7 +1112,7 @@ function rt(r, t, e) {
     }
   return r;
 }
-function k(r, t) {
+function B(r, t) {
   if (Object.assign)
     Object.assign(r, t);
   else
@@ -1121,7 +1121,7 @@ function k(r, t) {
   return r;
 }
 function ot(r, t, e) {
-  for (var i = ct(t), n = 0, a = i.length; n < a; n++) {
+  for (var i = vt(t), n = 0, a = i.length; n < a; n++) {
     var o = i[n];
     r[o] == null && (r[o] = t[o]);
   }
@@ -1198,7 +1198,7 @@ function Lt(r, t, e) {
     t.call(e, r[n], n, r) && i.push(r[n]);
   return i;
 }
-function ct(r) {
+function vt(r) {
   if (!r)
     return [];
   if (Object.keys)
@@ -1235,7 +1235,7 @@ function F(r) {
 function Vu(r) {
   return Fa.call(r) === "[object String]";
 }
-function vt(r) {
+function pt(r) {
   return typeof r == "number";
 }
 function V(r) {
@@ -1312,7 +1312,7 @@ var d1 = function() {
   }, r.prototype.set = function(t, e) {
     return this.data[t] = e, this;
   }, r.prototype.keys = function() {
-    return ct(this.data);
+    return vt(this.data);
   }, r.prototype.forEach = function(t) {
     var e = this.data;
     for (var i in e)
@@ -1368,7 +1368,7 @@ function Bs(r, t) {
     };
     i.prototype = r, e = new i();
   }
-  return t && k(e, t), e;
+  return t && B(e, t), e;
 }
 function Bg(r) {
   var t = r.style;
@@ -1930,7 +1930,7 @@ function W1() {
   wa(this.event);
 }
 var U1 = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     var e = r !== null && r.apply(this, arguments) || this;
     return e.handler = null, e;
@@ -1953,7 +1953,7 @@ var U1 = function(r) {
   "mousemove",
   "contextmenu"
 ], bl = new at(0, 0, 0, 0), $g = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e, i, n, a, o) {
     var s = r.call(this) || this;
     return s._hovered = new Rn(0, 0), s.storage = e, s.painter = i, s.painterRoot = a, s._pointerSize = o, n = n || new U1(), s.proxy = null, s.setHandlerProxy(n), s._draggingMgr = new D1(s), s;
@@ -3066,7 +3066,7 @@ function Hc(r) {
     var t = Vc.get(r);
     return t || (t = Fc(r, -0.1), Vc.put(r, t)), t;
   } else if (ks(r)) {
-    var e = k({}, r);
+    var e = B({}, r);
     return e.colorStops = W(r.colorStops, function(i) {
       return {
         offset: i.offset,
@@ -3190,8 +3190,8 @@ var On = [0, 0, 0, 0], gS = function() {
     var n = this.keyframes, a = n.length, o = !1, s = Wc, l = e;
     if (Zt(e)) {
       var u = dS(e);
-      s = u, (u === 1 && !vt(e[0]) || u === 2 && !vt(e[0][0])) && (o = !0);
-    } else if (vt(e) && !is(e))
+      s = u, (u === 1 && !pt(e[0]) || u === 2 && !pt(e[0][0])) && (o = !0);
+    } else if (pt(e) && !is(e))
       s = ro;
     else if (F(e))
       if (!isNaN(+e))
@@ -3201,7 +3201,7 @@ var On = [0, 0, 0, 0], gS = function() {
         h && (l = h, s = jn);
       }
     else if (ks(e)) {
-      var f = k({}, l);
+      var f = B({}, l);
       f.colorStops = W(e.colorStops, function(c) {
         return {
           offset: c.offset,
@@ -3308,7 +3308,7 @@ var On = [0, 0, 0, 0], gS = function() {
   }, r.prototype.changeTarget = function(t) {
     this._target = t;
   }, r.prototype.when = function(t, e, i) {
-    return this.whenWithKeys(t, e, ct(e), i);
+    return this.whenWithKeys(t, e, vt(e), i);
   }, r.prototype.whenWithKeys = function(t, e, i, n) {
     for (var a = this._tracks, o = 0; o < i.length; o++) {
       var s = i[o], l = a[s];
@@ -3449,7 +3449,7 @@ var On = [0, 0, 0, 0], gS = function() {
       }
     }
   }, r.prototype.__changeFinalValue = function(t, e) {
-    e = e || ct(t);
+    e = e || vt(t);
     for (var i = 0; i < e.length; i++) {
       var n = e[i], a = this._tracks[n];
       if (a) {
@@ -3466,7 +3466,7 @@ function Qi() {
   return (/* @__PURE__ */ new Date()).getTime();
 }
 var yS = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     var i = r.call(this) || this;
     return i._running = !1, i._time = 0, i._pausedTime = 0, i._pauseStart = 0, i._paused = !1, e = e || {}, i.stage = e.stage || {}, i;
@@ -3682,7 +3682,7 @@ var qc = /* @__PURE__ */ function() {
   }
   return r;
 }(), TS = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e, i) {
     var n = r.call(this) || this;
     return n.__pointerCapturing = !1, n.dom = e, n.painterRoot = i, n._localHandlerScope = new qc(e, we), Ll && (n._globalHandlerScope = new qc(document, th)), wS(n, n._localHandlerScope), n;
@@ -3942,7 +3942,7 @@ var Bl = "__zr_normal__", Nl = Ta.concat(["ignore"]), DS = wn(Ta, function(r, t)
     return i[3] = 1, ir(i, "rgba");
   }, r.prototype.traverse = function(t, e) {
   }, r.prototype.attrKV = function(t, e) {
-    t === "textConfig" ? this.setTextConfig(e) : t === "textContent" ? this.setTextContent(e) : t === "clipPath" ? this.setClipPath(e) : t === "extra" ? (this.extra = this.extra || {}, k(this.extra, e)) : this[t] = e;
+    t === "textConfig" ? this.setTextConfig(e) : t === "textContent" ? this.setTextContent(e) : t === "clipPath" ? this.setClipPath(e) : t === "extra" ? (this.extra = this.extra || {}, B(this.extra, e)) : this[t] = e;
   }, r.prototype.hide = function() {
     this.ignore = !0, this.markRedraw();
   }, r.prototype.show = function() {
@@ -3951,7 +3951,7 @@ var Bl = "__zr_normal__", Nl = Ta.concat(["ignore"]), DS = wn(Ta, function(r, t)
     if (typeof t == "string")
       this.attrKV(t, e);
     else if (V(t))
-      for (var i = t, n = ct(i), a = 0; a < n.length; a++) {
+      for (var i = t, n = vt(i), a = 0; a < n.length; a++) {
         var o = n[a];
         this.attrKV(o, t[o]);
       }
@@ -4052,12 +4052,12 @@ var Bl = "__zr_normal__", Nl = Ta.concat(["ignore"]), DS = wn(Ta, function(r, t)
   }, r.prototype._mergeStates = function(t) {
     for (var e = {}, i, n = 0; n < t.length; n++) {
       var a = t[n];
-      k(e, a), a.textConfig && (i = i || {}, k(i, a.textConfig));
+      B(e, a), a.textConfig && (i = i || {}, B(i, a.textConfig));
     }
     return i && (e.textConfig = i), e;
   }, r.prototype._applyStateObj = function(t, e, i, n, a, o) {
     var s = !(e && n);
-    e && e.textConfig ? (this.textConfig = k({}, n ? this.textConfig : i.textConfig), k(this.textConfig, e.textConfig)) : s && i.textConfig && (this.textConfig = i.textConfig);
+    e && e.textConfig ? (this.textConfig = B({}, n ? this.textConfig : i.textConfig), B(this.textConfig, e.textConfig)) : s && i.textConfig && (this.textConfig = i.textConfig);
     for (var l = {}, u = !1, h = 0; h < Nl.length; h++) {
       var f = Nl[h], v = a && DS[f];
       e && e[f] != null ? v ? (u = !0, l[f] = e[f]) : this[f] = e[f] : s && i[f] != null && (v ? (u = !0, l[f] = i[f]) : this[f] = i[f]);
@@ -4088,7 +4088,7 @@ var Bl = "__zr_normal__", Nl = Ta.concat(["ignore"]), DS = wn(Ta, function(r, t)
     var e = this._textContent;
     e !== t && (e && e !== t && this.removeTextContent(), t.innerTransformable = new vf(), this._attachComponent(t), this._textContent = t, this.markRedraw());
   }, r.prototype.setTextConfig = function(t) {
-    this.textConfig || (this.textConfig = {}), k(this.textConfig, t), this.markRedraw();
+    this.textConfig || (this.textConfig = {}), B(this.textConfig, t), this.markRedraw();
   }, r.prototype.removeTextConfig = function() {
     this.textConfig = null, this.markRedraw();
   }, r.prototype.removeTextContent = function() {
@@ -4253,7 +4253,7 @@ function RS(r, t) {
   return !0;
 }
 function jg(r, t, e, i, n, a, o, s) {
-  for (var l = ct(i), u = n.duration, h = n.delay, f = n.additive, v = n.setToFinal, c = !V(a), p = r.animators, g = [], d = 0; d < l.length; d++) {
+  for (var l = vt(i), u = n.duration, h = n.delay, f = n.additive, v = n.setToFinal, c = !V(a), p = r.animators, g = [], d = 0; d < l.length; d++) {
     var y = l[d], m = i[y];
     if (m != null && e[y] != null && (c || a[y]))
       if (V(m) && !Zt(m) && !ks(m)) {
@@ -4302,7 +4302,7 @@ function jg(r, t, e, i, n, a, o, s) {
   }
 }
 var xt = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     var i = r.call(this) || this;
     return i.isGroup = !0, i._children = [], i.attr(e), i;
@@ -4417,7 +4417,7 @@ var kS = function() {
     var n = this;
     this._sleepAfterStill = 10, this._stillFrameAccum = 0, this._needsRefresh = !0, this._needsRefreshHover = !0, this._darkMode = !1, i = i || {}, this.dom = e, this.id = t;
     var a = new Q1(), o = i.renderer || "canvas";
-    Wo[o] || (o = ct(Wo)[0]), i.useDirtyRect = i.useDirtyRect == null ? !1 : i.useDirtyRect;
+    Wo[o] || (o = vt(Wo)[0]), i.useDirtyRect = i.useDirtyRect == null ? !1 : i.useDirtyRect;
     var s = new Wo[o](e, a, i, t), l = i.ssr || s.ssrOnly;
     this.storage = a, this.painter = s;
     var u = !Y.node && !Y.worker && !l ? new TS(s.getViewportRoot(), s.root) : null, h = i.useCoarsePointer, f = h == null || h === "auto" ? Y.touchEventsSupported : !!h, v = 44, c;
@@ -4783,7 +4783,7 @@ function la(r) {
   return Me(r, "");
 }
 function Me(r, t) {
-  return r == null ? t : F(r) ? r : vt(r) || Vu(r) ? r + "" : t;
+  return r == null ? t : F(r) ? r : pt(r) || Vu(r) ? r + "" : t;
 }
 function yf(r) {
   var t = r.name;
@@ -4922,7 +4922,7 @@ function ab(r, t, e, i, n) {
   var a = t == null || t === "auto";
   if (i == null)
     return i;
-  if (vt(i)) {
+  if (pt(i)) {
     var o = iv(e || 0, i, n);
     return Tt(o, a ? Math.max(tr(e || 0), tr(i)) : t);
   } else {
@@ -4963,14 +4963,14 @@ function _f(r, t) {
     var i = this, n;
     return ub(i) ? n = /** @class */
     function(a) {
-      B(o, a);
+      N(o, a);
       function o() {
         return a.apply(this, arguments) || this;
       }
       return o;
     }(i) : (n = function() {
       (e.$constructor || i).apply(this, arguments);
-    }, c1(n, this)), k(n.prototype, e), n[uy] = !0, n.extend = this.extend, n.superCall = cb, n.superApply = vb, n.superClass = i, n;
+    }, c1(n, this)), B(n.prototype, e), n[uy] = !0, n.extend = this.extend, n.superCall = cb, n.superApply = vb, n.superClass = i, n;
   };
 }
 function ub(r) {
@@ -5118,7 +5118,7 @@ function mb(r, t, e, i, n, a) {
 }
 function cy(r, t, e, i) {
   i = i || {};
-  var n = k({}, i);
+  var n = B({}, i);
   n.font = t, e = J(e, "..."), n.maxIterations = J(i.maxIterations, 2);
   var a = n.minChar = J(i.minChar, 0);
   n.cnCharWidth = ee("国", t);
@@ -5323,12 +5323,12 @@ var ah = "__zr_style_" + Math.round(Math.random() * 10), gi = {
 };
 gi[ah] = !0;
 var lv = ["z", "z2", "invisible"], Db = ["invisible"], Wa = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
   return t.prototype._init = function(e) {
-    for (var i = ct(e), n = 0; n < i.length; n++) {
+    for (var i = vt(e), n = 0; n < i.length; n++) {
       var a = i[n];
       a === "style" ? this.useStyle(e[a]) : r.prototype.attrKV.call(this, a, e[a]);
     }
@@ -5380,7 +5380,7 @@ var lv = ["z", "z2", "invisible"], Db = ["invisible"], Wa = function(r) {
   }, t.prototype.attrKV = function(e, i) {
     e !== "style" ? r.prototype.attrKV.call(this, e, i) : this.style ? this.setStyle(i) : this.useStyle(i);
   }, t.prototype.setStyle = function(e, i) {
-    return typeof e == "string" ? this.style[e] = i : k(this.style, e), this.dirtyStyle(), this;
+    return typeof e == "string" ? this.style[e] = i : B(this.style, e), this.dirtyStyle(), this;
   }, t.prototype.dirtyStyle = function(e) {
     e || this.markRedraw(), this.__dirty |= Qn, this._rect && (this._rect = null);
   }, t.prototype.dirty = function() {
@@ -5406,11 +5406,11 @@ var lv = ["z", "z2", "invisible"], Db = ["invisible"], Wa = function(r) {
       if (o) {
         var h = this.style;
         if (this.style = this.createStyle(l ? {} : h), l)
-          for (var f = ct(h), v = 0; v < f.length; v++) {
+          for (var f = vt(h), v = 0; v < f.length; v++) {
             var c = f[v];
             c in u && (u[c] = u[c], this.style[c] = h[c]);
           }
-        for (var p = ct(u), v = 0; v < p.length; v++) {
+        for (var p = vt(u), v = 0; v < p.length; v++) {
           var c = p[v];
           this.style[c] = this.style[c];
         }
@@ -5430,7 +5430,7 @@ var lv = ["z", "z2", "invisible"], Db = ["invisible"], Wa = function(r) {
     }
     return n && (i.style = n), i;
   }, t.prototype._mergeStyle = function(e, i) {
-    return k(e, i), e;
+    return B(e, i), e;
   }, t.prototype.getAnimationStyleProps = function() {
     return Fs;
   }, t.initDefaultProps = function() {
@@ -5724,14 +5724,14 @@ var xi = function() {
             break;
           }
           case nt.A:
-            var G = i[b++], K = i[b++], tt = i[b++], ut = i[b++], pt = i[b++], St = i[b++], me = i[b++], Nr = !i[b++], Ai = tt > ut ? tt : ut, jt = Qe(tt - ut) > 1e-3, It = pt + St, Z = !1;
+            var G = i[b++], K = i[b++], tt = i[b++], ut = i[b++], dt = i[b++], St = i[b++], me = i[b++], Nr = !i[b++], Ai = tt > ut ? tt : ut, jt = Qe(tt - ut) > 1e-3, It = dt + St, Z = !1;
             if (c) {
               var T = p[y++];
-              d + T > m && (It = pt + St * (m - d) / T, Z = !0), d += T;
+              d + T > m && (It = dt + St * (m - d) / T, Z = !0), d += T;
             }
-            if (jt && t.ellipse ? t.ellipse(G, K, tt, ut, me, pt, It, Nr) : t.arc(G, K, Ai, pt, It, Nr), Z)
+            if (jt && t.ellipse ? t.ellipse(G, K, tt, ut, me, dt, It, Nr) : t.arc(G, K, Ai, dt, It, Nr), Z)
               break t;
-            M && (s = Kr(pt) * tt + G, l = Qr(pt) * ut + K), u = Kr(It) * tt + G, h = Qr(It) * ut + K;
+            M && (s = Kr(dt) * tt + G, l = Qr(dt) * ut + K), u = Kr(It) * tt + G, h = Qr(It) * ut + K;
             break;
           case nt.R:
             s = u = i[b], l = h = i[b + 1], f = i[b++], v = i[b++];
@@ -5999,7 +5999,7 @@ var gy = ot({
   "zlevel",
   "parent"
 ]), lt = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -6023,13 +6023,13 @@ var gy = ot({
   }, t.prototype.getDecalElement = function() {
     return this._decalEl;
   }, t.prototype._init = function(e) {
-    var i = ct(e);
+    var i = vt(e);
     this.shape = this.getDefaultShape();
     var n = this.getDefaultStyle();
     n && this.useStyle(n);
     for (var a = 0; a < i.length; a++) {
       var o = i[a], s = e[o];
-      o === "style" ? this.style ? k(this.style, s) : this.useStyle(s) : o === "shape" ? k(this.shape, s) : r.prototype.attrKV.call(this, o, s);
+      o === "style" ? this.style ? B(this.style, s) : this.useStyle(s) : o === "shape" ? B(this.shape, s) : r.prototype.attrKV.call(this, o, s);
     }
     this.style || this.useStyle({});
   }, t.prototype.getDefaultStyle = function() {
@@ -6115,7 +6115,7 @@ var gy = ot({
     e === "shape" ? this.setShape(i) : r.prototype.attrKV.call(this, e, i);
   }, t.prototype.setShape = function(e, i) {
     var n = this.shape;
-    return n || (n = this.shape = {}), typeof e == "string" ? n[e] = i : k(n, e), this.dirtyShape(), this;
+    return n || (n = this.shape = {}), typeof e == "string" ? n[e] = i : B(n, e), this.dirtyShape(), this;
   }, t.prototype.shapeChanged = function() {
     return !!(this.__dirty & Xi);
   }, t.prototype.createStyle = function(e) {
@@ -6123,14 +6123,14 @@ var gy = ot({
   }, t.prototype._innerSaveToNormal = function(e) {
     r.prototype._innerSaveToNormal.call(this, e);
     var i = this._normalState;
-    e.shape && !i.shape && (i.shape = k({}, this.shape));
+    e.shape && !i.shape && (i.shape = B({}, this.shape));
   }, t.prototype._applyStateObj = function(e, i, n, a, o, s) {
     r.prototype._applyStateObj.call(this, e, i, n, a, o, s);
     var l = !(i && a), u;
-    if (i && i.shape ? o ? a ? u = i.shape : (u = k({}, n.shape), k(u, i.shape)) : (u = k({}, a ? this.shape : n.shape), k(u, i.shape)) : l && (u = n.shape), u)
+    if (i && i.shape ? o ? a ? u = i.shape : (u = B({}, n.shape), B(u, i.shape)) : (u = B({}, a ? this.shape : n.shape), B(u, i.shape)) : l && (u = n.shape), u)
       if (o) {
-        this.shape = k({}, this.shape);
-        for (var h = {}, f = ct(u), v = 0; v < f.length; v++) {
+        this.shape = B({}, this.shape);
+        for (var h = {}, f = vt(u), v = 0; v < f.length; v++) {
           var c = f[v];
           typeof u[c] == "object" ? this.shape[c] = u[c] : h[c] = u[c];
         }
@@ -6151,7 +6151,7 @@ var gy = ot({
     return !1;
   }, t.extend = function(e) {
     var i = function(a) {
-      B(o, a);
+      N(o, a);
       function o(s) {
         var l = a.call(this, s) || this;
         return e.init && e.init.call(l, s), l;
@@ -6178,7 +6178,7 @@ var gy = ot({
   textBaseline: "top",
   miterLimit: 2
 }, gy), ps = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     return r !== null && r.apply(this, arguments) || this;
   }
@@ -6230,7 +6230,7 @@ function qb(r) {
   return !!(r && typeof r != "string" && r.width && r.height);
 }
 var qe = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     return r !== null && r.apply(this, arguments) || this;
   }
@@ -6292,7 +6292,7 @@ var Kb = /* @__PURE__ */ function() {
   }
   return r;
 }(), Qb = {}, _t = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -6335,7 +6335,7 @@ var vv = {
     borderRadius: !0
   }, Fs.style)
 }, Mt = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     var i = r.call(this) || this;
     return i.type = "text", i._children = [], i._defaultStyle = vv, i.attr(e), i;
@@ -6382,11 +6382,11 @@ var vv = {
     if (!i)
       return e;
     var n = i.rich, a = e.rich || n && {};
-    return k(e, i), n && a ? (this._mergeRich(a, n), e.rich = a) : a && (e.rich = a), e;
+    return B(e, i), n && a ? (this._mergeRich(a, n), e.rich = a) : a && (e.rich = a), e;
   }, t.prototype._mergeRich = function(e, i) {
-    for (var n = ct(i), a = 0; a < n.length; a++) {
+    for (var n = vt(i), a = 0; a < n.length; a++) {
       var o = n[a];
-      e[o] = e[o] || {}, k(e[o], i[o]);
+      e[o] = e[o] || {}, B(e[o], i[o]);
     }
   }, t.prototype.getAnimationStyleProps = function() {
     return jb;
@@ -6586,11 +6586,11 @@ function hw(r, t, e, i) {
     if (Oi(s) || Oi(l)) {
       i = i || {};
       var u = i.style || {};
-      u.fill === "inherit" ? (a = !0, i = k({}, i), u = k({}, u), u.fill = s) : !Oi(u.fill) && Oi(s) ? (a = !0, i = k({}, i), u = k({}, u), u.fill = Hc(s)) : !Oi(u.stroke) && Oi(l) && (a || (i = k({}, i), u = k({}, u)), u.stroke = Hc(l)), i.style = u;
+      u.fill === "inherit" ? (a = !0, i = B({}, i), u = B({}, u), u.fill = s) : !Oi(u.fill) && Oi(s) ? (a = !0, i = B({}, i), u = B({}, u), u.fill = Hc(s)) : !Oi(u.stroke) && Oi(l) && (a || (i = B({}, i), u = B({}, u)), u.stroke = Hc(l)), i.style = u;
     }
   }
   if (i && i.z2 == null) {
-    a || (i = k({}, i));
+    a || (i = B({}, i));
     var h = r.z2EmphasisLift;
     i.z2 = r.z2 + (h ?? aw);
   }
@@ -6598,7 +6598,7 @@ function hw(r, t, e, i) {
 }
 function fw(r, t, e) {
   if (e && e.z2 == null) {
-    e = k({}, e);
+    e = B({}, e);
     var i = r.z2SelectLift;
     e.z2 = r.z2 + (i ?? ow);
   }
@@ -6610,7 +6610,7 @@ function cw(r, t, e) {
   });
   e = e || {};
   var o = e.style || {};
-  return o.opacity == null && (e = k({}, e), o = k({
+  return o.opacity == null && (e = B({}, e), o = B({
     // Already being applied 'emphasis'. DON'T mul opacity multiple times.
     opacity: i ? n : a.opacity * 0.1
   }, o), e.style = o), e;
@@ -6695,7 +6695,7 @@ function sh(r, t, e, i) {
         }), Zt(t))
           a(u.getData(), t);
         else if (V(t))
-          for (var p = ct(t), g = 0; g < p.length; g++)
+          for (var p = vt(t), g = 0; g < p.length; g++)
             a(u.getData(p[g]), t[p[g]]);
         l.push(u), Sf(u).isBlured = !0;
       }
@@ -6983,7 +6983,7 @@ function Lw(r) {
   return t.toStatic(), t;
 }
 var Ay = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     return r !== null && r.apply(this, arguments) || this;
   }
@@ -6994,7 +6994,7 @@ function Iy(r) {
   return r.setData != null;
 }
 function Ly(r, t) {
-  var e = Lw(r), i = k({}, t);
+  var e = Lw(r), i = B({}, t);
   return i.buildPath = function(n) {
     if (Iy(n)) {
       n.setData(e.data);
@@ -7013,7 +7013,7 @@ function Pw(r, t) {
 }
 function Rw(r, t) {
   var e = Ly(r, t), i = function(n) {
-    B(a, n);
+    N(a, n);
     function a(o) {
       var s = n.call(this, o) || this;
       return s.applyTransform = e.applyTransform, s.buildPath = e.buildPath, s;
@@ -7042,7 +7042,7 @@ var Ow = /* @__PURE__ */ function() {
   }
   return r;
 }(), Ws = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7059,7 +7059,7 @@ var kw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Cf = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7122,7 +7122,7 @@ function $w(r, t) {
           if (_ = Oe(K, y), S = Oe(K, m), w = Oe(K, g), b = Oe(K, d), D = x = ta(_, S), A = M = ta(w, b), (x > be || M > be) && (T = i * Bi(u), I = i * ti(u), L = n * Bi(l), P = n * ti(l), c < Py)) {
             var tt = Nw(R, E, L, P, T, I, H, O);
             if (tt) {
-              var ut = R - tt[0], pt = E - tt[1], St = T - tt[0], me = I - tt[1], Nr = 1 / ti(Bw((ut * St + pt * me) / (fa(ut * ut + pt * pt) * fa(St * St + me * me))) / 2), Ai = fa(tt[0] * tt[0] + tt[1] * tt[1]);
+              var ut = R - tt[0], dt = E - tt[1], St = T - tt[0], me = I - tt[1], Nr = 1 / ti(Bw((ut * St + dt * me) / (fa(ut * ut + dt * dt) * fa(St * St + me * me))) / 2), Ai = fa(tt[0] * tt[0] + tt[1] * tt[1]);
               D = Oe(x, (i - Ai) / (Nr + 1)), A = Oe(M, (n - Ai) / (Nr - 1));
             }
           }
@@ -7152,7 +7152,7 @@ var Fw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Tn = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7171,7 +7171,7 @@ var Vw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Mf = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7232,7 +7232,7 @@ var Gw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Us = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7249,7 +7249,7 @@ var Ww = /* @__PURE__ */ function() {
   }
   return r;
 }(), Df = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7271,7 +7271,7 @@ var Uw = {}, Yw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Or = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7317,7 +7317,7 @@ function Nv(r, t, e) {
   ];
 }
 var Af = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7345,7 +7345,7 @@ var qw = /* @__PURE__ */ function() {
   }
   return r;
 }(), Ys = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e) {
     return r.call(this, e) || this;
   }
@@ -7363,7 +7363,7 @@ var qw = /* @__PURE__ */ function() {
 }(lt);
 Ys.prototype.type = "arc";
 var Zw = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     var e = r !== null && r.apply(this, arguments) || this;
     return e.type = "compound", e;
@@ -7396,14 +7396,14 @@ var Zw = function(r) {
     });
   }, r;
 }(), If = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e, i, n, a, o, s) {
     var l = r.call(this, o) || this;
     return l.x = e ?? 0, l.y = i ?? 0, l.x2 = n ?? 1, l.y2 = a ?? 0, l.type = "linear", l.global = s || !1, l;
   }
   return t;
 }(Ey), Kw = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e, i, n, a, o) {
     var s = r.call(this, a) || this;
     return s.x = e ?? 0.5, s.y = i ?? 0.5, s.r = n ?? 0.5, s.type = "radial", s.global = o || !1, s;
@@ -7451,7 +7451,7 @@ var Zw = function(r) {
     i[0] = s, i[1] = l;
   }, r;
 }(), Qw = [], jw = function(r) {
-  B(t, r);
+  N(t, r);
   function t() {
     var e = r !== null && r.apply(this, arguments) || this;
     return e.notClear = !0, e.incremental = !0, e._displayables = [], e._temporaryDisplayables = [], e._cursor = 0, e;
@@ -7692,7 +7692,7 @@ function $y(r, t, e) {
       y: o.y,
       rotation: o.rotation
     };
-    return lx(o) && (s.shape = k({}, o.shape)), s;
+    return lx(o) && (s.shape = B({}, o.shape)), s;
   }
   var a = i(r);
   t.traverse(function(o) {
@@ -7724,7 +7724,7 @@ function hx(r, t) {
     };
 }
 function Rf(r, t, e) {
-  var i = k({
+  var i = B({
     rectHover: !0
   }, t), n = i.style = {
     strokeNoScale: !0
@@ -7771,7 +7771,7 @@ function Xs(r) {
   };
   s[a + "Index"] = o;
   var l = r.formatterParamsExtra;
-  l && C(ct(l), function(h) {
+  l && C(vt(l), function(h) {
     bi(s, h) || (s[h] = l[h], s.$vars.push(h));
   });
   var u = it(r.el);
@@ -7924,7 +7924,7 @@ function pn(r, t) {
 }
 function $e(r, t, e, i, n) {
   var a = {};
-  return dx(a, r, e, i, n), t && k(a, t), a;
+  return dx(a, r, e, i, n), t && B(a, t), a;
 }
 function Hv(r, t, e) {
   t = t || {};
@@ -7953,7 +7953,7 @@ function gx(r) {
     var e = (r.option || qs).rich;
     if (e) {
       t = t || {};
-      for (var i = ct(e), n = 0; n < i.length; n++) {
+      for (var i = vt(e), n = 0; n < i.length; n++) {
         var a = i[n];
         t[a] = 1;
       }
@@ -8519,7 +8519,7 @@ function Bx(r, t, e, i, n) {
       level: r.level
     });
   else {
-    var o = k({}, ea);
+    var o = B({}, ea);
     if (r.level > 0)
       for (var s = 0; s < au.length; ++s)
         o[au[s]] = "{primary|" + o[au[s]] + "}";
@@ -8546,7 +8546,7 @@ function Yy(r, t) {
   return p ? "year" : c ? "month" : v ? "day" : f ? "hour" : h ? "minute" : u ? "second" : "millisecond";
 }
 function Zv(r, t, e) {
-  var i = vt(r) ? or(r) : r;
+  var i = pt(r) ? or(r) : r;
   switch (t = t || Yy(r, e), t) {
     case "year":
       return i[Nf(e)]();
@@ -8641,7 +8641,7 @@ function gh(r, t, e) {
     } else return js(l, i, e);
   }
   if (t === "ordinal")
-    return Vu(r) ? n(r) : vt(r) && a(r) ? r + "" : "-";
+    return Vu(r) ? n(r) : pt(r) && a(r) ? r + "" : "-";
   var u = vs(r);
   return a(u) ? Jy(u) : Vu(r) ? n(r) : typeof r == "boolean" ? r + "" : "-";
 }
@@ -8807,7 +8807,7 @@ function Vx(r, t) {
 var Hx = Dt(), st = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e, i, n) {
       var a = r.call(this, e, i, n) || this;
       return a.uid = Ks("ec_cpt_model"), a;
@@ -9127,7 +9127,7 @@ function Jx(r, t) {
 var go, zn, jv, Jv = "\0_ec_inner", tT = 1, Ff = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -9192,10 +9192,10 @@ var go, zn, jv, Jv = "\0_ec_inner", tT = 1, Ff = (
             if (b && b.constructor === D)
               b.name = S.keyInfo.name, b.mergeOption(x, this), b.optionUpdated(x, !1);
             else {
-              var A = k({
+              var A = B({
                 componentIndex: w
               }, S.keyInfo);
-              b = new D(x, this, this, A), k(b, A), S.brandNew && (b.__requireNewView = !0), b.init(x, this, this), b.optionUpdated(null, !0);
+              b = new D(x, this, this, A), B(b, A), S.brandNew && (b.__requireNewView = !0), b.init(x, this, this), b.optionUpdated(null, !0);
             }
           }
           b ? (d.push(b.option), y.push(b), m++) : (d.push(void 0), y.push(void 0));
@@ -9831,7 +9831,7 @@ function ST(r, t, e, i, n) {
     var s = r;
     i === "auto" || i == null ? up(function(u) {
       u != null && u !== "-" && (F(u) ? o == null && (o = 1) : o = 0);
-    }, e, s, 10) : o = vt(i) ? i : i ? 1 : 0, !n && o === 1 && (n = [], up(function(u, h) {
+    }, e, s, 10) : o = pt(i) ? i : i ? 1 : 0, !n && o === 1 && (n = [], up(function(u, h) {
       n[h] = u != null ? u + "" : "";
     }, e, s, 1 / 0)), a = n ? n.length : e === Cn ? s.length : s[0] ? s[0].length : null;
   } else if (t === Ze)
@@ -9854,7 +9854,7 @@ function bT(r) {
   for (var t = 0, e; t < r.length && !(e = r[t++]); )
     ;
   if (e)
-    return ct(e);
+    return vt(e);
 }
 function lp(r) {
   if (r) {
@@ -9913,7 +9913,7 @@ var ii, ni, ai, hp, fp, pm = (
       var t;
       fp = function(o, s, l) {
         var u = l.sourceFormat, h = l.seriesLayoutBy, f = l.startIndex, v = l.dimensionsDefine, c = hp[Hf(u, h)];
-        if (k(o, c), u === Pr)
+        if (B(o, c), u === Pr)
           o.getItem = e, o.count = n, o.fillStorage = i;
         else {
           var p = dm(u, h);
@@ -10195,7 +10195,7 @@ var DT = (
 }();
 function Ko(r, t) {
   var e = t && t.type;
-  return e === "ordinal" ? r : (e === "time" && !vt(r) && r != null && r !== "-" && (r = +or(r)), r == null || r === "" ? NaN : Number(r));
+  return e === "ordinal" ? r : (e === "time" && !pt(r) && r != null && r !== "-" && (r = +or(r)), r == null || r === "" ? NaN : Number(r));
 }
 Q({
   number: function(r) {
@@ -10216,7 +10216,7 @@ var AT = (
       this._resultLT = i ? 1 : -1, e == null && (e = i ? "min" : "max"), this._incomparable = e === "min" ? -1 / 0 : 1 / 0;
     }
     return r.prototype.evaluate = function(t, e) {
-      var i = vt(t) ? t : vs(t), n = vt(e) ? e : vs(e), a = isNaN(i), o = isNaN(n);
+      var i = pt(t) ? t : vs(t), n = pt(e) ? e : vs(e), a = isNaN(i), o = isNaN(n);
       if (a && (i = this._incomparable), o && (n = this._incomparable), a && o) {
         var s = F(t), l = F(e);
         s && (i = l ? t : 0), l && (n = s ? e : 0);
@@ -10305,13 +10305,13 @@ function RT(r) {
     return n;
   } else if (t === Ze) {
     for (var n = [], a = 0, o = e.length; a < o; a++)
-      n.push(k({}, e[a]));
+      n.push(B({}, e[a]));
     return n;
   }
 }
 function ET(r, t, e) {
   if (e != null) {
-    if (vt(e) || !isNaN(e) && !bi(t, e))
+    if (pt(e) || !isNaN(e) && !bi(t, e))
       return r[e];
     if (bi(t, e))
       return t[e];
@@ -10598,7 +10598,7 @@ var mh = (
       var e = this.clone(), i = e._count;
       if (!i)
         return this;
-      var n = ct(t), a = n.length;
+      var n = vt(t), a = n.length;
       if (!a)
         return this;
       var o = e.count(), s = zi(e._rawCount), l = new s(o), u = 0, h = n[0], f = t[h][0], v = t[h][1], c = e._chunks, p = !1;
@@ -10985,7 +10985,7 @@ function UT(r, t, e, i) {
   C(s, function(g, d) {
     var y = t.valueFormatter, m = xm(g)(
       // Inherit valueFormatter
-      y ? k(k({}, r), {
+      y ? B(B({}, r), {
         valueFormatter: y
       }) : r,
       g,
@@ -11080,8 +11080,8 @@ var cu = (
     }, r.prototype.wrapRichTextStyle = function(t, e) {
       var i = {};
       z(e) ? C(e, function(a) {
-        return k(i, a);
-      }) : k(i, e);
+        return B(i, a);
+      }) : B(i, e);
       var n = this._generateStyleName();
       return this.richTextStyles[n] = i, "{" + n + "|" + t + "}";
     }, r;
@@ -11150,7 +11150,7 @@ function mo(r, t) {
 var tC = "__universalTransitionEnabled", De = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e._selectedDataIndicesMap = {}, e;
@@ -11266,7 +11266,7 @@ var tC = "__universalTransitionEnabled", De = (
     }, t.prototype.getSelectedDataIndices = function() {
       if (this.option.selectedMap === "all")
         return [].slice.call(this.getData().getIndices());
-      for (var e = this._selectedDataIndicesMap, i = ct(e), n = [], a = 0; a < i.length; a++) {
+      for (var e = this._selectedDataIndicesMap, i = vt(e), n = [], a = 0; a < i.length; a++) {
         var o = e[i[a]];
         o >= 0 && n.push(o);
       }
@@ -11530,7 +11530,7 @@ var fC = {
     if (e.setVisual("style", o), e.setVisual("drawType", l), !t.isSeriesFiltered(r) && h)
       return e.setVisual("colorFromPalette", !1), {
         dataEach: function(c, p) {
-          var g = r.getDataParams(p), d = k({}, o);
+          var g = r.getDataParams(p), d = B({}, o);
           d[l] = h(g), c.setItemVisual(p, "style", d);
         }
       };
@@ -11547,7 +11547,7 @@ var fC = {
           if (l && l[i]) {
             Fn.option = l[i];
             var u = n(Fn), h = o.ensureUniqueItemVisual(s, "style");
-            k(h, u), Fn.option.decal && (o.setItemVisual(s, "decal", Fn.option.decal), Fn.option.decal.dirty = !0), a in u && o.setItemVisual(s, "colorFromPalette", !1);
+            B(h, u), Fn.option.decal && (o.setItemVisual(s, "decal", Fn.option.decal), Fn.option.decal.dirty = !0), a in u && o.setItemVisual(s, "colorFromPalette", !1);
           }
         } : null
       };
@@ -12122,12 +12122,12 @@ var CC = (
       var s = xh[o], l = r.get(s);
       q(l) ? (a = !0, n[s] = l) : i[s] = l;
     }
-    if (i.symbol = i.symbol || r.defaultSymbol, e.setVisual(k({
+    if (i.symbol = i.symbol || r.defaultSymbol, e.setVisual(B({
       legendIcon: r.legendIcon || i.symbol,
       symbolKeepAspect: r.get("symbolKeepAspect")
     }, i)), t.isSeriesFiltered(r))
       return;
-    var u = ct(n);
+    var u = vt(n);
     function h(f, v) {
       for (var c = r.getRawValue(v), p = r.getDataParams(v), g = 0; g < u.length; g++) {
         var d = u[g];
@@ -12212,7 +12212,7 @@ function Fi(r, t, e, i, n) {
           type: a,
           seriesId: o.id,
           name: z(v) ? f.getName(v[0]) : f.getName(v),
-          selected: F(l) ? l : k({}, l)
+          selected: F(l) ? l : B({}, l)
         });
       }
   });
@@ -12431,7 +12431,7 @@ function wo(r, t, e) {
   return (r[n] || bo(s[i]) || bo(r.style[i])) - (bo(s[a]) || 0) - (bo(s[o]) || 0) | 0;
 }
 function UC(r, t) {
-  return !r || r === "solid" || !(t > 0) ? null : r === "dashed" ? [4 * t, 2 * t] : r === "dotted" ? [t] : vt(r) ? [r] : z(r) ? r : null;
+  return !r || r === "solid" || !(t > 0) ? null : r === "dashed" ? [4 * t, 2 * t] : r === "dotted" ? [t] : pt(r) ? [r] : z(r) ? r : null;
 }
 function $m(r) {
   var t = r.style, e = t.lineDash && t.lineWidth > 0 && UC(t.lineDash, t.lineWidth), i = t.lineDashOffset;
@@ -12653,7 +12653,7 @@ function Dh(r, t) {
   function l(u) {
     for (var h = [e], f = !0, v = 0; v < Gp.length; ++v) {
       var c = o[Gp[v]];
-      if (c != null && !z(c) && !F(c) && !vt(c) && typeof c != "boolean") {
+      if (c != null && !z(c) && !F(c) && !pt(c) && typeof c != "boolean") {
         f = !1;
         break;
       }
@@ -12698,8 +12698,8 @@ function Dh(r, t) {
             if (K <= 0)
               break;
             if ($ % 2 === 0) {
-              var tt = (1 - o.symbolSize) * 0.5, ut = O + d[E][$] * tt, pt = L + y[P] * tt, St = d[E][$] * o.symbolSize, me = y[P] * o.symbolSize, Nr = G / 2 % m[H].length;
-              Ai(ut, pt, St, me, m[H][Nr]);
+              var tt = (1 - o.symbolSize) * 0.5, ut = O + d[E][$] * tt, dt = L + y[P] * tt, St = d[E][$] * o.symbolSize, me = y[P] * o.symbolSize, Nr = G / 2 % m[H].length;
+              Ai(ut, dt, St, me, m[H][Nr]);
             }
             O += d[E][$], ++G, ++$, $ === d[E].length && ($ = 0);
           }
@@ -12737,19 +12737,19 @@ function Gm(r) {
 function Wm(r) {
   if (!r || r.length === 0)
     return [[0, 0]];
-  if (vt(r)) {
+  if (pt(r)) {
     var t = Math.ceil(r);
     return [[t, t]];
   }
   for (var e = !0, i = 0; i < r.length; ++i)
-    if (!vt(r[i])) {
+    if (!pt(r[i])) {
       e = !1;
       break;
     }
   if (e)
     return Wm([r]);
   for (var n = [], i = 0; i < r.length; ++i)
-    if (vt(r[i])) {
+    if (pt(r[i])) {
       var t = Math.ceil(r[i]);
       n.push([t, t]);
     } else {
@@ -12763,7 +12763,7 @@ function Wm(r) {
 function eM(r) {
   if (!r || typeof r == "object" && r.length === 0)
     return [0, 0];
-  if (vt(r)) {
+  if (pt(r)) {
     var t = Math.ceil(r);
     return [t, t];
   }
@@ -12851,7 +12851,7 @@ function jm(r, t, e) {
 var Jm = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -12863,7 +12863,7 @@ t0.off = Qm("off");
 var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e, i, n) {
       var a = r.call(this, new CC()) || this;
       a._chartsViews = [], a._chartsMap = {}, a._componentsViews = [], a._componentsMap = {}, a._pendingActions = [], n = n || {}, F(i) && (i = i0[i]), a._dom = e;
@@ -13095,7 +13095,7 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
               var d = g.dataModel || o.getSeriesByIndex(g.seriesIndex);
               return l = d && d.getDataParams(g.dataIndex, g.dataType, s) || {}, !0;
             } else if (g.eventData)
-              return l = k({}, g.eventData), !0;
+              return l = B({}, g.eventData), !0;
           }, !0), l) {
             var h = l.componentType, f = l.componentIndex;
             (h === "markLine" || h === "markPoint" || h === "markArea") && (h = "series", f = l.seriesIndex);
@@ -13156,7 +13156,7 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
           try {
             n && Vi(this), _r.update.call(this, {
               type: "resize",
-              animation: k({
+              animation: B({
                 // Disable animation
                 duration: 0
               }, e && e.animation)
@@ -13183,7 +13183,7 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
       }
       this._loadingFX && this._zr.remove(this._loadingFX), this._loadingFX = null;
     }, t.prototype.makeActionFromEvent = function(e) {
-      var i = k({}, e);
+      var i = B({}, e);
       return i.type = da[e.type], i;
     }, t.prototype.dispatchAction = function(e, i) {
       if (this._disposed) {
@@ -13379,11 +13379,11 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
         this[Ot] = !0;
         var b = [f], x = !1;
         f.batch && (x = !0, b = W(f.batch, function(P) {
-          return P = ot(k({}, P), f), P.batch = null, P;
+          return P = ot(B({}, P), f), P.batch = null, P;
         }));
         var M = [], D, A = ch(f), T = Pv(f);
         if (T && Dy(this._api), C(b, function(P) {
-          if (D = y.action(P, c._model, c._api), D = D || k({}, P), D.type = m.event || D.type, M.push(D), T) {
+          if (D = y.action(P, c._model, c._api), D = D || B({}, P), D.type = m.event || D.type, M.push(D), T) {
             var R = mf(f), E = R.queryOptionMap, H = R.mainTypeSpecified, O = H ? E.keys()[0] : "series";
             xo(c, S, P, O), ie(c);
           } else A ? (xo(c, S, P, "series"), ie(c)) : w && xo(c, S, P, w.main, w.sub);
@@ -13487,7 +13487,7 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
         });
       }, To = function(f, v, c, p, g, d) {
         var y = f._scheduler;
-        g = k(g || {}, {
+        g = B(g || {}, {
           updatedSeries: v.getSeries()
         }), xe.trigger("series:beforeupdate", v, c, g);
         var m = !1;
@@ -13589,7 +13589,7 @@ var Vi, gu, xo, _r, yu, mu, _u, Vn, Hn, Yp, Xp, Su, qp, To, Zp, e0, ie, Kp, r0 =
       Zp = function(f) {
         return new /** @class */
         (function(v) {
-          B(c, v);
+          N(c, v);
           function c() {
             return v !== null && v.apply(this, arguments) || this;
           }
@@ -13893,7 +13893,7 @@ var Qo = (
   /** @class */
   /* @__PURE__ */ function() {
     function r(t) {
-      this.otherDims = {}, t != null && k(this, t);
+      this.otherDims = {}, t != null && B(this, t);
     }
     return r;
   }()
@@ -14016,7 +14016,7 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
       var i = this._getDimInfo(t);
       return i ? i.storeDimIndex : this._dimOmitted ? this._schema.getSourceDimensionIndex(t) : -1;
     }, r.prototype._recognizeDimIndex = function(t) {
-      if (vt(t) || t != null && !isNaN(t) && !this._getDimInfo(t) && (!this._dimOmitted || this._schema.getSourceDimensionIndex(t) < 0))
+      if (pt(t) || t != null && !isNaN(t) && !this._getDimInfo(t) && (!this._dimOmitted || this._schema.getSourceDimensionIndex(t) < 0))
         return +t;
     }, r.prototype._getStoreDimIndex = function(t) {
       var e = this.getDimensionIndex(t);
@@ -14102,7 +14102,7 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
     }, r.prototype.getCalculationInfo = function(t) {
       return this._calculationInfo[t];
     }, r.prototype.setCalculationInfo = function(t, e) {
-      Wn(t) ? k(this._calculationInfo, t) : this._calculationInfo[t] = e;
+      Wn(t) ? B(this._calculationInfo, t) : this._calculationInfo[t] = e;
     }, r.prototype.getName = function(t) {
       var e = this.getRawIndex(t), i = this._nameList[e];
       return i == null && this._nameDimIdx != null && (i = Un(this, this._nameDimIdx, e)), i == null && (i = ""), i;
@@ -14162,7 +14162,7 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
       var n = i || this, a = Sr(Yn(t), this._getStoreDimIndex, this);
       return this._store = this._store.filter(a, n ? j(e, n) : e), this;
     }, r.prototype.selectRange = function(t) {
-      var e = this, i = {}, n = ct(t);
+      var e = this, i = {}, n = vt(t);
       return C(n, function(a) {
         var o = e._getStoreDimIndex(a);
         i[o] = t[a];
@@ -14204,7 +14204,7 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
       var e = this._visual;
       return e && e[t];
     }, r.prototype.setVisual = function(t, e) {
-      this._visual = this._visual || {}, Wn(t) ? k(this._visual, t) : this._visual[t] = e;
+      this._visual = this._visual || {}, Wn(t) ? B(this._visual, t) : this._visual[t] = e;
     }, r.prototype.getItemVisual = function(t, e) {
       var i = this._itemVisuals[t], n = i && i[e];
       return n ?? this.getVisual(e);
@@ -14214,20 +14214,20 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
       var i = this._itemVisuals, n = i[t];
       n || (n = i[t] = {});
       var a = n[e];
-      return a == null && (a = this.getVisual(e), z(a) ? a = a.slice() : Wn(a) && (a = k({}, a)), n[e] = a), a;
+      return a == null && (a = this.getVisual(e), z(a) ? a = a.slice() : Wn(a) && (a = B({}, a)), n[e] = a), a;
     }, r.prototype.setItemVisual = function(t, e, i) {
       var n = this._itemVisuals[t] || {};
-      this._itemVisuals[t] = n, Wn(e) ? k(n, e) : n[e] = i;
+      this._itemVisuals[t] = n, Wn(e) ? B(n, e) : n[e] = i;
     }, r.prototype.clearAllVisual = function() {
       this._visual = {}, this._itemVisuals = [];
     }, r.prototype.setLayout = function(t, e) {
-      Wn(t) ? k(this._layout, t) : this._layout[t] = e;
+      Wn(t) ? B(this._layout, t) : this._layout[t] = e;
     }, r.prototype.getLayout = function(t) {
       return this._layout[t];
     }, r.prototype.getItemLayout = function(t) {
       return this._itemLayouts[t];
     }, r.prototype.setItemLayout = function(t, e, i) {
-      this._itemLayouts[t] = i ? k(this._itemLayouts[t] || {}, e) : e;
+      this._itemLayouts[t] = i ? B(this._itemLayouts[t] || {}, e) : e;
     }, r.prototype.clearItemLayouts = function() {
       this._itemLayouts.length = 0;
     }, r.prototype.setItemGraphicEl = function(t, e) {
@@ -14275,7 +14275,7 @@ var Wn = V, Sr = W, NM = typeof Int32Array > "u" ? Array : Int32Array, zM = "e\0
           e.hasOwnProperty(i) && (t[i] = e[i]);
         }), t.__wrappedMethods = e.__wrappedMethods, C(FM, function(i) {
           t[i] = X(e[i]);
-        }), t._calculationInfo = k({}, e._calculationInfo);
+        }), t._calculationInfo = B({}, e._calculationInfo);
       }, xu = function(t, e) {
         var i = t._nameList, n = t._idList, a = t._nameDimIdx, o = t._idDimIdx, s = i[e], l = n[e];
         if (s == null && a != null && (i[e] = s = Un(t, a, e)), l == null && o != null && (n[e] = l = Un(t, o, e)), l == null && s != null) {
@@ -14327,7 +14327,7 @@ function HM(r, t) {
     else {
       L = D, A = L.name;
       var P = L.ordinalMeta;
-      L.ordinalMeta = null, L = k({}, L), L.ordinalMeta = P, T = L.dimsDef, I = L.otherDims, L.name = L.coordDim = L.coordDimIndex = L.dimsDef = L.otherDims = null;
+      L.ordinalMeta = null, L = B({}, L), L.ordinalMeta = P, T = L.dimsDef, I = L.otherDims, L.name = L.coordDim = L.coordDimIndex = L.dimsDef = L.otherDims = null;
     }
     var R = f.get(A);
     if (R !== !1) {
@@ -14641,7 +14641,7 @@ function fl(r, t) {
 var Qf = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       i.type = "ordinal";
@@ -14709,7 +14709,7 @@ Ke.registerClass(Qf);
 var oi = Tt, Dn = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = "interval", e._interval = 0, e._intervalPrecision = 2, e;
@@ -14903,7 +14903,7 @@ function uD(r) {
     e[n] = {};
     var a = i.stacks, o = i.bandWidth, s = i.categoryGap;
     if (s == null) {
-      var l = ct(a).length;
+      var l = vt(a).length;
       s = Math.max(35 - l * 4, 15) + "%";
     }
     var u = Ft(s, o), h = Ft(i.gap, 1), f = i.remainedWidth, v = i.autoWidthCount, c = (f - u) / (v + (v - 1) * h);
@@ -15014,7 +15014,7 @@ var pD = function(r, t, e, i) {
 }, S0 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       return i.type = "time", i;
@@ -15052,7 +15052,7 @@ var pD = function(r, t, e, i) {
       var s = Mo.length, l = Math.min(pD(Mo, this._approxInterval, 0, s), s - 1);
       this._interval = Mo[l][1], this._minLevelUnit = Mo[Math.max(l - 1, 0)][0];
     }, t.prototype.parse = function(e) {
-      return vt(e) ? e : +or(e);
+      return pt(e) ? e : +or(e);
     }, t.prototype.contain = function(e) {
       return ul(this.parse(e), this._extent);
     }, t.prototype.normalize = function(e) {
@@ -15254,7 +15254,7 @@ Ke.registerClass(S0);
 var nd = Ke.prototype, ya = Dn.prototype, wD = Tt, xD = Math.floor, TD = Math.ceil, Do = Math.pow, Se = Math.log, Jf = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = "log", e.base = 10, e._originalScale = new Dn(), e._interval = 0, e;
@@ -15503,7 +15503,7 @@ function OD(r, t) {
   var e = {};
   return C(r.mapDimensionsAll(t), function(i) {
     e[QM(r, i)] = !0;
-  }), ct(e);
+  }), vt(e);
 }
 var kD = (
   /** @class */
@@ -15892,7 +15892,7 @@ function qD(r) {
 var ZD = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.hasSymbolVisual = !0, e;
@@ -15991,7 +15991,7 @@ function P0(r, t) {
 var ic = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e, i, n, a) {
       var o = r.call(this) || this;
       return o.updateData(e, i, n, a), o;
@@ -16064,7 +16064,7 @@ var ic = (
       var b = e.getItemVisual(i, "style"), x = b.fill;
       if (s instanceof qe) {
         var M = s.style;
-        s.useStyle(k({
+        s.useStyle(B({
           // TODO other properties like x, y ?
           image: M.image,
           x: M.x,
@@ -16073,7 +16073,7 @@ var ic = (
           height: M.height
         }, b));
       } else
-        s.__isEmptyBrush ? s.useStyle(k({}, b)) : s.useStyle(b), s.style.decal = null, s.setColor(x, o && o.symbolInnerColor), s.style.strokeNoScale = !0;
+        s.__isEmptyBrush ? s.useStyle(B({}, b)) : s.useStyle(b), s.style.decal = null, s.setColor(x, o && o.symbolInnerColor), s.style.strokeNoScale = !0;
       var D = e.getItemVisual(i, "liftZ"), A = this._z2;
       D != null ? A == null && (this._z2 = s.z2, s.z2 += D) : A != null && (s.z2 = A, this._z2 = null);
       var T = o && o.useNameLabel;
@@ -16253,7 +16253,7 @@ function R0(r, t, e) {
 }
 function jD(r, t) {
   var e = 0, i = r.scale.getExtent();
-  return t === "start" ? e = i[0] : t === "end" ? e = i[1] : vt(t) && !isNaN(t) ? e = t : i[0] > 0 ? e = i[0] : i[1] < 0 && (e = i[1]), e;
+  return t === "start" ? e = i[0] : t === "end" ? e = i[1] : pt(t) && !isNaN(t) ? e = t : i[0] > 0 ? e = i[0] : i[1] < 0 && (e = i[1]), e;
 }
 function E0(r, t, e, i) {
   var n = NaN;
@@ -16305,8 +16305,8 @@ function tA(r, t, e, i, n, a, o, s) {
     return g[St] - g[me];
   });
   for (var E = u.length, H = er(E), O = er(E), $ = er(E), G = er(E), K = [], _ = 0; _ < p.length; _++) {
-    var tt = p[_], ut = _ * 2, pt = tt * 2;
-    H[ut] = u[pt], H[ut + 1] = u[pt + 1], O[ut] = h[pt], O[ut + 1] = h[pt + 1], $[ut] = f[pt], $[ut + 1] = f[pt + 1], G[ut] = v[pt], G[ut + 1] = v[pt + 1], K[_] = c[tt];
+    var tt = p[_], ut = _ * 2, dt = tt * 2;
+    H[ut] = u[dt], H[ut + 1] = u[dt + 1], O[ut] = h[dt], O[ut + 1] = h[dt + 1], $[ut] = f[dt], $[ut + 1] = f[dt + 1], G[ut] = v[dt], G[ut + 1] = v[dt + 1], K[_] = c[tt];
   }
   return {
     current: H,
@@ -16383,7 +16383,7 @@ var O0 = (
 ), eA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       return i.type = "ec-polyline", i;
@@ -16440,7 +16440,7 @@ var O0 = (
 ), rA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -16449,7 +16449,7 @@ var O0 = (
 ), iA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       return i.type = "ec-polygon", i;
@@ -16554,7 +16554,7 @@ function vd(r, t) {
   return Math.max(Math.abs(i[0] - o[0]), Math.abs(i[1] - o[1]), Math.abs(n[0] - s[0]), Math.abs(n[1] - s[1]));
 }
 function pd(r) {
-  return vt(r) ? r : r ? 0.5 : 0;
+  return pt(r) ? r : r ? 0.5 : 0;
 }
 function aA(r, t, e) {
   if (!e.valueDim)
@@ -16745,7 +16745,7 @@ function vA(r, t) {
 var pA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -16826,10 +16826,10 @@ var pA = (
           connectNulls: x
         }), hh(g, e, "areaStyle"), it(g).seriesIndex = e.seriesIndex, Da(g, E, H, O);
       }
-      var pt = this._changePolyState;
+      var dt = this._changePolyState;
       s.eachItemGraphicEl(function(St) {
-        St && (St.onHoverStateChange = pt);
-      }), this._polyline.onHoverStateChange = pt, this._data = s, this._coordSys = a, this._stackedOnPoints = w, this._points = h, this._step = A, this._valueOrigin = _, e.get("triggerLineEvent") && (this.packEventData(e, p), g && this.packEventData(e, g));
+        St && (St.onHoverStateChange = dt);
+      }), this._polyline.onHoverStateChange = dt, this._data = s, this._coordSys = a, this._stackedOnPoints = w, this._points = h, this._step = A, this._valueOrigin = _, e.get("triggerLineEvent") && (this.packEventData(e, p), g && this.packEventData(e, g));
     }, t.prototype.packEventData = function(e, i) {
       it(i).eventData = {
         componentType: "series",
@@ -17123,7 +17123,7 @@ function mA(r) {
 var Oh = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -17192,7 +17192,7 @@ De.registerClass(Oh);
 var _A = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -17246,7 +17246,7 @@ var _A = (
 ), gd = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       return i.type = "sausage", i;
@@ -17304,7 +17304,7 @@ function bA(r, t) {
   };
 }
 function wA(r, t, e, i) {
-  if (vt(i)) {
+  if (pt(i)) {
     r.setTextConfig({
       rotation: i
     });
@@ -17378,7 +17378,7 @@ function TA(r, t) {
 var CA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r.call(this) || this;
       return e.type = t.type, e._isFirstFrame = !0, e;
@@ -17572,7 +17572,7 @@ var CA = (
 }, md = {
   cartesian2d: function(r, t, e, i, n, a, o, s, l) {
     var u = new _t({
-      shape: k({}, i),
+      shape: B({}, i),
       z2: 1
     });
     if (u.__dataIndex = e, u.name = "item", a) {
@@ -17692,7 +17692,7 @@ function wd(r, t, e, i, n, a, o, s) {
   if (s) {
     if (!a.get("roundCap")) {
       var h = r.shape, f = xA(i.getModel("itemStyle"), h);
-      k(h, f), r.setShape(h);
+      B(h, f), r.setShape(h);
     }
   } else {
     var u = i.get(["itemStyle", "borderRadius"]) || 0;
@@ -17740,7 +17740,7 @@ var PA = (
 ), xd = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e) {
       var i = r.call(this, e) || this;
       return i.type = "largeBar", i;
@@ -17835,7 +17835,7 @@ function OA(r) {
 var kA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -17859,7 +17859,7 @@ var kA = (
 ), kh = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -18036,7 +18036,7 @@ function Md(r, t, e, i) {
     var o = rt(rt({}, $A[a], !0), i, !0), s = (
       /** @class */
       function(l) {
-        B(u, l);
+        N(u, l);
         function u() {
           var h = l !== null && l.apply(this, arguments) || this;
           return h.type = t + "Axis." + a, h;
@@ -18090,7 +18090,7 @@ function Ad(r) {
 var HA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = "cartesian2d", e.dimensions = Bh, e;
@@ -18142,7 +18142,7 @@ var HA = (
 ), GA = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t(e, i, n, a, o) {
       var s = r.call(this, e, i, n) || this;
       return s.index = 0, s.type = a || "value", s.position = o || "bottom", s;
@@ -18243,7 +18243,7 @@ var UA = (
       var i = this._axesMap;
       this._updateScale(t, this.model);
       function n(o) {
-        var s, l = ct(o), u = l.length;
+        var s, l = vt(o), u = l.length;
         if (u) {
           for (var h = [], f = u - 1; f >= 0; f--) {
             var v = +l[f], c = o[v], p = c.model, g = c.scale;
@@ -18496,7 +18496,7 @@ var Ir = Math.PI, Rr = (
     if (n === "auto" && r.handleAutoShown && (n = r.handleAutoShown("axisLine")), !!n) {
       var a = t.axis.getExtent(), o = i.transform, s = [a[0], 0], l = [a[1], 0], u = s[0] > l[0];
       o && (pe(s, s, o), pe(l, l, o));
-      var h = k({
+      var h = B({
         lineCap: "round"
       }, t.getModel(["axisLine", "lineStyle"]).getLineStyle()), f = new Or({
         shape: {
@@ -18514,7 +18514,7 @@ var Ir = Math.PI, Rr = (
       var v = t.get(["axisLine", "symbol"]);
       if (v != null) {
         var c = t.get(["axisLine", "symbolSize"]);
-        F(v) && (v = [v, v]), (F(c) || vt(c)) && (c = [c, c]);
+        F(v) && (v = [v, v]), (F(c) || pt(c)) && (c = [c, c]);
         var p = zm(t.get(["axisLine", "symbolOffset"]) || 0, c), g = c[0], d = c[1];
         C([{
           rotate: r.rotation + Math.PI / 2,
@@ -18853,7 +18853,7 @@ function Ba(r) {
 var Bd = {}, G0 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -18930,7 +18930,7 @@ function o2(r) {
 var s2 = ["axisLine", "axisTickLabel", "axisName"], l2 = ["splitArea", "splitLine", "minorSplitLine"], W0 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.axisPointerClass = "CartesianAxisPointer", e;
@@ -18939,7 +18939,7 @@ var s2 = ["axisLine", "axisTickLabel", "axisName"], l2 = ["splitArea", "splitLin
       this.group.removeAll();
       var o = this._axisGroup;
       if (this._axisGroup = new xt(), this.group.add(this._axisGroup), !!e.get("show")) {
-        var s = e.getCoordSysModel(), l = Nh(s, e), u = new Rr(e, k({
+        var s = e.getCoordSysModel(), l = Nh(s, e), u = new Rr(e, B({
           handleAutoShown: function(f) {
             for (var v = s.coordinateSystem.getCartesians(), c = 0; c < v.length; c++)
               if (Rh(v[c].getOtherAxis(e.axis).scale))
@@ -19017,7 +19017,7 @@ var s2 = ["axisLine", "axisTickLabel", "axisName"], l2 = ["splitArea", "splitLin
 }, U0 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -19027,7 +19027,7 @@ var s2 = ["axisLine", "axisTickLabel", "axisName"], l2 = ["splitArea", "splitLin
 ), h2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = U0.type, e;
@@ -19037,7 +19037,7 @@ var s2 = ["axisLine", "axisTickLabel", "axisName"], l2 = ["splitArea", "splitLin
 ), f2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = "grid", e;
@@ -19078,7 +19078,7 @@ var Na = C, v2 = V, As = -1, Nt = (
     }, r.prototype.getNormalizer = function() {
       return j(this._normalizeData, this);
     }, r.listVisualTypes = function() {
-      return ct(r.visualHandlers);
+      return vt(r.visualHandlers);
     }, r.isValidType = function(t) {
       return r.visualHandlers.hasOwnProperty(t);
     }, r.eachVisual = function(t, e, i) {
@@ -19426,7 +19426,7 @@ function $d(r) {
 var w2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -19520,7 +19520,7 @@ var w2 = (
 ), x2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -19817,7 +19817,7 @@ function P2(r, t, e) {
 var R2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       return r !== null && r.apply(this, arguments) || this;
     }
@@ -19895,7 +19895,7 @@ function Ud(r) {
 var O2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -20011,7 +20011,7 @@ function Hh(r, t) {
 var F2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -20114,7 +20114,7 @@ function qd(r, t, e, i, n) {
       return;
     }
     var o = H2(t, r), s = o.payloadBatch, l = o.snapToValue;
-    s[0] && n.seriesIndex == null && k(n, s[0]), !i && r.snap && a.containData(l) && l != null && (t = l), e.showPointer(r, t, s), e.showTooltip(r, o, l);
+    s[0] && n.seriesIndex == null && B(n, s[0]), !i && r.snap && a.containData(l) && l != null && (t = l), e.showPointer(r, t, s), e.showTooltip(r, o, l);
   }
 }
 function H2(r, t) {
@@ -20295,7 +20295,7 @@ function K2(r, t) {
 var Q2 = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -20625,7 +20625,7 @@ var uI = new _t({
 }), hI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -20785,7 +20785,7 @@ var uI = new _t({
                 var I = pp(D.formatTooltip(A, !0, null)), L = I.frag;
                 if (L) {
                   var P = Zn([D], a).get("valueFormatter");
-                  x.blocks.push(P ? k({
+                  x.blocks.push(P ? B({
                     valueFormatter: P
                   }, L) : L);
                 }
@@ -20810,7 +20810,7 @@ var uI = new _t({
       if (!(d != null && d !== "item")) {
         var y = u.getDataParams(h, f), m = new cu();
         y.marker = m.makeTooltipMarker("item", Ti(y.color), c);
-        var _ = pp(u.formatTooltip(h, !1, f)), S = g.get("order"), w = g.get("valueFormatter"), b = _.frag, x = b ? _p(w ? k({
+        var _ = pp(u.formatTooltip(h, !1, f)), S = g.get("order"), w = g.get("valueFormatter"), b = _.frag, x = b ? _p(w ? B({
           valueFormatter: w
         }, b) : b, m, c, S, a.get("useUTC"), g.get("textStyle")) : _.text, M = "item_" + u.name + "_" + h;
         this._showOrMove(g, function() {
@@ -21088,7 +21088,7 @@ var mI = function(r, t) {
 }, Gh = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.layoutMode = {
@@ -21141,7 +21141,7 @@ var mI = function(r, t) {
         h && yf(l) && i.push(l.name);
       }), this._availableNames = n;
       var a = this.get("data") || i, o = Q(), s = W(a, function(l) {
-        return (F(l) || vt(l)) && (l = {
+        return (F(l) || pt(l)) && (l = {
           name: l
         }), o.get(l.name) ? null : (o.set(l.name, !0), new bt(l, this, this.ecModel));
       }, this);
@@ -21264,7 +21264,7 @@ var mI = function(r, t) {
 ), Wi = Ct, Wh = C, ko = xt, i_ = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.newlineDisabled = !1, e;
@@ -21320,7 +21320,7 @@ var mI = function(r, t) {
                 if (!M.containName(g))
                   return;
                 var D = M.indexOfName(g), A = M.getItemVisual(D, "style"), T = M.getItemVisual(D, "legendIcon"), I = de(A.fill);
-                I && I[3] === 0 && (I[3] = 0.2, A = k(k({}, A), {
+                I && I[3] === 0 && (I[3] = 0.2, A = B(B({}, A), {
                   fill: ir(I, "rgba")
                 }));
                 var L = this._createItem(x, g, p, c, i, e, {}, A, T, f, a);
@@ -21541,7 +21541,7 @@ function a_(r) {
 var xI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -21583,7 +21583,7 @@ function sg(r, t, e) {
 var lg = xt, Bu = ["width", "height"], Nu = ["x", "y"], TI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.newlineDisabled = !0, e._currentIndex = 0, e;
@@ -21814,7 +21814,7 @@ var o_ = {
 }, ug = Nt.mapVisual, II = Nt.eachVisual, LI = z, hg = C, PI = ey, RI = ar, Is = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.stateList = ["inRange", "outOfRange"], e.replacableOptionKeys = ["inRange", "outOfRange", "target", "controller", "color"], e.layoutMode = {
@@ -21963,7 +21963,7 @@ var o_ = {
 ), fg = [20, 140], EI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -22064,7 +22064,7 @@ function cg(r, t, e) {
 var s_ = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e.autoPositionValues = {
@@ -22147,7 +22147,7 @@ function Jo(r, t) {
 var ke = ar, OI = C, pg = Math.min, zu = Math.max, kI = 12, BI = 6, NI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e._shapes = {}, e._dataInterval = [], e._handleEnds = [], e._hoverLinkDataIndices = [], e;
@@ -22236,7 +22236,7 @@ var ke = ar, OI = C, pg = Math.min, zu = Math.max, kI = 12, BI = 6, NI = (
       var u = e.getModel("indicatorStyle").getItemStyle();
       if (l instanceof qe) {
         var h = l.style;
-        l.useStyle(k({
+        l.useStyle(B({
           // TODO other properties like x, y ?
           image: h.image,
           x: h.x,
@@ -22588,7 +22588,7 @@ function WI(r) {
 var UI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e._pieceList = [], e;
@@ -22794,7 +22794,7 @@ function Sg(r, t) {
 var XI = (
   /** @class */
   function(r) {
-    B(t, r);
+    N(t, r);
     function t() {
       var e = r !== null && r.apply(this, arguments) || this;
       return e.type = t.type, e;
@@ -22908,7 +22908,7 @@ function bg(r, t, e) {
   return o && (o.position = "absolute", o.left = "0", o.top = "0", o.width = n + "px", o.height = a + "px", i.setAttribute("data-zr-dom-id", r)), i.width = n * e, i.height = a * e, i;
 }
 var $u = function(r) {
-  B(t, r);
+  N(t, r);
   function t(e, i, n) {
     var a = r.call(this) || this;
     a.motionBlur = !1, a.lastFrameAlpha = 0.7, a.dpr = 1, a.virtual = !1, a.config = {}, a.incremental = !1, a.zlevel = 0, a.maxRepaintRectCount = 5, a.__dirty = !0, a.__firstTimePaint = !0, a.__used = !1, a.__drawIndex = 0, a.__startIndex = 0, a.__endIndex = 0, a.__prevStartIndex = null, a.__prevEndIndex = null;
@@ -23043,7 +23043,7 @@ var JI = function() {
   function r(t, e, i, n) {
     this.type = "canvas", this._zlevelList = [], this._prevDisplayList = [], this._layers = {}, this._layerConfig = {}, this._needsManuallyCompositing = !1, this.type = "canvas";
     var a = !t.nodeName || t.nodeName.toUpperCase() === "CANVAS";
-    this._opts = i = k({}, i || {}), this.dpr = i.devicePixelRatio || hs, this._singleCanvas = a, this.root = t;
+    this._opts = i = B({}, i || {}), this.dpr = i.devicePixelRatio || hs, this._singleCanvas = a, this.root = t;
     var o = t.style;
     o && (Bg(t), t.innerHTML = ""), this.storage = e;
     var s = this._zlevelList;
@@ -23352,7 +23352,7 @@ let za = class extends ve {
     this.chart && this.option && this.chart.setOption(this.option, !0);
   }
   render() {
-    return N`<div class="canvas" style="height:${this.height}"></div>`;
+    return k`<div class="canvas" style="height:${this.height}"></div>`;
   }
 };
 za.styles = fr`
@@ -23449,11 +23449,11 @@ let _n = class extends ve {
   }
   render() {
     const r = this.flow;
-    return N`
+    return k`
       <section>
         <h2>Charging and discharging</h2>
 
-        ${r.sign_looks_inverted ? N`<p class="warn">
+        ${r.sign_looks_inverted ? k`<p class="warn">
               The charge rises while this battery reports discharging. The power sensor's
               direction is probably reversed — tick "Invert battery power" in the integration's
               options. Until then charging and discharging are swapped everywhere on this page.
@@ -23462,24 +23462,24 @@ let _n = class extends ve {
         <div class="cards">
           <div class="card">
             <span class="name">Mean charge power</span>
-            <span class="value">${dt(r.mean_charge_w, this.locale)}</span>
+            <span class="value">${gt(r.mean_charge_w, this.locale)}</span>
             <span class="row">
-              <span>Of the time</span><span>${gt(r.share_charging, this.locale)}</span>
+              <span>Of the time</span><span>${ct(r.share_charging, this.locale)}</span>
             </span>
           </div>
           <div class="card">
             <span class="name">Mean discharge power</span>
-            <span class="value">${dt(r.mean_discharge_w, this.locale)}</span>
+            <span class="value">${gt(r.mean_discharge_w, this.locale)}</span>
             <span class="row">
               <span>Of the time</span>
-              <span>${gt(r.share_discharging, this.locale)}</span>
+              <span>${ct(r.share_discharging, this.locale)}</span>
             </span>
           </div>
           <div class="card">
             <span class="name">Resting</span>
-            <span class="value">${gt(r.share_idle, this.locale)}</span>
+            <span class="value">${ct(r.share_idle, this.locale)}</span>
             <span class="row">
-              <span>Below</span><span>${dt(r.idle_w, this.locale)}</span>
+              <span>Below</span><span>${gt(r.idle_w, this.locale)}</span>
             </span>
           </div>
           <div class="card">
@@ -23496,11 +23496,11 @@ let _n = class extends ve {
       r.cycles_per_day
     )}
             </span>
-            ${r.cycles_per_day === null ? N`<span class="row"><span>Needs the battery capacity</span></span>` : U}
+            ${r.cycles_per_day === null ? k`<span class="row"><span>Needs the battery capacity</span></span>` : U}
           </div>
         </div>
 
-        ${r.cycles_per_day === null && !this.hasCapacity ? N`<p class="note">
+        ${r.cycles_per_day === null && !this.hasCapacity ? k`<p class="note">
               Set the battery capacity in the integration's options and this becomes the energy
               discharged each day divided by one full charge. It is not guessed from the state of
               charge, which would count a shallow cycle the same as a deep one.
@@ -23565,14 +23565,14 @@ let ur = class extends ve {
   }
   renderKpi(r) {
     const t = this.hass.locale.language, e = r.dips_measurable, i = "—", n = [
-      ["Mean charge", gt(li(r.kpi.mean_soc), t), "over the whole period"],
+      ["Mean charge", ct(li(r.kpi.mean_soc), t), "over the whole period"],
       [
         "Lowest charge",
-        e ? gt(li(r.kpi.min_soc), t) : i,
+        e ? ct(li(r.kpi.min_soc), t) : i,
         e ? "exact data only" : "needs exact data"
       ],
       [
-        `Below ${gt(li(r.low_pct), t)}`,
+        `Below ${ct(li(r.low_pct), t)}`,
         e ? tn(r.kpi.seconds_below_low) : i,
         e ? "exact data only" : "needs exact data"
       ],
@@ -23583,13 +23583,13 @@ let ur = class extends ve {
       ],
       [
         "Mean low point",
-        e ? gt(li(r.kpi.mean_low_point), t) : i,
+        e ? ct(li(r.kpi.mean_low_point), t) : i,
         e ? "across those dips" : "needs exact data"
       ]
     ];
-    return N`<div class="kpi">
+    return k`<div class="kpi">
       ${n.map(
-      ([a, o, s]) => N`<div class="cell">
+      ([a, o, s]) => k`<div class="cell">
           <span class="label">${a}</span>
           <span class="value">${o}</span>
           <span class="hint">${s}</span>
@@ -23599,24 +23599,24 @@ let ur = class extends ve {
   }
   renderEpisodes(r) {
     const t = this.hass.locale.language;
-    return r.dips_measurable ? r.episodes.length ? N`<table>
+    return r.dips_measurable ? r.episodes.length ? k`<table>
       <thead>
         <tr><th>Start</th><th>Duration</th><th>Lowest</th><th>Recovered to</th></tr>
       </thead>
       <tbody>
         ${r.episodes.map(
-      (e) => N`<tr>
+      (e) => k`<tr>
             <td>${new Date(e.start).toLocaleString(t)}</td>
             <td>${tn(e.seconds)}</td>
-            <td>${gt(li(e.lowest), t)}</td>
-            <td>${gt(li(e.recovered_to), t)}</td>
+            <td>${ct(li(e.lowest), t)}</td>
+            <td>${ct(li(e.recovered_to), t)}</td>
           </tr>`
     )}
       </tbody>
-    </table>` : N`<p class="empty">
-        The charge never stayed below ${gt(li(r.low_pct), t)} for more than
+    </table>` : k`<p class="empty">
+        The charge never stayed below ${ct(li(r.low_pct), t)} for more than
         a minute in this period.
-      </p>` : N`<p class="empty">
+      </p>` : k`<p class="empty">
         This period is covered only by hourly averages, which record the mean charge across each
         hour. A fall to 8% for twenty minutes shows up there as a comfortable number, so dips
         cannot be counted at all — an empty table would read as "none happened". Pick a shorter
@@ -23625,23 +23625,23 @@ let ur = class extends ve {
   }
   render() {
     if (this.error)
-      return N`<div class="notice">
+      return k`<div class="notice">
         Could not load data: ${this.error}
         <button @click=${() => this.load()}>Try again</button>
       </div>`;
     if (!this.payload)
-      return N`<div class="notice">Computing…</div>`;
+      return k`<div class="notice">Computing…</div>`;
     const r = this.payload, t = this.hass.locale.language, e = rs(r.coverage, t);
-    return N`
+    return k`
       <div class="status">
         <span class="badge">${Jh(r.precision, r.boundary, t)}</span>
-        ${e ? N`<span class="warn">${e}</span>` : U}
-        ${r.clamped ? N`<span class="warn">Period shortened to the maximum allowed</span>` : U}
-        ${r.raw_from && r.dips_restricted && r.dips_measurable ? N`<span class="warn">
+        ${e ? k`<span class="warn">${e}</span>` : U}
+        ${r.clamped ? k`<span class="warn">Period shortened to the maximum allowed</span>` : U}
+        ${r.raw_from && r.dips_restricted && r.dips_measurable ? k`<span class="warn">
               Dips counted from ${new Date(r.raw_from).toLocaleDateString(t)}, where
               exact data begins
             </span>` : U}
-        ${this.loading ? N`<span class="warn">Refreshing…</span>` : U}
+        ${this.loading ? k`<span class="warn">Refreshing…</span>` : U}
       </div>
 
       ${this.renderKpi(r)}
@@ -23661,11 +23661,11 @@ let ur = class extends ve {
         ${this.renderEpisodes(r)}
       </section>
 
-      ${r.power ? N`<ia-charge-section
+      ${r.power ? k`<ia-charge-section
             .flow=${r.power}
             .hasCapacity=${r.has_capacity}
             .locale=${t}
-          ></ia-charge-section>` : N`<section>
+          ></ia-charge-section>` : k`<section>
             <h2>Charging and discharging</h2>
             <p class="empty">
               Map a battery power sensor in the integration's options to see how much moves in and
@@ -23759,89 +23759,89 @@ let Sn = class extends ve {
   }
   renderCards() {
     const { rating_per_phase: r } = this.phases;
-    return N`<div class="cards">
+    return k`<div class="cards">
       ${this.phases.per_phase.map((t) => {
       const e = this.series[t.key]?.coverage;
-      return N`<div class="card">
+      return k`<div class="card">
           <span class="name">${t.label}</span>
-          <span class="value">${dt(t.mean, this.locale)}</span>
-          <span class="row"><span>Peak</span><span>${dt(t.peak, this.locale)}</span></span>
-          <span class="row"><span>P95</span><span>${dt(t.p95, this.locale)}</span></span>
-          <span class="row"><span>Share of load</span><span>${gt(t.share, this.locale)}</span></span>
+          <span class="value">${gt(t.mean, this.locale)}</span>
+          <span class="row"><span>Peak</span><span>${gt(t.peak, this.locale)}</span></span>
+          <span class="row"><span>P95</span><span>${gt(t.p95, this.locale)}</span></span>
+          <span class="row"><span>Share of load</span><span>${ct(t.share, this.locale)}</span></span>
           <span class="row">
-            <span>Peak vs ${dt(r, this.locale)}</span>
-            <span>${gt(t.headroom, this.locale)}</span>
+            <span>Peak vs ${gt(r, this.locale)}</span>
+            <span>${ct(t.headroom, this.locale)}</span>
           </span>
-          ${e !== void 0 && e < 0.95 ? N`<span class="warn">Covers ${aa(e, this.locale)} of the period</span>` : U}
+          ${e !== void 0 && e < 0.95 ? k`<span class="warn">Covers ${aa(e, this.locale)} of the period</span>` : U}
         </div>`;
     })}
     </div>`;
   }
   renderImbalance() {
     const { imbalance: r } = this.phases;
-    return r.mean === null ? N`<p class="empty">
-        Total load never rose above ${dt(r.floor_w, this.locale)}, so there was
+    return r.mean === null ? k`<p class="empty">
+        Total load never rose above ${gt(r.floor_w, this.locale)}, so there was
         nothing to measure the spread against in this period.
-      </p>` : N`
+      </p>` : k`
       <div class="cards">
         <div class="card">
           <span class="name">Mean imbalance</span>
-          <span class="value">${gt(r.mean, this.locale)}</span>
+          <span class="value">${ct(r.mean, this.locale)}</span>
         </div>
         <div class="card">
           <span class="name">P95 imbalance</span>
-          <span class="value">${gt(r.p95, this.locale)}</span>
+          <span class="value">${ct(r.p95, this.locale)}</span>
         </div>
         <div class="card">
-          <span class="name">Above ${gt(r.threshold, this.locale)}</span>
-          <span class="value">${gt(r.fraction_above, this.locale)}</span>
+          <span class="name">Above ${ct(r.threshold, this.locale)}</span>
+          <span class="value">${ct(r.fraction_above, this.locale)}</span>
           <span class="row"><span>of the measured time</span></span>
         </div>
       </div>
       <ia-chart .option=${Y_(r)}></ia-chart>
       <p class="note">
         Measured over ${tn(r.analysed_seconds)}
-        (${aa(r.coverage, this.locale)} of the period).${r.below_floor_seconds > 0 ? N` A further ${tn(r.below_floor_seconds)} sat below
-              ${dt(r.floor_w, this.locale)} of total load and is excluded: at
+        (${aa(r.coverage, this.locale)} of the period).${r.below_floor_seconds > 0 ? k` A further ${tn(r.below_floor_seconds)} sat below
+              ${gt(r.floor_w, this.locale)} of total load and is excluded: at
               standby power a few watts of difference is a large percentage and means nothing.` : U}
       </p>
     `;
   }
   renderEpisodes() {
     const { episodes: r, per_phase: t } = this.phases;
-    return r.length ? N`<table>
+    return r.length ? k`<table>
       <thead>
         <tr>
           <th>Start</th>
           <th>Duration</th>
           <th>Worst</th>
-          ${t.map((e) => N`<th>${e.label}</th>`)}
+          ${t.map((e) => k`<th>${e.label}</th>`)}
         </tr>
       </thead>
       <tbody>
         ${r.map(
-      (e) => N`<tr>
+      (e) => k`<tr>
             <td>${new Date(e.start).toLocaleString(this.locale)}</td>
             <td>${tn(e.seconds)}</td>
-            <td>${gt(e.peak_imbalance, this.locale)}</td>
-            ${e.phases.map((i) => N`<td>${dt(i, this.locale)}</td>`)}
+            <td>${ct(e.peak_imbalance, this.locale)}</td>
+            ${e.phases.map((i) => k`<td>${gt(i, this.locale)}</td>`)}
           </tr>`
     )}
       </tbody>
-    </table>` : N`<p class="empty">No sustained imbalance in this period.</p>`;
+    </table>` : k`<p class="empty">No sustained imbalance in this period.</p>`;
   }
   render() {
     const { imbalance: r, rating_per_phase: t, rating_per_phase_derived: e, rating_per_phase_divisor: i } = this.phases;
-    return N`
+    return k`
       <section>
         <h2>Phases</h2>
         ${this.renderCards()}
-        ${e ? N`<p class="note">
+        ${e ? k`<p class="note">
               No per-phase rating is configured, so the total is split across
-              ${i} phases — ${dt(t, this.locale)}
+              ${i} phases — ${gt(t, this.locale)}
               each. Set the real figure in the integration's options if the hardware differs.
             </p>` : U}
-        ${r.aligned_coverage < 0.95 ? N`<p class="warn">
+        ${r.aligned_coverage < 0.95 ? k`<p class="warn">
               All phases had data at the same moment for only
               ${aa(r.aligned_coverage, this.locale)} of the period. The spread
               cannot be measured while any one phase is unknown.
@@ -23880,23 +23880,23 @@ let bn = class extends ve {
   }
   render() {
     const { parts: r, aligned_coverage: t } = this.strings;
-    return N`
+    return k`
       <section>
         <h2>PV strings</h2>
         <div class="cards">
           ${r.map((e) => {
       const i = this.series[e.key]?.coverage;
-      return N`<div class="card">
+      return k`<div class="card">
               <span class="name">${e.label}</span>
-              <span class="value">${dt(e.mean, this.locale)}</span>
-              <span class="row"><span>Peak</span><span>${dt(e.peak, this.locale)}</span></span>
-              <span class="row"><span>Share of PV</span><span>${gt(e.share, this.locale)}</span></span>
-              ${i !== void 0 && i < 0.95 ? N`<span class="warn">Covers ${aa(i, this.locale)} of the period</span>` : U}
+              <span class="value">${gt(e.mean, this.locale)}</span>
+              <span class="row"><span>Peak</span><span>${gt(e.peak, this.locale)}</span></span>
+              <span class="row"><span>Share of PV</span><span>${ct(e.share, this.locale)}</span></span>
+              ${i !== void 0 && i < 0.95 ? k`<span class="warn">Covers ${aa(i, this.locale)} of the period</span>` : U}
             </div>`;
     })}
         </div>
         <ia-chart .option=${X_(r, mt.pv)}></ia-chart>
-        ${t < 0.95 ? N`<p class="warn">
+        ${t < 0.95 ? k`<p class="warn">
               All strings had data at the same moment for only
               ${aa(t, this.locale)} of the period, so the shares are of
               that time rather than the whole window.
@@ -23968,23 +23968,23 @@ let We = class extends ve {
   renderConsistency(r, t, e) {
     if (!r?.beyond_margin) return U;
     const i = this.hass.locale.language;
-    return N`<span class="warn">
-      ${t} averages ${dt(r.total_mean, i)} while ${e} add up to
-      ${dt(r.parts_mean, i)}. Is one of them mapped to the wrong sensor?
+    return k`<span class="warn">
+      ${t} averages ${gt(r.total_mean, i)} while ${e} add up to
+      ${gt(r.parts_mean, i)}. Is one of them mapped to the wrong sensor?
     </span>`;
   }
   renderKpi(r) {
-    const t = this.hass.locale.language, e = (n) => n === null ? "" : gt(n / r.rated_power, t) + " of rated", i = [
-      ["Mean", dt(r.kpi.mean, t), e(r.kpi.mean)],
-      ["Median", dt(r.kpi.median, t), ""],
-      ["P95", dt(r.kpi.p95, t), ""],
-      ["Peak", dt(r.kpi.max, t), e(r.kpi.max)],
-      ["Sustained 15 min", dt(r.kpi.max_sustained_15m, t), ""],
-      [">80% of rated", gt(r.kpi.fraction_above_80pct, t), "of time"]
+    const t = this.hass.locale.language, e = (n) => n === null ? "" : ct(n / r.rated_power, t) + " of rated", i = [
+      ["Mean", gt(r.kpi.mean, t), e(r.kpi.mean)],
+      ["Median", gt(r.kpi.median, t), ""],
+      ["P95", gt(r.kpi.p95, t), ""],
+      ["Peak", gt(r.kpi.max, t), e(r.kpi.max)],
+      ["Sustained 15 min", gt(r.kpi.max_sustained_15m, t), ""],
+      [">80% of rated", ct(r.kpi.fraction_above_80pct, t), "of time"]
     ];
-    return N`<div class="kpi">
+    return k`<div class="kpi">
       ${i.map(
-      ([n, a, o]) => N`<div class="cell">
+      ([n, a, o]) => k`<div class="cell">
           <span class="label">${n}</span>
           <span class="value">${a}</span>
           <span class="hint">${o}</span>
@@ -23994,18 +23994,18 @@ let We = class extends ve {
   }
   renderOverloads(r) {
     if (!r.overloads.length)
-      return N`<p class="empty">No overloads in this period.</p>`;
+      return k`<p class="empty">No overloads in this period.</p>`;
     const t = this.hass.locale.language;
-    return N`<table>
+    return k`<table>
       <thead>
         <tr><th>Start</th><th>Duration</th><th>Peak</th></tr>
       </thead>
       <tbody>
         ${r.overloads.map(
-      (e) => N`<tr>
+      (e) => k`<tr>
             <td>${new Date(e.start).toLocaleString(t)}</td>
             <td>${tn(e.seconds)}</td>
-            <td>${dt(e.peak, t)}</td>
+            <td>${gt(e.peak, t)}</td>
           </tr>`
     )}
       </tbody>
@@ -24013,24 +24013,24 @@ let We = class extends ve {
   }
   render() {
     if (this.error)
-      return N`<div class="notice">
+      return k`<div class="notice">
         Could not load data: ${this.error}
         <button @click=${() => this.load()}>Try again</button>
       </div>`;
     if (!this.payload)
-      return N`<div class="notice">Computing…</div>`;
+      return k`<div class="notice">Computing…</div>`;
     const r = this.payload, t = this.hass.locale.language;
-    return N`
+    return k`
       <div class="status">
         <span class="badge">${Jh(r.precision, r.boundary, t)}</span>
-        ${rs(r.coverage, t) ? N`<span class="warn">${rs(r.coverage, t)}</span>` : U}
-        ${r.clamped ? N`<span class="warn">Period shortened to the maximum allowed</span>` : U}
-        ${r.histogram.clipped_low_seconds + r.histogram.clipped_high_seconds > 0 ? N`<span class="warn">
+        ${rs(r.coverage, t) ? k`<span class="warn">${rs(r.coverage, t)}</span>` : U}
+        ${r.clamped ? k`<span class="warn">Period shortened to the maximum allowed</span>` : U}
+        ${r.histogram.clipped_low_seconds + r.histogram.clipped_high_seconds > 0 ? k`<span class="warn">
               Some values fell outside the histogram range and are shown in its edge buckets
             </span>` : U}
         ${this.renderConsistency(r.consistency.load, "Total load", "the phases")}
         ${this.renderConsistency(r.consistency.pv, "Total PV power", "the strings")}
-        ${this.loading ? N`<span class="warn">Refreshing…</span>` : U}
+        ${this.loading ? k`<span class="warn">Refreshing…</span>` : U}
       </div>
 
       ${this.renderKpi(r)}
@@ -24060,13 +24060,13 @@ let We = class extends ve {
         ${this.renderOverloads(r)}
       </section>
 
-      ${r.phases ? N`<ia-phases-section
+      ${r.phases ? k`<ia-phases-section
             .phases=${r.phases}
             .series=${r.series}
             .locale=${t}
           ></ia-phases-section>` : U}
 
-      ${r.strings ? N`<ia-strings-section
+      ${r.strings ? k`<ia-strings-section
             .strings=${r.strings}
             .series=${r.series}
             .locale=${t}
@@ -24187,24 +24187,24 @@ let hr = class extends ve {
   }
   renderMonthTable(r) {
     const t = this.hass.locale.language, e = r.months.map((i) => i.key);
-    return N`<table>
+    return k`<table>
       <thead>
         <tr>
           <th>Month</th>
           <th>Mean load</th>
           <th>Busiest hour</th>
-          ${r.has_pv ? N`<th>Mean PV</th>` : U}
+          ${r.has_pv ? k`<th>Mean PV</th>` : U}
           <th>Of the month</th>
         </tr>
       </thead>
       <tbody>
         ${r.months.map(
-      (i, n) => N`<tr class=${i.complete ? "" : "partial"}>
+      (i, n) => k`<tr class=${i.complete ? "" : "partial"}>
             <td>${ef(i.key, e[n - 1])}</td>
-            <td>${dt(i.load_mean, t)}</td>
-            <td>${dt(i.load_peak_hourly, t)}</td>
-            ${r.has_pv ? N`<td>${dt(i.pv_mean, t)}</td>` : U}
-            <td>${gt(i.coverage, t)}</td>
+            <td>${gt(i.load_mean, t)}</td>
+            <td>${gt(i.load_peak_hourly, t)}</td>
+            ${r.has_pv ? k`<td>${gt(i.pv_mean, t)}</td>` : U}
+            <td>${ct(i.coverage, t)}</td>
           </tr>`
     )}
       </tbody>
@@ -24212,30 +24212,38 @@ let hr = class extends ve {
   }
   render() {
     if (this.error)
-      return N`<div class="notice">
+      return k`<div class="notice">
         Could not load data: ${this.error}
         <button @click=${() => this.load()}>Try again</button>
       </div>`;
     if (!this.payload)
-      return N`<div class="notice">Computing…</div>`;
-    const r = this.payload, t = this.hass.locale.language, e = rs(r.coverage, t), i = r.months.filter((n) => !n.complete);
-    return N`
+      return k`<div class="notice">Computing…</div>`;
+    const r = this.payload, t = this.hass.locale.language, e = rs(r.coverage, t), i = r.months.filter((a) => !a.complete && a.load_mean !== null), n = r.months.filter((a) => a.load_mean === null);
+    return k`
       <div class="status">
         <span class="badge">${Jh(r.precision, r.boundary, t)}</span>
         <span class="badge">Months in ${r.timezone}</span>
-        ${e ? N`<span class="warn">${e}</span>` : U}
-        ${r.clamped ? N`<span class="warn">Period shortened to the maximum allowed</span>` : U}
-        ${this.loading ? N`<span class="warn">Refreshing…</span>` : U}
+        ${e ? k`<span class="warn">${e}</span>` : U}
+        ${r.clamped ? k`<span class="warn">Period shortened to the maximum allowed</span>` : U}
+        ${this.loading ? k`<span class="warn">Refreshing…</span>` : U}
       </div>
 
       <section>
         <h2>Mean power by month</h2>
         <ia-chart .option=${K_(r.months, r.has_pv)}></ia-chart>
-        ${i.length ? N`<p class="note">
-              ${i.length === 1 ? "One month is" : `${i.length} months are`} covered by
-              less than ${gt(r.incomplete_below, t)} of their days and
-              ${i.length === 1 ? "is" : "are"} drawn in grey. A month the recorder only saw
-              part of is not a lower month; the figures stand, the comparison does not.
+        ${i.length ? k`<p class="note">
+              ${i.length === 1 ? k`One month is covered by less than
+                    ${ct(r.incomplete_below, t)} of its days and is drawn in
+                    grey.` : k`${i.length} months are covered by less than
+                    ${ct(r.incomplete_below, t)} of their days and are drawn
+                    in grey.`}
+              A month the recorder only saw part of is not a lower month; the figures stand, the
+              comparison does not.
+            </p>` : U}
+        ${n.length ? k`<p class="note">
+              ${n.length === 1 ? "One month has" : `${n.length} months have`} no recorded
+              data at all and ${n.length === 1 ? "carries" : "carry"} no bar. Home Assistant
+              keeps long-term statistics only from the moment a sensor starts producing them.
             </p>` : U}
       </section>
 
@@ -24389,17 +24397,17 @@ let Ie = class extends ve {
     this.entryId = r, this.writeLocation();
   }
   render() {
-    return this.error ? N`<div class="notice">
+    return this.error ? k`<div class="notice">
         Could not load configuration: ${this.error}
         <button @click=${() => {
       this.error = void 0, this.loadConfig();
     }}>
           Try again
         </button>
-      </div>` : this.config ? this.config.entries.length ? N`
+      </div>` : this.config ? this.config.entries.length ? k`
       <div class="header">
         <h1>Inverter Analytics</h1>
-        ${this.config.entries.length > 1 ? N`<select
+        ${this.config.entries.length > 1 ? k`<select
               @change=${(r) => {
       this.selectEntry(r.target.value);
     }}
@@ -24410,7 +24418,7 @@ let Ie = class extends ve {
       // assignment lands on an empty select and the browser falls
       // back to the first entry. The page then showed one inverter's
       // data under another inverter's name.
-      (r) => N`<option
+      (r) => k`<option
                   value=${r.entry_id}
                   ?selected=${r.entry_id === this.entryId}
                 >
@@ -24420,7 +24428,7 @@ let Ie = class extends ve {
             </select>` : U}
         <div class="ranges">
           ${Ig.map(
-      (r) => N`<button
+      (r) => k`<button
               class=${r === this.range ? "active" : ""}
               @click=${() => this.selectRange(r)}
             >${F_[r]}</button>`
@@ -24430,7 +24438,7 @@ let Ie = class extends ve {
 
       <nav class="tabs">
         ${xg.map(
-      (r) => N`<button
+      (r) => k`<button
             class=${r.id === this.tab ? "active" : ""}
             @click=${() => this.selectTab(r.id)}
           >${r.label}</button>`
@@ -24438,26 +24446,26 @@ let Ie = class extends ve {
       </nav>
 
       <main>
-        ${this.tab === "load" ? N`<ia-load-tab
+        ${this.tab === "load" ? k`<ia-load-tab
               .hass=${this.hass}
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-load-tab>` : U}
-        ${this.tab === "battery" ? N`<ia-battery-tab
+        ${this.tab === "battery" ? k`<ia-battery-tab
               .hass=${this.hass}
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-battery-tab>` : U}
-        ${this.tab === "seasonal" ? N`<ia-seasonality-tab
+        ${this.tab === "seasonal" ? k`<ia-seasonality-tab
               .hass=${this.hass}
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-seasonality-tab>` : U}
-        ${["load", "battery", "seasonal"].includes(this.tab) ? U : N`<div class="notice">This tab is not built yet.</div>`}
+        ${["load", "battery", "seasonal"].includes(this.tab) ? U : k`<div class="notice">This tab is not built yet.</div>`}
       </main>
-    ` : N`<div class="notice">
+    ` : k`<div class="notice">
         No inverter is configured yet. Add the Inverter Analytics integration in settings.
-      </div>` : N`<div class="notice">Loading…</div>`;
+      </div>` : k`<div class="notice">Loading…</div>`;
   }
 };
 Ie.styles = fr`
