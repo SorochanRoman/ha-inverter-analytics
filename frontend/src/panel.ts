@@ -8,6 +8,7 @@ import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
 import "./tabs/battery-tab";
 import "./tabs/load-tab";
+import "./tabs/seasonality-tab";
 
 const BASE_PATH = "/inverter-analytics";
 
@@ -196,7 +197,14 @@ export class InverterAnalyticsPanel extends LitElement {
               .range=${this.range}
             ></ia-battery-tab>`
           : nothing}
-        ${this.tab === "load" || this.tab === "battery"
+        ${this.tab === "seasonal"
+          ? html`<ia-seasonality-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-seasonality-tab>`
+          : nothing}
+        ${["load", "battery", "seasonal"].includes(this.tab)
           ? nothing
           : html`<div class="notice">This tab is not built yet.</div>`}
       </main>
