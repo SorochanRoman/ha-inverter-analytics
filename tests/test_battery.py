@@ -25,6 +25,7 @@ def build(soc, power=None, **kwargs):
         "low_pct": 20.0,
         "idle_w": 50.0,
         "raw_from": None,
+        "metered": None,
     } | kwargs
     return build_battery_payload(soc, power, **options)
 
@@ -167,3 +168,68 @@ def test_the_cutoff_is_only_announced_when_it_held_something_back():
 
 def test_nothing_is_restricted_when_the_whole_window_is_raw():
     assert build(soc_series((0, 50.0)))["dips_restricted"] is False
+
+
+def flat_soc(start_pct: float, end_pct: float) -> Series:
+    """A charge that drifts from one value to another across the window."""
+    return soc_series((0, start_pct), (60, end_pct))
+
+
+def steady_power() -> Series:
+    return Series.of(BASE, at(120), [Sample(at(0), 1000.0), Sample(at(60), -1000.0)])
+
+
+def test_meters_replace_the_integrated_power_reading():
+    """The counters are what the inverter itself accounts for.
+
+    Integrating a power reading loses whatever the gaps in it lost, so where
+    both counters exist they win.
+    """
+    payload = build(flat_soc(50.0, 50.0), steady_power(), metered=(12.0, 10.0))["power"]
+    assert payload["energy_in_kwh"] == 12.0
+    assert payload["energy_out_kwh"] == 10.0
+    assert payload["energy_metered"] is True
+
+
+def test_without_meters_the_power_reading_is_still_integrated_and_says_so():
+    payload = build(flat_soc(50.0, 50.0), steady_power())["power"]
+    assert payload["energy_metered"] is False
+    assert payload["energy_in_kwh"] == 1.0
+    assert payload["round_trip_efficiency"] is None
+
+
+def test_round_trip_efficiency_is_discharged_over_charged():
+    payload = build(flat_soc(50.0, 52.0), steady_power(), metered=(10.0, 9.0))["power"]
+    assert payload["round_trip_efficiency"] == 0.9
+    assert payload["soc_drift_pct"] == 2.0
+
+
+def test_a_battery_that_ended_fuller_than_it_started_gets_no_efficiency():
+    """The gap would be energy still in the battery, not energy lost.
+
+    A period that begins empty and ends full would otherwise report a terrible
+    efficiency for a battery that did nothing wrong.
+    """
+    payload = build(flat_soc(20.0, 90.0), steady_power(), metered=(20.0, 4.0))["power"]
+    assert payload["round_trip_efficiency"] is None
+    assert payload["soc_drift_pct"] == 70.0
+
+
+def test_a_battery_that_ended_emptier_gets_no_efficiency_either():
+    payload = build(flat_soc(90.0, 20.0), steady_power(), metered=(4.0, 20.0))["power"]
+    assert payload["round_trip_efficiency"] is None
+
+
+def test_too_little_throughput_to_divide():
+    payload = build(flat_soc(50.0, 50.0), steady_power(), metered=(0.4, 0.35))["power"]
+    assert payload["round_trip_efficiency"] is None
+
+
+def test_cycles_are_counted_from_the_metered_discharge():
+    soc = soc_series((0, 50.0), end=1440.0)
+    # 500 W for a day integrates to 12 kWh, while the meter says 24. The two
+    # have to differ or the assertion cannot tell which one was used.
+    power = Series.of(BASE, at(1440), [Sample(at(0), -500.0)])
+    payload = build(soc, power, capacity_kwh=12.0, metered=(26.0, 24.0))["power"]
+    # 24 metered kWh out of a 12 kWh battery over one day, not the 12 integrated.
+    assert payload["cycles_per_day"] == 2.0
