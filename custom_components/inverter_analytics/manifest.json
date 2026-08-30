@@ -1,13 +1,20 @@
 {
   "domain": "inverter_analytics",
   "name": "Inverter Analytics",
-  "codeowners": ["@SorochanRoman"],
+  "codeowners": [
+    "@SorochanRoman"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "recorder", "websocket_api"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "recorder",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/SorochanRoman/ha-inverter-analytics",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/SorochanRoman/ha-inverter-analytics/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
