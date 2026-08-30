@@ -13,6 +13,7 @@ import type {
   PartSummary,
 } from "../types";
 import {
+  FLOW_LABELS,
   bandsOption,
   dailyFlowsOption,
   durationCurveOption,
@@ -344,23 +345,49 @@ describe("balance charts", () => {
   });
 
   it("keeps a day without a counter as a hole rather than a zero", () => {
-    const option = dailyFlowsOption(days, [...SOURCES, ...SINKS]) as any;
+    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
     const house = option.series.find((s: any) => s.name === "House");
     expect(house.data).toEqual([4, null]);
   });
 
   it("drops a series no day has any accounting for", () => {
-    const option = dailyFlowsOption(days, [...SOURCES, ...SINKS]) as any;
+    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
     expect(option.series.map((s: any) => s.name)).toEqual(["Solar", "House"]);
+  });
+
+  it("keeps a day's sources and sinks on separate stacks", () => {
+    // One stack would add a day's production to its consumption and draw a
+    // column whose height counts the same energy twice.
+    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
+    const stacks = Object.fromEntries(option.series.map((s: any) => [s.name, s.stack]));
+    expect(stacks["Solar"]).toBe("in");
+    expect(stacks["House"]).toBe("out");
   });
 
   it("uses only keys a registered component can render", () => {
     const built = [
       flowBarsOption(totals, SOURCES, SINKS),
-      dailyFlowsOption(days, [...SOURCES, ...SINKS]),
+      dailyFlowsOption(days, SOURCES, SINKS),
     ];
     for (const option of built) {
       expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
     }
+  });
+});
+
+describe("flow colours", () => {
+  it("gives every flow a colour of its own", () => {
+    // Two greys sat side by side in the legend for the two grid directions,
+    // and charging the battery was drawn in the red that means a fault here.
+    const totals = Object.fromEntries(Object.keys(FLOW_LABELS).map((role) => [role, 1]));
+    const option = flowBarsOption(
+      totals,
+      ["pv_energy_total", "grid_import_total", "battery_discharge_total"],
+      ["load_energy_total", "grid_export_total", "battery_charge_total"],
+    ) as any;
+
+    const colours = option.series.map((s: any) => s.itemStyle.color);
+    expect(new Set(colours).size).toBe(colours.length);
+    expect(colours).not.toContain(SERIES.overload);
   });
 });

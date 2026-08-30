@@ -6,6 +6,11 @@ export const SERIES = {
   grid: "#8a8f98",
   overload: "#d64545",
   muted: "#b0b6bf",
+  // The outbound half of each two-way flow. Paired with its inbound colour by
+  // family so grid and battery each read as one thing going two ways, and
+  // distinct enough that the legend does not put two greys side by side.
+  gridExport: "#4aa3a3",
+  batteryCharge: "#8fd19e",
 } as const;
 
 /**

@@ -48,6 +48,12 @@ beyond pointing the integration at the ones you already have.
   averages and become two shapes. Months the recorder only partly saw keep
   their bar in grey rather than vanishing, and months with no data at all
   are named as such.
+- **A Balance tab.** Where the energy came from and where it went: solar,
+  the grid both ways and the battery both ways, as two stacked bars whose
+  matching is the balance. Self-sufficiency and self-consumption with the
+  arithmetic written out, and a day-by-day breakdown. Energy is read from
+  Home Assistant's own hourly statistics, which is where counter resets are
+  already accounted for.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -86,10 +92,12 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-The Energy balance tab is a placeholder. The Battery tab integrates power
-rather than reading the energy meters, so round-trip efficiency is not
-among its figures. Seasonality cannot compare the same month across two
-years, because a single query is capped at 400 days. Detection covers the naming scheme of the
+All four tabs are built. The Battery tab still integrates power rather
+than reading the energy meters, so round-trip efficiency is not among its
+figures. Seasonality cannot compare the same month across two years,
+because a single query is capped at 400 days. The Balance tab shows no
+costs: tariffs are a domain of their own, and a wrong number about money
+is worse than no number. Detection covers the naming scheme of the
 StephanJoubert Solarman integration, read off a live instance; other
 vendors fall back to manual mapping. See `docs/known-gaps.md` for the
 full list of what is deliberately missing and what remains unverified.

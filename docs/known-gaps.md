@@ -34,6 +34,13 @@ deliberately thin month marked and the eight empty ones present but bar-less.
 This closes the project's largest unverified area — and it found a defect the
 moment it ran; see item 15.
 
+**Energy counters across a reset.** Six counters were imported as hourly
+statistics over five days with one meter reset to zero mid-window — its
+accumulated sum climbing, its own reading dropping, which is what the recorder
+writes for a `total_increasing` sensor it has caught resetting. Every total came
+back to the hundredth of a kilowatt-hour, no day held negative energy, and the
+reset day is indistinguishable from its neighbours on screen.
+
 **Battery analytics.** A history built for it — a charge, a hard discharge, a
 70-second fall to 12%, a 15-second one that must not count, and a recovery —
 produced exactly one episode with its lowest point and recovery, while the time
@@ -113,7 +120,14 @@ the defect was only visible on screen.
 15. **"9 months are drawn in grey" when one was.** The sentence counted months
     with a thin bar together with months that have no bar at all. Two different
     problems, now two sentences.
-16. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
+16. **Two greys and a fault red in the energy legend.** The two grid
+    directions were both grey and near-indistinguishable side by side, and
+    charging the battery was drawn in the red this app uses for overloads.
+    Every flow now has its own colour, checked by a test.
+17. **A day's sources and sinks stacked into one bar.** The column added
+    production to consumption — the same energy twice — and looked exactly
+    like a daily total. Two stacks per day now, matching the chart above it.
+18. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
    ignores an option whose component was not registered, so the string
    comparison drew two unlabelled colours — while a unit test asserted
    `legend.data` was present and passed. Every option builder is now checked
@@ -155,17 +169,13 @@ the defect was only visible on screen.
 
 ## 5. Deliberately deferred
 
-**Tabs.** Energy balance is a placeholder.
-
 **Year-on-year comparison.** Windows are capped at 400 days, so the same month
 in two different years cannot both be in view. Lifting the cap is a separate
 decision about how much one query may ask of the recorder.
 
-**Metered battery energy.** `battery_charge_total` and `battery_discharge_total`
-are `total_increasing`, which needs `sum`/`state` statistics, and `source.py`
-asks only for `mean`. The Battery tab integrates power instead and says so on
-screen. Round-trip efficiency waits for that extension, which the Balance tab
-needs anyway for six sensors at once.
+**Round-trip efficiency on the Battery tab.** The counter reader the Balance
+tab introduced would now support it, but the Battery tab still integrates power
+and says so on screen. Moving it over is a small, separate change.
 
 **A real depth-of-discharge figure.** Measured across dip episodes it would be
 the threshold minus the minimum, since every episode starts at the threshold by

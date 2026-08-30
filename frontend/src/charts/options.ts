@@ -335,13 +335,16 @@ export const FLOW_LABELS: Record<string, string> = {
   battery_charge_total: "To battery",
 };
 
+// Every flow gets its own colour: the two grid directions were both grey and
+// indistinguishable in the legend, and charging the battery was drawn in the
+// overload red this app uses for faults.
 const FLOW_COLOURS: Record<string, string> = {
   pv_energy_total: SERIES.pv,
   grid_import_total: SERIES.grid,
   battery_discharge_total: SERIES.battery,
   load_energy_total: SERIES.load,
-  grid_export_total: SERIES.muted,
-  battery_charge_total: SERIES.overload,
+  grid_export_total: SERIES.gridExport,
+  battery_charge_total: SERIES.batteryCharge,
 };
 
 export function flowBarsOption(
@@ -375,10 +378,13 @@ export function flowBarsOption(
 
 export function dailyFlowsOption(
   days: BalanceDay[],
-  roles: readonly string[],
+  sources: readonly string[],
+  sinks: readonly string[],
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
-  const present = roles.filter((role) => days.some((day) => role in day.flows));
+  const present = [...sources, ...sinks].filter((role) =>
+    days.some((day) => role in day.flows),
+  );
 
   return {
     ...base,
@@ -389,7 +395,10 @@ export function dailyFlowsOption(
     series: present.map((role) => ({
       name: FLOW_LABELS[role],
       type: "bar",
-      stack: "flows",
+      // Two stacks per day, not one. Adding a day's sources to its sinks
+      // produces a column whose height means nothing — the same energy counted
+      // twice — while looking exactly like a daily total.
+      stack: sources.includes(role) ? "in" : "out",
       itemStyle: { color: FLOW_COLOURS[role] },
       // A day the counter has no accounting for stays a hole, not a zero.
       data: days.map((day) => (role in day.flows ? round(day.flows[role], 3) : null)),

@@ -202,10 +202,11 @@ export class IaBalanceTab extends LitElement {
       <section>
         <h2>Day by day</h2>
         ${payload.days.length
-          ? html`<ia-chart .option=${dailyFlowsOption(payload.days, ALL)}></ia-chart>`
+          ? html`<ia-chart .option=${dailyFlowsOption(payload.days, SOURCES, SINKS)}></ia-chart>`
           : html`<p class="empty">No days with energy statistics in this period.</p>`}
         <p class="note">
-          Energy is read from Home Assistant's hourly statistics, which is where counter resets
+          Two bars a day: what came in, and what went out. Adding the two together would count
+          the same energy twice. Energy is read from Home Assistant's hourly statistics, which is where counter resets
           are already accounted for. The current hour is compiled only once it ends, so a period
           running up to now stops at the last completed hour.
         </p>
