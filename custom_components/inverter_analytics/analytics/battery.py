@@ -25,7 +25,14 @@ from .resample import (
     time_weighted_mean,
     to_intervals,
 )
-from .source import Precision, Window, async_series_many, describe_series, plan_precision
+from .source import (
+    Precision,
+    Window,
+    async_energy_many,
+    async_series_many,
+    describe_series,
+    plan_precision,
+)
 
 SOC_BUCKET_WIDTH = 5.0
 SOC_MAX_BUCKETS = 20
@@ -48,6 +55,18 @@ SIGN_MIN_SECONDS = 300.0
 # The share of the evidence that has to contradict the configured direction
 # before the tab is willing to call it inverted.
 SIGN_INVERTED_SHARE = 0.7
+
+# Round-trip efficiency is discharged over charged, and that only means
+# efficiency when the battery ends the period roughly where it started.
+# Otherwise the difference is energy still sitting in the battery, and a period
+# that begins empty and ends full would report a terrible efficiency for a
+# battery that did nothing wrong. Five points of drift is about a fifth of a
+# typical daily cycle: small enough not to dominate, large enough to be reached
+# by any real month.
+EFFICIENCY_MAX_DRIFT_PCT = 5.0
+
+# Below this there is not enough throughput for the ratio to mean anything.
+EFFICIENCY_MIN_KWH = 1.0
 
 SECONDS_PER_DAY = 86400.0
 JOULES_PER_KWH = 3_600_000.0
@@ -136,8 +155,34 @@ def _sign_verdict(soc: Series, power: Series, idle_w: float) -> bool | None:
     return disagree / total > SIGN_INVERTED_SHARE
 
 
+def _soc_drift(intervals: list[Interval]) -> float | None:
+    """How far the charge ended from where it began, in percentage points."""
+    if not intervals:
+        return None
+    return intervals[-1].value - intervals[0].value
+
+
+def _efficiency(charged: float, discharged: float, drift: float | None) -> float | None:
+    """Round-trip efficiency, or None when the period cannot support one.
+
+    Needs throughput, and needs the battery to end roughly where it started:
+    otherwise the gap between charged and discharged is energy still in the
+    battery rather than energy lost on the way through.
+    """
+    if charged < EFFICIENCY_MIN_KWH or discharged <= 0:
+        return None
+    if drift is None or abs(drift) > EFFICIENCY_MAX_DRIFT_PCT:
+        return None
+    return discharged / charged
+
+
 def _power_payload(
-    soc: Series, power: Series, idle_w: float, capacity_kwh: float | None, window_seconds: float
+    soc: Series,
+    power: Series,
+    idle_w: float,
+    capacity_kwh: float | None,
+    window_seconds: float,
+    metered: tuple[float, float] | None,
 ) -> dict[str, Any]:
     """Charging and discharging over the whole window."""
     intervals = to_intervals(power)
@@ -147,12 +192,21 @@ def _power_payload(
 
     joules_in = sum(item.value * item.seconds for item in charging)
     joules_out = -sum(item.value * item.seconds for item in discharging)
-    energy_out = joules_out / JOULES_PER_KWH
+
+    # Meters win over integrated power when both counters are mapped: the
+    # counters are what the inverter itself accounts for, and integrating a
+    # power reading loses whatever the gaps in it lost.
+    if metered is not None:
+        energy_in, energy_out = metered
+    else:
+        energy_in, energy_out = joules_in / JOULES_PER_KWH, joules_out / JOULES_PER_KWH
 
     days = window_seconds / SECONDS_PER_DAY
     cycles = None
     if capacity_kwh and capacity_kwh > 0 and days > 0:
         cycles = energy_out / capacity_kwh / days
+
+    drift = _soc_drift(to_intervals(soc))
 
     def share(items: list[Interval]) -> float | None:
         return (sum(item.seconds for item in items) / measured) if measured > 0 else None
@@ -166,11 +220,18 @@ def _power_payload(
         "share_charging": share(charging),
         "share_discharging": share(discharging),
         "share_idle": share([item for item in intervals if abs(item.value) <= idle_w]),
-        # Integrated from power readings rather than read off a meter, so a
-        # window with gaps understates it. The coverage figure sits beside it.
-        "energy_in_kwh": joules_in / JOULES_PER_KWH,
+        "energy_in_kwh": energy_in,
         "energy_out_kwh": energy_out,
+        "energy_metered": metered is not None,
         "cycles_per_day": cycles,
+        # Only from meters. Integrated power carries the gaps in the power
+        # reading into both halves of the ratio, and the answer would move with
+        # the recorder's health rather than with the battery's.
+        "round_trip_efficiency": (
+            _efficiency(energy_in, energy_out, drift) if metered is not None else None
+        ),
+        "soc_drift_pct": drift,
+        "efficiency_max_drift_pct": EFFICIENCY_MAX_DRIFT_PCT,
         "sign_looks_inverted": _sign_verdict(soc, power, idle_w),
     }
 
@@ -183,6 +244,7 @@ def build_battery_payload(
     low_pct: float,
     idle_w: float,
     raw_from: datetime | None,
+    metered: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
     """Distribution, dips and throughput for one battery.
 
@@ -257,7 +319,7 @@ def build_battery_payload(
         "power": (
             None
             if power is None
-            else _power_payload(soc, power, idle_w, capacity_kwh, soc.duration)
+            else _power_payload(soc, power, idle_w, capacity_kwh, soc.duration, metered)
         ),
     }
 
@@ -296,6 +358,16 @@ async def async_battery_analytics(
     soc = results[soc_id]
     power = results[power_id] if power_id else None
 
+    # The two counters have been detected since the first release and read by
+    # nothing. They are what the inverter itself accounts for, so where they
+    # exist they replace the integrated power reading.
+    charge_id = config.entity_id("battery_charge_total")
+    discharge_id = config.entity_id("battery_discharge_total")
+    metered = None
+    if charge_id and discharge_id:
+        energy = await async_energy_many(hass, [charge_id, discharge_id], window)
+        metered = (energy[charge_id].total, energy[discharge_id].total)
+
     payload = build_battery_payload(
         soc.series,
         power.series if power else None,
@@ -303,6 +375,7 @@ async def async_battery_analytics(
         low_pct=config.number("battery_low_pct") or DEFAULT_BATTERY_LOW_PCT,
         idle_w=config.number("battery_idle_w") or DEFAULT_BATTERY_IDLE_W,
         raw_from=_raw_from(hass, window),
+        metered=metered,
     )
 
     series_block = {"battery_soc": describe_series(soc_id, soc)}

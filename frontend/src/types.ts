@@ -166,6 +166,12 @@ export interface ChargeFlow {
   energy_in_kwh: number;
   energy_out_kwh: number;
   cycles_per_day: number | null;
+  /** True when the figures came from energy meters rather than integrated power. */
+  energy_metered: boolean;
+  /** Only from meters, and only when the charge ended near where it started. */
+  round_trip_efficiency: number | null;
+  soc_drift_pct: number | null;
+  efficiency_max_drift_pct: number;
   /** null when the battery barely moved and there was nothing to conclude. */
   sign_looks_inverted: boolean | null;
 }

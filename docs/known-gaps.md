@@ -34,6 +34,12 @@ deliberately thin month marked and the eight empty ones present but bar-less.
 This closes the project's largest unverified area — and it found a defect the
 moment it ran; see item 15.
 
+**Round-trip efficiency against seeded statistics.** A battery cycle imported
+beyond the recorder's retention — charged 60 kWh, discharged 50.4, ending 4.5
+points from where it began — read back as exactly 84.0%, and the same figures
+over a window whose charge drifted 23 points correctly produced no efficiency at
+all with the reason on screen.
+
 **Energy counters across a reset.** Six counters were imported as hourly
 statistics over five days with one meter reset to zero mid-window — its
 accumulated sum climbing, its own reading dropping, which is what the recorder
@@ -173,9 +179,12 @@ the defect was only visible on screen.
 in two different years cannot both be in view. Lifting the cap is a separate
 decision about how much one query may ask of the recorder.
 
-**Round-trip efficiency on the Battery tab.** The counter reader the Balance
-tab introduced would now support it, but the Battery tab still integrates power
-and says so on screen. Moving it over is a small, separate change.
+**Efficiency without a returning charge.** Round-trip efficiency is withheld
+when the state of charge ends more than five points from where it started,
+because the gap between charged and discharged is then mostly stored energy. It
+could instead be corrected using the capacity and the drift — but that compounds
+a user-entered capacity with a percentage reading, and a corrected number that
+looks precise is worse than an absent one that explains itself.
 
 **A real depth-of-discharge figure.** Measured across dip episodes it would be
 the threshold minus the minimum, since every episode starts at the threshold by

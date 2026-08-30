@@ -54,6 +54,10 @@ beyond pointing the integration at the ones you already have.
   arithmetic written out, and a day-by-day breakdown. Energy is read from
   Home Assistant's own hourly statistics, which is where counter resets are
   already accounted for.
+- **Round-trip efficiency**, when the battery's charge and discharge
+  counters are mapped. It is withheld for a period that ends at a very
+  different state of charge, and says why: the gap between what went in and
+  what came out is then mostly energy still in the battery, not energy lost.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -92,9 +96,7 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-All four tabs are built. The Battery tab still integrates power rather
-than reading the energy meters, so round-trip efficiency is not among its
-figures. Seasonality cannot compare the same month across two years,
+All four tabs are built. Seasonality cannot compare the same month across two years,
 because a single query is capped at 400 days. The Balance tab shows no
 costs: tariffs are a domain of their own, and a wrong number about money
 is worse than no number. Detection covers the naming scheme of the

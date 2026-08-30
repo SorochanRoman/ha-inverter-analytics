@@ -54,6 +54,15 @@ export class IaChargeSection extends LitElement {
               <span>Charged</span><span>${formatEnergy(flow.energy_in_kwh, this.locale)}</span>
             </span>
           </div>
+          ${flow.round_trip_efficiency !== null
+            ? html`<div class="card">
+                <span class="name">Round-trip efficiency</span>
+                <span class="value">
+                  ${formatPercent(flow.round_trip_efficiency, this.locale)}
+                </span>
+                <span class="row"><span>Out of what went in</span></span>
+              </div>`
+            : nothing}
           <div class="card">
             <span class="name">Full cycles per day</span>
             <span class="value">
@@ -77,10 +86,28 @@ export class IaChargeSection extends LitElement {
             </p>`
           : nothing}
 
-        <p class="note">
-          Energy is integrated from the power readings rather than read off a meter, so a period
-          with gaps understates it — compare it against the coverage above.
-        </p>
+        ${flow.energy_metered
+          ? nothing
+          : html`<p class="note">
+              Energy is integrated from the power readings rather than read off a meter, so a
+              period with gaps understates it — compare it against the coverage above. Map the
+              battery's charge and discharge counters in the options to read the inverter's own
+              accounting instead, and to get round-trip efficiency.
+            </p>`}
+        ${flow.energy_metered && flow.round_trip_efficiency === null
+          ? html`<p class="note">
+              No round-trip efficiency for this period.
+              ${flow.soc_drift_pct !== null &&
+              Math.abs(flow.soc_drift_pct) > flow.efficiency_max_drift_pct
+                ? html`The charge ended
+                    ${Math.abs(Math.round(flow.soc_drift_pct))} points
+                    ${flow.soc_drift_pct < 0 ? "below" : "above"} where it started, so the gap
+                    between charged and discharged is mostly energy still in the battery rather
+                    than energy lost on the way through. A longer period, or one that begins and
+                    ends at a similar charge, will give a figure.`
+                : html`There was too little charging and discharging to divide one by the other.`}
+            </p>`
+          : nothing}
       </section>
     `;
   }
