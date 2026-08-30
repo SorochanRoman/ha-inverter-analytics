@@ -14,6 +14,7 @@ import voluptuous as vol
 
 from .analytics.battery import async_battery_analytics
 from .analytics.load import async_load_analytics
+from .analytics.seasonality import async_seasonality_analytics
 from .analytics.source import Window, raw_available_from
 from .const import DATA_CACHE, DOMAIN
 from .roles import EntryConfig
@@ -50,6 +51,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_config)
     websocket_api.async_register_command(hass, ws_load)
     websocket_api.async_register_command(hass, ws_battery)
+    websocket_api.async_register_command(hass, ws_seasonality)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -162,3 +164,16 @@ async def ws_battery(
 ) -> None:
     """Return the battery analytics for a window."""
     await _async_windowed_response(hass, connection, msg, "battery", async_battery_analytics)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/seasonality", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_seasonality(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the seasonality analytics for a window."""
+    await _async_windowed_response(
+        hass, connection, msg, "seasonality", async_seasonality_analytics
+    )

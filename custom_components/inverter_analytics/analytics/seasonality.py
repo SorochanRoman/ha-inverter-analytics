@@ -12,8 +12,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, tzinfo
 from typing import Any
 
+from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
+
+from ..roles import EntryConfig
 from .resample import Interval, Series, coverage, split_local_hours, to_intervals
-from .source import Window
+from .source import Window, async_series_many, describe_series
 
 # Below this share of a month, its figure is marked incomplete. It is still
 # shown: a hole in a row of bars invites the reader to invent a reason for it,
@@ -193,3 +197,38 @@ def build_seasonality_payload(
             for (key, hour), bucket in sorted(cells.items())
         ],
     }
+
+
+async def async_seasonality_analytics(
+    hass: HomeAssistant, config: EntryConfig, window: Window
+) -> dict[str, Any]:
+    """Read the data and compute the seasonality analytics."""
+    load_id = config.entity_id("load_power")
+    if load_id is None:
+        raise ValueError("load_power is not configured")
+
+    pv_id = config.entity_id("pv_power")
+    signs = {load_id: config.sign("load_power")}
+    if pv_id:
+        signs[pv_id] = config.sign("pv_power")
+
+    results = await async_series_many(hass, [load_id, *([pv_id] if pv_id else [])], window, signs)
+    load = results[load_id]
+    pv = results[pv_id] if pv_id else None
+
+    # Months and hours of the day are wall-clock ideas, so they belong to the
+    # installation's zone rather than to UTC or to the browser's.
+    zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
+
+    payload = build_seasonality_payload(
+        load.series, pv.series if pv else None, tz=zone, window=window
+    )
+
+    series_block = {"load_total": describe_series(load_id, load)}
+    if pv_id and pv:
+        series_block["pv_total"] = describe_series(pv_id, pv)
+    payload["series"] = series_block
+    payload["precision"] = load.precision.value
+    payload["boundary"] = load.boundary.isoformat() if load.boundary else None
+    payload["timezone"] = str(zone)
+    return payload
