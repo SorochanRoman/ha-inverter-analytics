@@ -138,6 +138,41 @@ full list of what is deliberately missing and what remains unverified.
    strings the string comparison; the rest is optional and feeds tabs that
    are not built yet.
 
+## Updating
+
+The version shown on the integration's page in Home Assistant is read from the
+files on disk. If it has not changed, nothing has been downloaded yet — whatever
+HACS is showing.
+
+**Through HACS.** Open HACS → Inverter Analytics → the three-dot menu →
+**Update information**, which re-reads the repository immediately instead of
+waiting for the next scheduled scan. If no update appears after that, the
+download is tracking the `main` branch rather than releases — choose
+**Redownload** and pick a version from the list. Either way **restart Home
+Assistant afterwards**: HACS replaces the files, but the running instance keeps
+the old version loaded until it restarts, so the page goes on showing the old
+number.
+
+**Without HACS.** If the integration was copied in by hand, HACS does not manage
+it and will never offer an update. From the directory holding
+`configuration.yaml`:
+
+```bash
+curl -L -o release.tar.gz \
+  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.3.0.tar.gz
+rm -rf custom_components/inverter_analytics
+tar -xzf release.tar.gz --strip-components=2 -C custom_components \
+    ha-inverter-analytics-0.3.0/custom_components/inverter_analytics
+rm release.tar.gz
+```
+
+Then restart Home Assistant. Replace both version numbers to install a
+different release; the directory inside the archive carries the version without
+its leading `v`.
+
+**After any update, reload the browser with Ctrl+Shift+R.** The panel is a
+separate JavaScript bundle and browsers cache it aggressively.
+
 ## Documentation
 
 - `docs/known-gaps.md` — what is verified, what is not, and what the next
