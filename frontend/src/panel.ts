@@ -6,6 +6,7 @@ import { singleFlight } from "./single-flight";
 import { buildLocation, parseLocation } from "./location";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
 import type { ConfigResult, HomeAssistant } from "./types";
+import "./tabs/balance-tab";
 import "./tabs/battery-tab";
 import "./tabs/load-tab";
 import "./tabs/seasonality-tab";
@@ -204,9 +205,13 @@ export class InverterAnalyticsPanel extends LitElement {
               .range=${this.range}
             ></ia-seasonality-tab>`
           : nothing}
-        ${["load", "battery", "seasonal"].includes(this.tab)
-          ? nothing
-          : html`<div class="notice">This tab is not built yet.</div>`}
+        ${this.tab === "balance"
+          ? html`<ia-balance-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-balance-tab>`
+          : nothing}
       </main>
     `;
   }

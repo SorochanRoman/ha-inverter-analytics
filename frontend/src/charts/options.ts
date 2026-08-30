@@ -1,5 +1,6 @@
 import { SERIES, chartBaseOption } from "../theme";
 import type {
+  BalanceDay,
   Band,
   BatteryPayload,
   HourBucket,
@@ -321,5 +322,77 @@ export function monthHourHeatmapOption(
       inRange: { color: [SERIES.battery, SERIES.pv, SERIES.overload] },
     },
     series: [{ type: "heatmap", data }],
+  };
+}
+
+/** Human labels for the six energy roles, in the order they are shown. */
+export const FLOW_LABELS: Record<string, string> = {
+  pv_energy_total: "Solar",
+  grid_import_total: "From grid",
+  battery_discharge_total: "From battery",
+  load_energy_total: "House",
+  grid_export_total: "To grid",
+  battery_charge_total: "To battery",
+};
+
+const FLOW_COLOURS: Record<string, string> = {
+  pv_energy_total: SERIES.pv,
+  grid_import_total: SERIES.grid,
+  battery_discharge_total: SERIES.battery,
+  load_energy_total: SERIES.load,
+  grid_export_total: SERIES.muted,
+  battery_charge_total: SERIES.overload,
+};
+
+export function flowBarsOption(
+  totals: Record<string, number>,
+  sources: readonly string[],
+  sinks: readonly string[],
+): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  const present = [...sources, ...sinks].filter((role) => role in totals);
+
+  // One stacked bar per side over a shared axis, so the books balancing is
+  // visible as the two bars matching rather than as a number to be compared.
+  return {
+    ...base,
+    legend: { data: present.map((role) => FLOW_LABELS[role]), top: 0, textStyle: base.textStyle },
+    grid: { ...(base.grid as Record<string, unknown>), top: 56 },
+    xAxis: { ...axis, type: "value", name: "kWh" },
+    yAxis: { ...axis, type: "category", data: ["Out", "In"] },
+    series: present.map((role) => ({
+      name: FLOW_LABELS[role],
+      type: "bar",
+      stack: sources.includes(role) ? "in" : "out",
+      itemStyle: { color: FLOW_COLOURS[role] },
+      // Row 1 is "In", row 0 is "Out": ECharts draws category axes bottom-up.
+      data: sources.includes(role)
+        ? [null, round(totals[role], 3)]
+        : [round(totals[role], 3), null],
+    })),
+  };
+}
+
+export function dailyFlowsOption(
+  days: BalanceDay[],
+  roles: readonly string[],
+): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  const present = roles.filter((role) => days.some((day) => role in day.flows));
+
+  return {
+    ...base,
+    legend: { data: present.map((role) => FLOW_LABELS[role]), top: 0, textStyle: base.textStyle },
+    grid: { ...(base.grid as Record<string, unknown>), top: 56 },
+    xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
+    yAxis: { ...axis, type: "value", name: "kWh" },
+    series: present.map((role) => ({
+      name: FLOW_LABELS[role],
+      type: "bar",
+      stack: "flows",
+      itemStyle: { color: FLOW_COLOURS[role] },
+      // A day the counter has no accounting for stays a hole, not a zero.
+      data: days.map((day) => (role in day.flows ? round(day.flows[role], 3) : null)),
+    })),
   };
 }

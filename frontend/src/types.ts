@@ -239,3 +239,33 @@ export interface SeasonalityPayload {
   window: { start: string; end: string };
   clamped: boolean;
 }
+
+export interface BalanceDay {
+  day: string;
+  flows: Record<string, number>;
+}
+
+export interface BalancePayload {
+  totals: Record<string, number>;
+  mapped: string[];
+  missing: string[];
+  sources_total: number;
+  sinks_total: number;
+  /** null until all six counters are mapped: otherwise it measures the omission. */
+  unaccounted: number | null;
+  unaccounted_share: number | null;
+  self_sufficiency: number | null;
+  self_consumption: number | null;
+  days: BalanceDay[];
+  covered_start: string | null;
+  covered_end: string | null;
+  window_start: string;
+  window_end: string;
+  covers_whole_window: boolean;
+  entities: Record<string, string>;
+  timezone: string;
+  precision: Precision;
+  boundary: string | null;
+  window: { start: string; end: string };
+  clamped: boolean;
+}
