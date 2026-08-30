@@ -1,4 +1,5 @@
 import type {
+  BalancePayload,
   BatteryPayload,
   ConfigResult,
   HomeAssistant,
@@ -48,6 +49,20 @@ export function fetchSeasonality(
 ): Promise<SeasonalityPayload> {
   return hass.connection.sendMessagePromise<SeasonalityPayload>({
     type: "inverter_analytics/seasonality",
+    entry_id: entryId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  });
+}
+
+export function fetchBalance(
+  hass: HomeAssistant,
+  entryId: string,
+  start: Date,
+  end: Date,
+): Promise<BalancePayload> {
+  return hass.connection.sendMessagePromise<BalancePayload>({
+    type: "inverter_analytics/balance",
     entry_id: entryId,
     start: start.toISOString(),
     end: end.toISOString(),

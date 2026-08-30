@@ -274,7 +274,13 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         async_register(hass)
 
     registered = [call.args[1].__name__ for call in register.call_args_list]
-    assert registered == ["ws_config", "ws_load", "ws_battery", "ws_seasonality"]
+    assert registered == [
+        "ws_config",
+        "ws_load",
+        "ws_battery",
+        "ws_seasonality",
+        "ws_balance",
+    ]
 
 
 async def test_battery_command_returns_analytics(
@@ -410,3 +416,85 @@ async def test_seasonality_command_returns_months_in_the_installation_zone(
     assert result["months"], "a 40-day window touches at least one month"
     assert all("coverage" in month for month in result["months"])
     assert result["has_pv"] is False
+
+
+async def test_balance_command_returns_flows_and_the_covered_span(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "pv_energy_total": ["sensor.pv_energy"],
+                "load_energy_total": ["sensor.load_energy"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    rows = {
+        "sensor.pv_energy": [{"start": end - timedelta(hours=2), "change": 4.0}],
+        "sensor.load_energy": [{"start": end - timedelta(hours=2), "change": 3.0}],
+    }
+
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ):
+        await client.send_json_auto_id(
+            {
+                "type": "inverter_analytics/balance",
+                "entry_id": entry.entry_id,
+                "start": (end - timedelta(days=1)).isoformat(),
+                "end": end.isoformat(),
+            }
+        )
+        response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["totals"] == {"pv_energy_total": 4.0, "load_energy_total": 3.0}
+    assert result["unaccounted"] is None, "four counters are missing"
+    assert result["missing"] == [
+        "grid_import_total",
+        "battery_discharge_total",
+        "grid_export_total",
+        "battery_charge_total",
+    ]
+    assert result["timezone"] == "Europe/Kyiv"
+    assert result["covers_whole_window"] is False
+
+
+async def test_balance_command_says_what_to_map_when_nothing_is(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """A Load tab can be fully configured without a single energy counter."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/balance",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "invalid_config"
+    assert "energy counters" in response["error"]["message"]

@@ -206,6 +206,86 @@ def _observed_precision(plan: PrecisionPlan, has_lts: bool, has_raw: bool) -> Pr
     return Precision.RAW
 
 
+@dataclass(frozen=True, slots=True)
+class EnergyRow:
+    """One hour's worth of energy, as the recorder accounts for it."""
+
+    start: datetime
+    change: float
+
+
+@dataclass(frozen=True, slots=True)
+class EnergySeries:
+    """A counter's hourly changes, with the span they actually cover."""
+
+    rows: tuple[EnergyRow, ...]
+
+    @property
+    def total(self) -> float:
+        """Energy across every hour returned."""
+        return sum(row.change for row in self.rows)
+
+    @property
+    def covered_start(self) -> datetime | None:
+        """The first hour with statistics, or None if there are none."""
+        return self.rows[0].start if self.rows else None
+
+    @property
+    def covered_end(self) -> datetime | None:
+        """The end of the last hour with statistics."""
+        return (self.rows[-1].start + STATISTICS_PERIOD) if self.rows else None
+
+
+def _read_energy(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, list[Mapping[str, Any]]]:
+    """Hourly counter changes for several entities, in one query."""
+    result = statistics_during_period(
+        hass, window.start, window.end, set(entity_ids), "hour", None, {"change"}
+    )
+    return {entity_id: list(result.get(entity_id, [])) for entity_id in entity_ids}
+
+
+async def async_energy_many(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, EnergySeries]:
+    """Read hourly energy for several counters.
+
+    Always from statistics, never from raw states, and for every window
+    including today's. The six energy roles are total_increasing counters that
+    reset — nightly, yearly, or whenever the vendor feels like it — and the
+    recorder already detects the dip and keeps its accumulated sum climbing
+    across it. `change` is that accounting, and it is what Home Assistant's own
+    Energy dashboard reads.
+
+    Raw states would be more precise for a rate. For a counter they are merely
+    raw: using them would mean re-implementing reset detection, where one
+    mistake turns a nightly reset into a day of negative production.
+    """
+    unique = list(dict.fromkeys(entity_ids))
+    if not unique:
+        return {}
+
+    recorder = get_instance(hass)
+    raw = await recorder.async_add_executor_job(partial(_read_energy, hass, tuple(unique), window))
+
+    results: dict[str, EnergySeries] = {}
+    for entity_id in unique:
+        rows = []
+        for row in raw.get(entity_id, []):
+            change = row.get("change")
+            start = row.get("start")
+            moment = dt_util.utc_from_timestamp(start) if isinstance(start, (int, float)) else start
+            # A null change is an hour the recorder has no accounting for, which
+            # is not an hour of no energy. Dropping it keeps it out of both the
+            # total and the covered span.
+            if change is None or moment is None:
+                continue
+            rows.append(EnergyRow(moment, float(change)))
+        results[entity_id] = EnergySeries(tuple(rows))
+    return results
+
+
 def describe_series(entity_id: str, result: SeriesResult) -> dict[str, Any]:
     """One entry of a payload's per-series provenance block."""
     return {
