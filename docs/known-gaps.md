@@ -26,6 +26,14 @@ imbalance — produced two episodes with their per-phase values, and 60 s
 correctly excluded as below the load floor. Both had only ever been exercised
 by unit tests against hand-built data.
 
+**Long-term statistics, at last.** Five months of real hourly rows were
+imported through `recorder/import_statistics` and the Seasonality tab was read
+back from them: monthly means, the busiest hour, the hour-of-day curve and the
+month-by-hour heat map all came from statistics rather than states, with the
+deliberately thin month marked and the eight empty ones present but bar-less.
+This closes the project's largest unverified area — and it found a defect the
+moment it ran; see item 15.
+
 **Battery analytics.** A history built for it — a charge, a hard discharge, a
 70-second fall to 12%, a 15-second one that must not count, and a recovery —
 produced exactly one episode with its lowest point and recovery, while the time
@@ -95,7 +103,17 @@ the defect was only visible on screen.
     a digest of the file's contents instead.
 13. **A card titled "Energy in / out" showed the out figure.** Its sub-row was
     labelled "Charged", so the title's order contradicted what was on screen.
-14. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
+14. **A missing hour of statistics was read as a continuation.** A state
+    persists until something changes it; a statistics row describes one hour
+    and nothing more. Treating them alike carried the last value before an
+    outage across the whole outage, so four seeded days of June came back as a
+    fully covered month whose mean beat May's — and coverage is the one figure
+    the Seasonality tab's honesty rests on. Only visible against real imported
+    statistics, which nothing before this had ever used.
+15. **"9 months are drawn in grey" when one was.** The sentence counted months
+    with a thin bar together with months that have no bar at all. Two different
+    problems, now two sentences.
+16. **The chart legend never rendered.** ECharts is tree-shaken and *silently*
    ignores an option whose component was not registered, so the string
    comparison drew two unlabelled colours — while a unit test asserted
    `legend.data` was present and passed. Every option builder is now checked
@@ -109,11 +127,9 @@ the defect was only visible on screen.
   metadata — licence, description, topics — which GitHub exposes from the
   default branch only, so on a feature branch those checks measure nothing.
   `hassfest` runs everywhere, because it validates the manifest, which is code.
-- **Real long-term statistics.** The hybrid raw+LTS path is correct by code and
-  by tests, but the live database held minutes of history, so the LTS branch
-  has never run against genuine hourly data. Per-entity precision is proven by
-  unit test with the recorder mocked, not by a real sensor lacking a
-  `state_class`.
+- **A sensor that genuinely lacks `state_class`.** Per-entity precision is
+  proven by unit test with the recorder mocked; no live sensor has ever been
+  missing its statistics while a neighbour had them.
 - **Whether a typical load sensor carries `state_class` at all.** Without it
   there is no LTS, and a 30-day window on a 10-day recorder will honestly
   report roughly 33% coverage — which a user is likely to read as a bug.
@@ -139,7 +155,11 @@ the defect was only visible on screen.
 
 ## 5. Deliberately deferred
 
-**Tabs.** Seasonality and Energy balance are placeholders.
+**Tabs.** Energy balance is a placeholder.
+
+**Year-on-year comparison.** Windows are capped at 400 days, so the same month
+in two different years cannot both be in view. Lifting the cap is a separate
+decision about how much one query may ask of the recorder.
 
 **Metered battery energy.** `battery_charge_total` and `battery_discharge_total`
 are `total_increasing`, which needs `sum`/`state` statistics, and `source.py`

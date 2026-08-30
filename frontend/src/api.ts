@@ -1,4 +1,10 @@
-import type { BatteryPayload, ConfigResult, HomeAssistant, LoadPayload } from "./types";
+import type {
+  BatteryPayload,
+  ConfigResult,
+  HomeAssistant,
+  LoadPayload,
+  SeasonalityPayload,
+} from "./types";
 
 export function fetchConfig(hass: HomeAssistant): Promise<ConfigResult> {
   return hass.connection.sendMessagePromise<ConfigResult>({
@@ -28,6 +34,20 @@ export function fetchBattery(
 ): Promise<BatteryPayload> {
   return hass.connection.sendMessagePromise<BatteryPayload>({
     type: "inverter_analytics/battery",
+    entry_id: entryId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  });
+}
+
+export function fetchSeasonality(
+  hass: HomeAssistant,
+  entryId: string,
+  start: Date,
+  end: Date,
+): Promise<SeasonalityPayload> {
+  return hass.connection.sendMessagePromise<SeasonalityPayload>({
+    type: "inverter_analytics/seasonality",
     entry_id: entryId,
     start: start.toISOString(),
     end: end.toISOString(),

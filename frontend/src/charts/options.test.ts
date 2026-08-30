@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { SERIES } from "../theme";
 import { SUPPORTED_OPTION_KEYS } from "./registry";
-import type { Band, BatteryPayload, Imbalance, LoadPayload, PartSummary } from "../types";
+import type {
+  Band,
+  BatteryPayload,
+  HourBucket,
+  Imbalance,
+  LoadPayload,
+  MonthBucket,
+  MonthHourCell,
+  PartSummary,
+} from "../types";
 import {
   bandsOption,
   durationCurveOption,
   histogramOption,
+  hourOfDayOption,
   imbalanceOption,
+  monthHourHeatmapOption,
+  monthLabel,
+  monthlyOption,
   partsOption,
   socBandsOption,
   socHistogramOption,
@@ -228,6 +241,71 @@ describe("battery charts", () => {
   it("uses only keys a registered component can render", () => {
     for (const option of [socHistogramOption(battery), socBandsOption(bands)]) {
       expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
+    }
+  });
+});
+
+describe("seasonality charts", () => {
+  const months: MonthBucket[] = [
+    { key: "2025-12", load_mean: 3000, load_peak_hourly: 5000, pv_mean: 200,
+      seconds: 100, month_seconds: 100, coverage: 1, complete: true },
+    { key: "2026-01", load_mean: 3200, load_peak_hourly: 5200, pv_mean: 250,
+      seconds: 10, month_seconds: 100, coverage: 0.1, complete: false },
+  ];
+  const hours: HourBucket[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour, load_mean: 1000 + hour, pv_mean: hour * 10, seconds: 3600,
+  }));
+  const cells: MonthHourCell[] = [
+    { month: "2025-12", hour: 18, load_mean: 4000, seconds: 3600 },
+    { month: "2026-01", hour: 12, load_mean: 2000, seconds: 3600 },
+    { month: "1999-01", hour: 0, load_mean: 1, seconds: 3600 },
+  ];
+
+  it("labels the year only where it turns over", () => {
+    expect(monthLabel("2025-12")).toBe("Dec 2025");
+    expect(monthLabel("2026-01", "2025-12")).toBe("Jan 2026");
+    expect(monthLabel("2026-02", "2026-01")).toBe("Feb");
+  });
+
+  it("greys an incomplete month rather than dropping it", () => {
+    const option = monthlyOption(months, false) as any;
+    const colourOf = option.series[0].itemStyle.color;
+    expect(option.series[0].data).toEqual([3000, 3200]);
+    expect(colourOf({ dataIndex: 0 })).toBe(SERIES.load);
+    expect(colourOf({ dataIndex: 1 })).toBe(SERIES.muted);
+  });
+
+  it("adds a PV series only when there is PV", () => {
+    expect((monthlyOption(months, false) as any).series).toHaveLength(1);
+    expect((monthlyOption(months, true) as any).series).toHaveLength(2);
+    expect((hourOfDayOption(hours, true) as any).series).toHaveLength(2);
+  });
+
+  it("maps heat-map cells onto the month axis and ignores strays", () => {
+    const option = monthHourHeatmapOption(cells, months) as any;
+    // The 1999 cell belongs to no column on this axis and must not shift the rest.
+    expect(option.series[0].data).toEqual([[0, 18, 4000], [1, 12, 2000]]);
+    expect(option.visualMap.min).toBe(2000);
+    expect(option.visualMap.max).toBe(4000);
+  });
+
+  it("survives having no cells at all", () => {
+    const option = monthHourHeatmapOption([], months) as any;
+    expect(option.series[0].data).toEqual([]);
+    expect(option.visualMap.max).toBe(1);
+  });
+
+  it("uses only keys a registered component can render", () => {
+    const built = [
+      monthlyOption(months, true),
+      hourOfDayOption(hours, true),
+      monthHourHeatmapOption(cells, months),
+    ];
+    for (const option of built) {
+      const unsupported = Object.keys(option)
+        .filter((key) => option[key as keyof typeof option] !== undefined)
+        .filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
+      expect(unsupported).toEqual([]);
     }
   });
 });

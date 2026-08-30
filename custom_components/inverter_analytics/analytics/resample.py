@@ -538,15 +538,27 @@ def max_sustained_mean(intervals: Sequence[Interval], window_seconds: float) -> 
     return best
 
 
-def hour_of_day_durations(intervals: Sequence[Interval], tz: tzinfo) -> list[float]:
-    """Duration by hour of day in the local zone, exactly 24 elements.
+@dataclass(frozen=True, slots=True)
+class LocalPiece:
+    """A slice of an interval that lies inside one local clock hour."""
 
-    The arithmetic is done in UTC; the local zone is only used to work out
-    the hour number. This means DST transitions neither create nor lose
-    seconds: the sum always equals the total length of the input intervals.
+    local: datetime
+    seconds: float
+    value: float
+
+
+def split_local_hours(intervals: Sequence[Interval], tz: tzinfo) -> Iterator[LocalPiece]:
+    """Cut intervals at local clock-hour boundaries.
+
+    The arithmetic is done in UTC and the local zone is used only to work out
+    which hour a moment belongs to, so daylight-saving transitions neither
+    create nor lose seconds: the emitted durations always sum to the input's.
+
+    Every view that groups by wall-clock time — hour of day, month of year, and
+    the two crossed — needs exactly this, so it lives here once. Three separate
+    implementations each getting the transition right is the shape of a bug
+    waiting for the third one.
     """
-    totals = [0.0] * 24
-
     for interval in intervals:
         cursor = interval.start
         while cursor < interval.end:
@@ -555,10 +567,20 @@ def hour_of_day_durations(intervals: Sequence[Interval], tz: tzinfo) -> list[flo
                 minutes=local.minute, seconds=local.second, microseconds=local.microsecond
             )
             boundary = hour_start + timedelta(hours=1)
+            # A termination guard, not a fix for an observed case: on the
+            # zones tested the boundary always advances, including across both
+            # transitions. It states the invariant the loop depends on rather
+            # than leaving it to be re-derived by whoever touches this next.
             if boundary <= cursor:
                 boundary = cursor + timedelta(hours=1)
             step_end = min(boundary, interval.end)
-            totals[local.hour] += (step_end - cursor).total_seconds()
+            yield LocalPiece(local, (step_end - cursor).total_seconds(), interval.value)
             cursor = step_end
 
+
+def hour_of_day_durations(intervals: Sequence[Interval], tz: tzinfo) -> list[float]:
+    """Duration by hour of day in the local zone, exactly 24 elements."""
+    totals = [0.0] * 24
+    for piece in split_local_hours(intervals, tz):
+        totals[piece.local.hour] += piece.seconds
     return totals

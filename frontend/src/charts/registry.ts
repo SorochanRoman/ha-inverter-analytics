@@ -1,5 +1,10 @@
-import { BarChart, LineChart } from "echarts/charts";
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { BarChart, HeatmapChart, LineChart } from "echarts/charts";
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  VisualMapComponent,
+} from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 
 /**
@@ -12,10 +17,12 @@ import { CanvasRenderer } from "echarts/renderers";
  */
 export const REGISTERED = [
   BarChart,
+  HeatmapChart,
   LineChart,
   GridComponent,
   LegendComponent,
   TooltipComponent,
+  VisualMapComponent,
   CanvasRenderer,
 ];
 
@@ -39,6 +46,8 @@ export const SUPPORTED_OPTION_KEYS: ReadonlySet<string> = new Set([
   "tooltip",
   // LegendComponent
   "legend",
+  // VisualMapComponent, which the heat map's colour scale needs
+  "visualMap",
   // the charts themselves
   "series",
 ]);

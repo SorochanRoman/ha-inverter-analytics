@@ -274,7 +274,7 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         async_register(hass)
 
     registered = [call.args[1].__name__ for call in register.call_args_list]
-    assert registered == ["ws_config", "ws_load", "ws_battery"]
+    assert registered == ["ws_config", "ws_load", "ws_battery", "ws_seasonality"]
 
 
 async def test_battery_command_returns_analytics(
@@ -376,3 +376,37 @@ async def test_load_and_battery_do_not_share_a_cache_entry(
 
     assert "rated_power" in load and "rated_power" not in battery
     assert "low_pct" in battery and "low_pct" not in load
+
+
+async def test_seasonality_command_returns_months_in_the_installation_zone(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """A month boundary is a wall-clock idea, so it belongs to the home's zone."""
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("sensor.load_power", "1500")
+    await async_wait_recording_done(hass)
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/seasonality",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=40)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["timezone"] == "Europe/Kyiv"
+    assert len(result["hours"]) == 24
+    assert result["months"], "a 40-day window touches at least one month"
+    assert all("coverage" in month for month in result["months"])
+    assert result["has_pv"] is False

@@ -198,3 +198,44 @@ export interface BatteryPayload {
   window: { start: string; end: string };
   clamped: boolean;
 }
+
+export interface MonthBucket {
+  key: string;
+  load_mean: number | null;
+  /** The highest hourly average, never the peak load: statistics average each hour. */
+  load_peak_hourly: number | null;
+  pv_mean: number | null;
+  seconds: number;
+  month_seconds: number;
+  coverage: number;
+  complete: boolean;
+}
+
+export interface HourBucket {
+  hour: number;
+  load_mean: number | null;
+  pv_mean: number | null;
+  seconds: number;
+}
+
+export interface MonthHourCell {
+  month: string;
+  hour: number;
+  load_mean: number | null;
+  seconds: number;
+}
+
+export interface SeasonalityPayload {
+  coverage: number;
+  incomplete_below: number;
+  has_pv: boolean;
+  months: MonthBucket[];
+  hours: HourBucket[];
+  cells: MonthHourCell[];
+  timezone: string;
+  series: Record<string, SeriesInfo>;
+  precision: Precision;
+  boundary: string | null;
+  window: { start: string; end: string };
+  clamped: boolean;
+}

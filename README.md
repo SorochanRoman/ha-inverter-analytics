@@ -42,6 +42,12 @@ beyond pointing the integration at the ones you already have.
   that can only be answered from exact data says so on its own card, and a
   period covered only by hourly averages explains why dips cannot be
   counted there rather than showing an empty table.
+- **A Seasonality tab.** Mean power for each month of the period with PV
+  beside it, the same by hour of the day, and a heat map of the two crossed
+  — where a winter evening peak and a summer midday one stop being two
+  averages and become two shapes. Months the recorder only partly saw keep
+  their bar in grey rather than vanishing, and months with no data at all
+  are named as such.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -80,9 +86,10 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-The Seasonality and Energy balance tabs are placeholders; their analytics
-are not implemented. The Battery tab integrates power rather than reading
-the energy meters, so round-trip efficiency is not among its figures. Detection covers the naming scheme of the
+The Energy balance tab is a placeholder. The Battery tab integrates power
+rather than reading the energy meters, so round-trip efficiency is not
+among its figures. Seasonality cannot compare the same month across two
+years, because a single query is capped at 400 days. Detection covers the naming scheme of the
 StephanJoubert Solarman integration, read off a live instance; other
 vendors fall back to manual mapping. See `docs/known-gaps.md` for the
 full list of what is deliberately missing and what remains unverified.

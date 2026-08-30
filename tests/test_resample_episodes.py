@@ -11,6 +11,7 @@ from custom_components.inverter_analytics.analytics.resample import (
     episodes_below,
     hour_of_day_durations,
     max_sustained_mean,
+    split_local_hours,
 )
 
 BASE = datetime(2026, 1, 1, tzinfo=UTC)
@@ -109,3 +110,41 @@ def test_hour_buckets_double_the_hour_repeated_by_autumn_dst():
     totals = hour_of_day_durations([Interval(start, end, 100.0)], KYIV)
     assert totals[3] == 7200.0
     assert sum(totals) == 25 * 3600
+
+
+def test_split_pieces_sum_to_the_input_duration_across_a_spring_transition():
+    """The invariant every wall-clock view rests on.
+
+    A day that loses an hour is 23 hours long, and the pieces must add up to
+    exactly that — not to 24 because the clock says so, and not to 22 because a
+    boundary was skipped.
+    """
+    start = datetime(2025, 3, 30, tzinfo=KYIV).astimezone(UTC)
+    end = datetime(2025, 3, 31, tzinfo=KYIV).astimezone(UTC)
+    pieces = list(split_local_hours([Interval(start, end, 100.0)], KYIV))
+    assert sum(piece.seconds for piece in pieces) == (end - start).total_seconds()
+    assert sum(piece.seconds for piece in pieces) == 23 * 3600.0
+
+
+def test_split_pieces_sum_to_the_input_duration_across_an_autumn_transition():
+    start = datetime(2025, 10, 26, tzinfo=KYIV).astimezone(UTC)
+    end = datetime(2025, 10, 27, tzinfo=KYIV).astimezone(UTC)
+    pieces = list(split_local_hours([Interval(start, end, 100.0)], KYIV))
+    assert sum(piece.seconds for piece in pieces) == 25 * 3600.0
+
+
+def test_each_piece_carries_its_local_hour_and_the_interval_value():
+    start = datetime(2026, 6, 1, 10, 30, tzinfo=KYIV).astimezone(UTC)
+    end = datetime(2026, 6, 1, 12, 15, tzinfo=KYIV).astimezone(UTC)
+    pieces = list(split_local_hours([Interval(start, end, 42.0)], KYIV))
+
+    assert [piece.local.hour for piece in pieces] == [10, 11, 12]
+    assert [piece.seconds for piece in pieces] == [1800.0, 3600.0, 900.0]
+    assert {piece.value for piece in pieces} == {42.0}
+
+
+def test_an_interval_inside_one_hour_stays_one_piece():
+    start = datetime(2026, 6, 1, 10, 10, tzinfo=KYIV).astimezone(UTC)
+    end = datetime(2026, 6, 1, 10, 40, tzinfo=KYIV).astimezone(UTC)
+    pieces = list(split_local_hours([Interval(start, end, 1.0)], KYIV))
+    assert [piece.seconds for piece in pieces] == [1800.0]
