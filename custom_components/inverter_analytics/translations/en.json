@@ -226,7 +226,9 @@
       }
     },
     "abort": {
-      "reconfigure_successful": "The mapping was updated and the inverter reloaded."
+      "reconfigure_successful": "The mapping was updated and the inverter reloaded.",
+      "entry_gone": "That inverter has been removed, so there is nothing left to map.",
+      "already_mapped": "Those sensors are already mapped, or are no longer in this installation. Nothing needed doing."
     }
   },
   "options": {
@@ -249,6 +251,23 @@
           "battery_idle_w": "Battery power below this, in either direction, is treated as resting rather than charging or discharging. Without it a pack drawing a few watts of standby would be reported as working all night. Default 50 W."
         }
       }
+    }
+  },
+  "issues": {
+    "unmapped_sensors": {
+      "title": "{name}: {count} unmapped {sensors} would feed {features}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Map the sensors found for {name}",
+            "description": "Inverter Analytics found these sensors in your installation and {name} is not reading any of them:\n\n{entities}\n\nThey feed: {features}.\n\nThis usually means the inverter was set up before those analytics existed — the wizard could not ask about a role it did not have yet. Submitting maps them and leaves everything already mapped exactly as it is. To choose the sensors yourself instead, use Reconfigure in the integration's menu."
+          }
+        }
+      }
+    },
+    "missing_entities": {
+      "title": "{name}: {count} mapped sensors no longer exist",
+      "description": "{name} is mapped to sensors that nothing in this installation answers to any more:\n\n{entities}\n\nA sensor usually disappears like this after being renamed, or after the integration that owns it was removed and added again. The charts drawn from it come back empty, which the page reports as an absence of data — the data is there, under another name.\n\nOpen Inverter Analytics, choose Reconfigure, and point each of them at the sensor that replaced it. Which one that is, only you can say."
     }
   }
 }

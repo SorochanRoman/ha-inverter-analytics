@@ -45,6 +45,16 @@ beyond pointing the integration at the ones you already have.
   sensors are not mapped explains which ones it needs and where to add
   them, rather than reporting the absence of a setting as a failure to load
   data.
+- **It tells you when your setup has fallen behind.** An integration
+  configured once has no reason to be revisited, so anything it needs to say
+  has to arrive where you are already looking. Two cards appear in
+  **Settings → Repairs**: one when your installation has sensors this
+  inverter is not reading — naming the tab they would feed, and offering to
+  map them in place — and one when a mapped sensor no longer exists, which
+  is what a rename looks like from here. Both withdraw themselves the moment
+  the reason is gone. The first is raised only for sensors some analytic is
+  actually waiting on: a notification you learn to dismiss unread is
+  expensive to have taught you.
 - **A Battery tab.** How much time the battery spends at each state of
   charge, a band breakdown, and a table of every episode where it fell
   below your low mark — with what it bottomed out at and what it recovered

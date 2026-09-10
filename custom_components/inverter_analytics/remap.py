@@ -92,6 +92,21 @@ def _with_fill(config: EntryConfig, filled: Mapping[str, Any]) -> EntryConfig:
     return EntryConfig(entities=entities, numbers=config.numbers, inverted=config.inverted)
 
 
+def wanted_fill(config: EntryConfig, filled: Mapping[str, Any]) -> dict[str, Any]:
+    """The part of a fill that some feature is actually waiting on.
+
+    Detection recognises more than the analytics currently read — grid power
+    is mapped and stored and drives nothing yet. Raising a repair about a
+    sensor that would change nothing on screen is how a notification area
+    becomes something users learn to scroll past, so the checks are gated on
+    this rather than on the fill itself. The reconfigure form still offers the
+    whole fill: the user is already there, and a stored role costs them
+    nothing.
+    """
+    wanted = {role for feature in FEATURES for role in missing_roles(config, feature)}
+    return {key: value for key, value in filled.items() if key in wanted}
+
+
 def unlocked_by(config: EntryConfig, filled: Mapping[str, Any]) -> list[str]:
     """The features that would go from unavailable to available."""
     after = _with_fill(config, filled)
@@ -99,4 +114,20 @@ def unlocked_by(config: EntryConfig, filled: Mapping[str, Any]) -> list[str]:
         feature.label
         for feature in FEATURES
         if missing_roles(config, feature) and not missing_roles(after, feature)
+    ]
+
+
+def fed_by(config: EntryConfig, filled: Mapping[str, Any]) -> list[str]:
+    """The features a fill brings closer to complete, whether or not it opens them.
+
+    Weaker than unlocked_by and true more often. The Balance tab opens on its
+    first counter and is not finished until its sixth, so an entry that has
+    two of them gains a great deal from the other four while never crossing
+    the line unlocked_by watches.
+    """
+    after = _with_fill(config, filled)
+    return [
+        feature.label
+        for feature in FEATURES
+        if len(missing_roles(after, feature)) < len(missing_roles(config, feature))
     ]

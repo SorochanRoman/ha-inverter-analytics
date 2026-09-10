@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.start import async_at_started
 
 from .analytics.cache import ResultCache
 from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS, DATA_CACHE, DOMAIN
+from .issues import async_check_entry, async_clear_issues
 from .panel import async_register_panel, async_remove_panel
 from .roles import normalise_entity_ids, tuning_role_keys
 from .websocket_api import async_register
@@ -74,7 +76,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     async_register(hass)
     await async_register_panel(hass)
+
+    # Deferred until the rest of Home Assistant is up. At this point the
+    # entity registry is still filling, and a check for sensors that no longer
+    # exist would report every one belonging to an integration that loads
+    # after this one. On a reload — which is what follows a reconfigure — this
+    # runs immediately, so a fix is reflected as soon as it is made.
+    #
+    # Decorated rather than passed as a lambda: an undecorated callable is
+    # taken for blocking work and run in an executor, and the issue registry
+    # refuses to be touched from off the event loop.
+    @callback
+    def _check_issues(_: HomeAssistant) -> None:
+        async_check_entry(hass, entry)
+
+    entry.async_on_unload(async_at_started(hass, _check_issues))
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop anything raised about an inverter that has been deleted."""
+    async_clear_issues(hass, entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
