@@ -32,8 +32,19 @@ beyond pointing the integration at the ones you already have.
   the data genuinely cannot settle a question, such as which set of
   current transformers faces the grid, it asks instead of guessing. Every
   field explains what it is for, and manual mapping is always available.
-  The mapping can be changed later from the integration's options,
-  including renaming the inverter and the imbalance thresholds.
+- **Reconfiguring, with detection.** Detection is not something that only
+  happens once. **Reconfigure** in the integration's menu runs it again
+  against the inverter this entry already describes, and fills in only the
+  roles that are still empty — so an installation mapped before a tab
+  existed can be brought up to date without hunting for entity ids, and a
+  sensor corrected by hand is never overwritten by the step meant to
+  improve the mapping. It says what it found and which tab that opens.
+  **Configure** is the inverter's name and the thresholds; the sensors live
+  in Reconfigure.
+- **The page says when it has not been told something.** A tab whose
+  sensors are not mapped explains which ones it needs and where to add
+  them, rather than reporting the absence of a setting as a failure to load
+  data.
 - **A Battery tab.** How much time the battery spends at each state of
   charge, a band breakdown, and a table of every episode where it fell
   below your low mark — with what it bottomed out at and what it recovered

@@ -122,12 +122,25 @@ export interface LoadPayload {
   consistency: { load?: Consistency; pv?: Consistency };
 }
 
+/**
+ * Whether one tab can be filled from this entry's mapping, and what it is
+ * short of. Computed in the backend, where the requirement is declared once —
+ * the panel used to render every tab regardless and let the analytics raise.
+ */
+export interface FeatureInfo {
+  key: string;
+  label: string;
+  available: boolean;
+  missing: string[];
+}
+
 export interface EntryInfo {
   entry_id: string;
   title: string;
   entities: Record<string, string[]>;
   numbers: Record<string, number>;
   inverted: string[];
+  features: FeatureInfo[];
 }
 
 export interface ConfigResult {

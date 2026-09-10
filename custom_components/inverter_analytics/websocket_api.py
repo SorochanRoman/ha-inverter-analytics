@@ -18,7 +18,7 @@ from .analytics.load import async_load_analytics
 from .analytics.seasonality import async_seasonality_analytics
 from .analytics.source import Window, raw_available_from
 from .const import DATA_CACHE, DOMAIN
-from .roles import EntryConfig
+from .roles import EntryConfig, feature_availability
 
 MAX_WINDOW_DAYS = 400
 FRESH_TTL = 60.0
@@ -73,6 +73,12 @@ def ws_config(
                 "entities": {role: list(ids) for role, ids in config.entities.items()},
                 "numbers": dict(config.numbers),
                 "inverted": sorted(config.inverted),
+                # Which tabs this entry can actually fill, and what each one
+                # is short of. The panel used to render all four regardless
+                # and let the analytics raise, so an inverter with no battery
+                # answered its Battery tab with the words
+                # "battery_soc is not configured" under "Could not load data".
+                "features": feature_availability(config),
             }
         )
 

@@ -113,16 +113,20 @@
           "invert_grid_power": "Enable if your sensor reports import as a negative number.",
           "invert_grid_power_phase": "Same, for the per-phase grid sensors."
         }
-      }
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Inverter Analytics",
-        "description": "Change the sensor mapping and the inverter's parameters.",
+      },
+      "reconfigure": {
+        "title": "Reconfigure the inverter",
+        "description": "{found}\n\nRun detection to fill in only the sensors that are not mapped yet, or map everything by hand.",
+        "menu_options": {
+          "reconfigure_detected": "Fill in what detection found",
+          "reconfigure_manual": "Map sensors by hand"
+        }
+      },
+      "reconfigure_detected": {
+        "title": "Sensors found for this inverter",
+        "description": "{found} The fields that were already mapped are left as they are — nothing here overwrites a correction you made by hand. {no_statistics}",
         "data": {
-          "name": "Name",
+          "ct_choice": "Grid measurement",
           "rated_power": "Rated power",
           "rated_power_per_phase": "Rated power per phase",
           "battery_capacity": "Battery capacity",
@@ -143,14 +147,10 @@
           "grid_export_total": "Grid export total",
           "invert_battery_power": "Invert battery power sign",
           "invert_grid_power": "Invert grid power sign",
-          "invert_grid_power_phase": "Invert per-phase grid power sign",
-          "imbalance_floor_pct": "Imbalance floor",
-          "imbalance_threshold_pct": "Imbalance threshold",
-          "battery_low_pct": "Low battery charge",
-          "battery_idle_w": "Battery idle power"
+          "invert_grid_power_phase": "Invert per-phase grid power sign"
         },
         "data_description": {
-          "name": "Shown in the sidebar page when you have more than one inverter.",
+          "ct_choice": "Which current transformers face the grid. This depends on how they were installed.",
           "rated_power": "The inverter's continuous rated power in watts, from its nameplate. Load bands and overload episodes are measured against it. For a SUN-12K this is 12000.",
           "rated_power_per_phase": "Optional. The per-phase limit in watts. Leave empty to assume a third of the rated power — the analytics will say when it has assumed.",
           "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",
@@ -171,7 +171,78 @@
           "grid_export_total": "A lifetime kWh counter for energy sold.",
           "invert_battery_power": "Enable if your sensor reports discharge as a positive number. Easy to check: look at the sign while the battery is charging.",
           "invert_grid_power": "Enable if your sensor reports import as a negative number.",
-          "invert_grid_power_phase": "Same, for the per-phase grid sensors.",
+          "invert_grid_power_phase": "Same, for the per-phase grid sensors."
+        }
+      },
+      "reconfigure_manual": {
+        "title": "Change the sensor mapping",
+        "description": "Every role this inverter can use, pre-filled with what is in force. Only load power and rated power are required; clearing an optional field turns off the analytics that depend on it. The inverter's name and its thresholds are in Configure, not here.",
+        "data": {
+          "rated_power": "Rated power",
+          "rated_power_per_phase": "Rated power per phase",
+          "battery_capacity": "Battery capacity",
+          "load_power": "Load power",
+          "load_power_phase": "Load power per phase",
+          "pv_power": "PV power",
+          "pv_power_string": "PV power per string",
+          "battery_power": "Battery power",
+          "grid_power": "Grid power",
+          "grid_power_phase": "Grid power per phase",
+          "battery_soc": "Battery state of charge",
+          "grid_connected": "Grid connected",
+          "pv_energy_total": "PV energy total",
+          "load_energy_total": "Load energy total",
+          "battery_charge_total": "Battery charge energy total",
+          "battery_discharge_total": "Battery discharge energy total",
+          "grid_import_total": "Grid import total",
+          "grid_export_total": "Grid export total",
+          "invert_battery_power": "Invert battery power sign",
+          "invert_grid_power": "Invert grid power sign",
+          "invert_grid_power_phase": "Invert per-phase grid power sign"
+        },
+        "data_description": {
+          "rated_power": "The inverter's continuous rated power in watts, from its nameplate. Load bands and overload episodes are measured against it. For a SUN-12K this is 12000.",
+          "rated_power_per_phase": "Optional. The per-phase limit in watts. Leave empty to assume a third of the rated power — the analytics will say when it has assumed.",
+          "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",
+          "load_power": "Total consumption on the inverter's output. If you also have per-phase sensors, map them below to get imbalance analysis.",
+          "load_power_phase": "One sensor per phase, in order L1, L2, L3. Only used for the per-phase section; the totals above stay the source for headline figures.",
+          "pv_power": "Total solar production in watts, as the inverter reports it. If you also have per-string sensors, map them below; the total stays the source for headline figures.",
+          "pv_power_string": "One sensor per string. Stored now; per-string charts arrive with the solar tab.",
+          "battery_power": "Charge and discharge power on one sensor. Use the inversion switch below if the sign runs the other way.",
+          "grid_power": "Exchange with the grid. Positive usually means import.",
+          "grid_power_phase": "One sensor per phase, in order L1, L2, L3. Positive usually means import — use the inversion switch below if yours runs the other way.",
+          "battery_soc": "State of charge in percent. This drives the dip analysis — how often and how deeply the battery is drawn down.",
+          "grid_connected": "A binary sensor that is on while grid power is present. Used to measure outages.",
+          "pv_energy_total": "A lifetime kWh counter, not a daily one. Daily counters reset and would be read as a drop to zero.",
+          "load_energy_total": "A lifetime kWh counter for consumption.",
+          "battery_charge_total": "A lifetime kWh counter for energy into the battery.",
+          "battery_discharge_total": "A lifetime kWh counter for energy out of the battery.",
+          "grid_import_total": "A lifetime kWh counter for energy bought.",
+          "grid_export_total": "A lifetime kWh counter for energy sold.",
+          "invert_battery_power": "Enable if your sensor reports discharge as a positive number. Easy to check: look at the sign while the battery is charging.",
+          "invert_grid_power": "Enable if your sensor reports import as a negative number.",
+          "invert_grid_power_phase": "Same, for the per-phase grid sensors."
+        }
+      }
+    },
+    "abort": {
+      "reconfigure_successful": "The mapping was updated and the inverter reloaded."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Inverter Analytics",
+        "description": "The inverter's name and the thresholds the analytics measure against. To change which sensor is which, use Reconfigure in this integration's menu — it can run detection against your installation instead of asking you to find the entities.",
+        "data": {
+          "name": "Name",
+          "imbalance_floor_pct": "Imbalance floor",
+          "imbalance_threshold_pct": "Imbalance threshold",
+          "battery_low_pct": "Low battery charge",
+          "battery_idle_w": "Battery idle power"
+        },
+        "data_description": {
+          "name": "Shown in the sidebar page when you have more than one inverter.",
           "imbalance_floor_pct": "Imbalance is only measured while total load is above this share of rated power. At 20 W of night-time load a 5 W spread between phases is a 25% imbalance — true, and meaningless. Default 5%.",
           "imbalance_threshold_pct": "The spread between phases counted as a problem, as a share of their average. Time above it is reported, and runs above it become episodes. Default 30%.",
           "battery_low_pct": "The state of charge counted as low. Time below it is reported, and runs below it become dip episodes. What counts as low differs by chemistry — a lithium pack and a lead-acid one are not comparable here. Default 20%.",

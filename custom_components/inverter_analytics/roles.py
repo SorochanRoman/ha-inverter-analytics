@@ -5,12 +5,15 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+import logging
 import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 
 from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RoleKind(StrEnum):
@@ -66,6 +69,58 @@ ROLES: tuple[Role, ...] = (
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
+
+
+def tuning_role_keys() -> frozenset[str]:
+    """Keys of the roles the options flow owns, as opposed to the mapping."""
+    return frozenset(role.key for role in ROLES if role.advanced)
+
+
+@dataclass(frozen=True, slots=True)
+class Feature:
+    """Something the page can show, and the roles it cannot be shown without.
+
+    The requirement lived in three places before this: the analytics module
+    raised when a role it needed was absent, the tab rendered whatever came
+    back, and the panel showed the tab either way. Nothing in that chain could
+    answer "what would mapping this sensor give me", which is the question an
+    installation configured before the feature existed needs answered.
+
+    key matches the panel's tab id, because every feature here is a whole tab;
+    a section inside a tab is answered by the payload it is drawn from, which
+    already knows what it was given.
+    """
+
+    key: str
+    label: str
+    requires: tuple[str, ...]
+    # Whether every listed role is needed, or any one of them is enough. The
+    # Balance tab is the second kind: one counter draws one bar, and the books
+    # only close with all six — so it is worth showing long before it is
+    # complete, and its own payload reports what the six are missing.
+    needs_all: bool = True
+
+
+# The six energy counters are named here rather than imported from
+# analytics.balance, which imports this module; test_roles asserts the two
+# lists stay identical.
+_BALANCE_COUNTERS = (
+    "pv_energy_total",
+    "grid_import_total",
+    "battery_discharge_total",
+    "load_energy_total",
+    "grid_export_total",
+    "battery_charge_total",
+)
+
+FEATURES: tuple[Feature, ...] = (
+    Feature("load", "Load analytics", ("load_power", "rated_power")),
+    Feature("battery", "Battery analytics", ("battery_soc",)),
+    Feature("seasonal", "Seasonality", ("load_power",)),
+    Feature("balance", "Energy balance", _BALANCE_COUNTERS, needs_all=False),
+)
+
+FEATURES_BY_KEY: dict[str, Feature] = {feature.key: feature for feature in FEATURES}
 
 
 def normalise_entity_ids(value: object) -> tuple[str, ...]:
@@ -196,11 +251,26 @@ class EntryConfig:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EntryConfig:
-        """Build a config from a dict in the ConfigEntry.data format."""
+        """Build a config from a dict in the ConfigEntry.data format.
+
+        A role the running version does not recognise is dropped rather than
+        raised on. A stored entry can have been written by a version that had
+        a role this one has since removed, or by a newer one that has a role
+        this one does not have yet — and refusing to load the integration at
+        all, so that every tab goes dark over one unread key, is a far worse
+        answer to that than ignoring the key. It is logged because a role
+        silently vanishing from a working setup would otherwise look like the
+        mapping had been lost.
+
+        A value that is present but unreadable still raises: that is a
+        corrupted entry rather than an unfamiliar one, and continuing would
+        mean computing against a number nobody wrote.
+        """
         entities: dict[str, tuple[str, ...]] = {}
         for key, value in (data.get(CONF_ENTITIES) or {}).items():
             if key not in ROLES_BY_KEY:
-                raise KeyError(f"Unknown role: {key}")
+                _LOGGER.warning("Ignoring sensor mapped to unknown role %s", key)
+                continue
             cleaned = normalise_entity_ids(value)
             if cleaned:
                 entities[key] = cleaned
@@ -208,7 +278,8 @@ class EntryConfig:
         numbers: dict[str, float] = {}
         for key, value in (data.get(CONF_NUMBERS) or {}).items():
             if key not in ROLES_BY_KEY:
-                raise KeyError(f"Unknown role: {key}")
+                _LOGGER.warning("Ignoring value stored for unknown role %s", key)
+                continue
             if value is None:
                 continue
             try:
@@ -222,14 +293,31 @@ class EntryConfig:
         inverted = frozenset(data.get(CONF_INVERTED) or ())
         unknown = inverted - set(ROLES_BY_KEY)
         if unknown:
-            raise KeyError(f"Unknown roles in inverted: {sorted(unknown)}")
+            _LOGGER.warning("Ignoring inversion flags for unknown roles %s", sorted(unknown))
+            inverted -= unknown
 
         return cls(entities=entities, numbers=numbers, inverted=inverted)
 
     @classmethod
     def from_entry(cls, entry: ConfigEntry) -> EntryConfig:
-        """Build a config from a config entry; options override data."""
-        return cls.from_dict(entry.options or entry.data)
+        """Build a config from a config entry.
+
+        The sensor mapping lives in `data`, written by the setup and
+        reconfigure flows; the tuning thresholds live in `options`, written by
+        the options flow. Entries created before that split hold a whole copy
+        of the mapping in `options` and are moved to the new shape by
+        `async_migrate_entry`, so only the thresholds are ever overlaid here.
+
+        The overlay is per key rather than wholesale: `options` carries the
+        four thresholds and nothing else, and replacing the numbers dict with
+        it would take `rated_power` — a required role — out of the config the
+        moment anyone opened the options form.
+        """
+        merged = dict(entry.data)
+        option_numbers = (entry.options or {}).get(CONF_NUMBERS) or {}
+        if option_numbers:
+            merged[CONF_NUMBERS] = dict(merged.get(CONF_NUMBERS) or {}) | dict(option_numbers)
+        return cls.from_dict(merged)
 
     def entity_ids(self, role_key: str) -> tuple[str, ...]:
         """Every entity mapped to the role, in the order they were configured."""
@@ -268,3 +356,30 @@ class EntryConfig:
             else bool(self.entity_ids(key))
             for key in role_keys
         )
+
+
+def missing_roles(config: EntryConfig, feature: Feature) -> tuple[str, ...]:
+    """The roles the feature needs that are not configured.
+
+    Reported for a feature that is already available too: the Balance tab
+    draws whatever counters it has, and "you have four of six" is the whole
+    point of asking.
+    """
+    return tuple(key for key in feature.requires if not config.has(key))
+
+
+def feature_availability(config: EntryConfig) -> list[dict[str, Any]]:
+    """Every feature, whether it can be shown, and what it is short of."""
+    availability = []
+    for feature in FEATURES:
+        missing = missing_roles(config, feature)
+        available = not missing if feature.needs_all else len(missing) < len(feature.requires)
+        availability.append(
+            {
+                "key": feature.key,
+                "label": feature.label,
+                "available": available,
+                "missing": list(missing),
+            }
+        )
+    return availability

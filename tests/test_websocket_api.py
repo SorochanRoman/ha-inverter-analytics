@@ -69,6 +69,37 @@ async def test_config_command_lists_entries(
     assert "raw_available_from" in response["result"]
 
 
+async def test_config_command_reports_what_each_tab_is_short_of(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The panel cannot decide this for itself without duplicating the rule.
+
+    This entry has a load sensor and nothing else, which is exactly the shape
+    the wizard's two required fields produce — so the Battery and Balance tabs
+    have nothing to draw and used to say so as a raised error.
+    """
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "inverter_analytics/config"})
+    response = await client.receive_json()
+
+    features = {item["key"]: item for item in response["result"]["entries"][0]["features"]}
+    assert features["load"]["available"] is True
+    assert features["seasonal"]["available"] is True
+    assert features["battery"]["available"] is False
+    assert features["battery"]["missing"] == ["battery_soc"]
+    # One counter is enough to draw a bar, so the tab opens as soon as there
+    # is one — and keeps reporting the five it has not got.
+    assert features["balance"]["available"] is False
+    assert len(features["balance"]["missing"]) == 6
+    # The label is what the reader is told they are missing out on.
+    assert features["battery"]["label"] == "Battery analytics"
+
+
 async def test_config_command_hands_lists_to_send_result(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:

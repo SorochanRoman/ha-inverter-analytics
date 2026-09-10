@@ -29,7 +29,16 @@ from .detect import (
     collect_sensors,
 )
 from .presets import CT_CHOICES
-from .roles import ROLES_BY_KEY, RoleKind, entity_roles, normalise_entity_ids, number_roles
+from .remap import fill, matching_cluster, offered_ids, open_ambiguities, unlocked_by
+from .roles import (
+    ROLES_BY_KEY,
+    EntryConfig,
+    Role,
+    RoleKind,
+    entity_roles,
+    normalise_entity_ids,
+    number_roles,
+)
 
 CONF_NAME = "name"
 INVERT_PREFIX = "invert_"
@@ -115,36 +124,52 @@ def _entity_selector(kind: RoleKind, multiple: bool = False) -> selector.EntityS
     )
 
 
-def build_schema(defaults: Mapping[str, Any] | None = None, advanced: bool = False) -> vol.Schema:
-    """Build the flat mapping-form schema.
+def _marked(role: Role, defaults: Mapping[str, Any]) -> Any:
+    """The voluptuous key for one role, pre-filled where there is a value.
 
-    Advanced fields are the tuning thresholds: they have defensible defaults
-    and nobody should have to answer them before seeing a single chart, so
-    they appear only when reconfiguring an inverter that already works.
+    `suggested_value`, not `default=`, matters here: the frontend omits an
+    optional field from the submission precisely when the user clears it, and
+    `default=` would then silently restore the old value instead of accepting
+    the clear (see commit 08fb537). A real frontend always resubmits an
+    untouched, pre-filled field's current contents, so `suggested_value` alone
+    is enough for that case.
+    """
+    marker = vol.Required if role.required else vol.Optional
+    if role.key not in defaults:
+        return marker(role.key)
+    return marker(role.key, description={"suggested_value": defaults[role.key]})
+
+
+def build_schema(
+    defaults: Mapping[str, Any] | None = None,
+    *,
+    name: bool = True,
+    mapping: bool = True,
+    tuning: bool = False,
+) -> vol.Schema:
+    """Build the flat form schema in one of the shapes it is asked for.
+
+    The wizard and the reconfigure form ask for the mapping — which sensor is
+    which, and the numbers off the nameplate. The options form asks for the
+    tuning thresholds instead: they have defensible defaults and nobody should
+    have to answer them before seeing a single chart.
+
+    Reconfigure leaves the name out. Renaming is a preference rather than a
+    fact about the hardware, and it stays in options next to the other
+    preferences; a field in both places would let two forms disagree.
     """
     defaults = defaults or {}
-    fields: dict[Any, Any] = {
-        vol.Required(
-            CONF_NAME, default=defaults.get(CONF_NAME, "Inverter")
-        ): selector.TextSelector()
-    }
+    fields: dict[Any, Any] = {}
+
+    if name:
+        fields[vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, "Inverter"))] = (
+            selector.TextSelector()
+        )
 
     for role in number_roles():
-        if role.advanced and not advanced:
+        if not (tuning if role.advanced else mapping):
             continue
-        marker = vol.Required if role.required else vol.Optional
-        # `suggested_value`, not `default=`, matters here: the frontend omits
-        # an optional field from the submission precisely when the user
-        # clears it, and `default=` would then silently restore the old
-        # value instead of accepting the clear (see commit 08fb537). A real
-        # frontend always resubmits an untouched, pre-filled field's current
-        # contents, so `suggested_value` alone is enough for that case.
-        key = (
-            marker(role.key, description={"suggested_value": defaults[role.key]})
-            if role.key in defaults
-            else marker(role.key)
-        )
-        fields[key] = selector.NumberSelector(
+        fields[_marked(role, defaults)] = selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=0,
                 step="any",
@@ -153,22 +178,17 @@ def build_schema(defaults: Mapping[str, Any] | None = None, advanced: bool = Fal
             )
         )
 
-    for role in entity_roles():
-        marker = vol.Required if role.required else vol.Optional
-        key = (
-            marker(role.key, description={"suggested_value": defaults[role.key]})
-            if role.key in defaults
-            else marker(role.key)
-        )
-        fields[key] = _entity_selector(role.kind, role.multiple)
+    if mapping:
+        for role in entity_roles():
+            fields[_marked(role, defaults)] = _entity_selector(role.kind, role.multiple)
 
-    for role in entity_roles():
-        if not role.invertible:
-            continue
-        flag = f"{INVERT_PREFIX}{role.key}"
-        fields[vol.Optional(flag, default=bool(defaults.get(flag, False)))] = (
-            selector.BooleanSelector()
-        )
+        for role in entity_roles():
+            if not role.invertible:
+                continue
+            flag = f"{INVERT_PREFIX}{role.key}"
+            fields[vol.Optional(flag, default=bool(defaults.get(flag, False)))] = (
+                selector.BooleanSelector()
+            )
 
     return vol.Schema(fields)
 
@@ -207,6 +227,20 @@ def pack(user_input: Mapping[str, Any]) -> dict[str, Any]:
     return {CONF_ENTITIES: entities, CONF_NUMBERS: numbers, CONF_INVERTED: sorted(inverted)}
 
 
+def _tuning_numbers(user_input: Mapping[str, Any]) -> dict[str, float]:
+    """Read the tuning form back into the numbers dict options holds.
+
+    A cleared field arrives as absent or empty and is dropped rather than
+    stored as zero: absent means "use the default", and a zero imbalance floor
+    would silently mean something quite different.
+    """
+    return {
+        key: float(value)
+        for key, value in user_input.items()
+        if key != CONF_NAME and key in ROLES_BY_KEY and value not in (None, "")
+    }
+
+
 def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
     """Convert the nested format back into the flat form."""
     flat: dict[str, Any] = {}
@@ -222,10 +256,34 @@ def unpack(config: Mapping[str, Any]) -> dict[str, Any]:
     return flat
 
 
+def _describe_fill(config: EntryConfig, filled: Mapping[str, Any]) -> str:
+    """What running detection against an existing entry actually turned up.
+
+    Naming the tab is the part that answers the user's real question. Six
+    entity ids appearing in a form say nothing about why they are worth
+    having; "this enables Energy balance" does.
+    """
+    if not filled:
+        return (
+            "Detection found nothing this inverter is not already mapped to. "
+            "Choose manual mapping to change what is there."
+        )
+    count = len(filled)
+    noun = "sensor" if count == 1 else "sensors"
+    sentence = f"Detection found {count} {noun} this inverter is not mapped to yet."
+    unlocked = unlocked_by(config, filled)
+    if unlocked:
+        sentence += f" Mapping {'it' if count == 1 else 'them'} enables: {', '.join(unlocked)}."
+    return sentence
+
+
 class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
     """Wizard for adding an inverter."""
 
     VERSION = 1
+    # 1.2 moved the mapping into entry.data and left options holding only the
+    # tuning thresholds; see async_migrate_entry.
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         """Hold what discovery found between steps."""
@@ -314,6 +372,107 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=user_input[CONF_NAME], data=pack(user_input))
         return self.async_show_form(step_id="manual", data_schema=build_schema())
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Offer to run detection again, or to edit the mapping by hand.
+
+        This is the step the options form could never be. An entry mapped
+        before a role existed cannot learn about it on its own: detection
+        already knows how to find that sensor, it was simply unreachable
+        after setup. Running it here against the entry's own cluster fills
+        what is empty and leaves what is not alone.
+        """
+        entry = self._get_reconfigure_entry()
+        config = EntryConfig.from_entry(entry)
+        cluster = matching_cluster(cluster_sensors(collect_sensors(self.hass)), config)
+        self._detection = classify(cluster) if cluster is not None else None
+
+        # With nothing to add, the menu would offer a choice between doing
+        # nothing and mapping by hand. Go straight to the form.
+        filled = fill(self._detection, config)
+        if not filled:
+            return await self.async_step_reconfigure_manual()
+
+        return self.async_show_menu(
+            step_id="reconfigure",
+            menu_options=["reconfigure_detected", "reconfigure_manual"],
+            description_placeholders={"found": _describe_fill(config, filled)},
+        )
+
+    async def async_step_reconfigure_detected(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the current mapping with the empty roles detection could fill."""
+        entry = self._get_reconfigure_entry()
+        config = EntryConfig.from_entry(entry)
+        if self._detection is None:
+            return await self.async_step_reconfigure_manual()
+        detection = self._detection
+        ambiguities = open_ambiguities(detection, config)
+
+        if user_input is not None:
+            return self._finish_reconfigure(entry, user_input, ambiguities)
+
+        filled = fill(detection, config)
+        fields: dict[Any, Any] = {}
+        by_role = {ambiguity.role: ambiguity for ambiguity in ambiguities}
+        for key, value in build_schema(unpack(entry.data) | filled, name=False).schema.items():
+            role_key = str(getattr(key, "schema", key))
+            ambiguity = by_role.get(role_key)
+            if ambiguity is None:
+                fields[key] = value
+                continue
+            fields[vol.Required(ambiguity.key)] = _ambiguity_selector(ambiguity)
+
+        return self.async_show_form(
+            step_id="reconfigure_detected",
+            data_schema=vol.Schema(fields),
+            description_placeholders={
+                "found": _describe_fill(config, filled),
+                # Only about the sensors this step is proposing. The warning
+                # is a reason to think twice before accepting them; repeating
+                # it for entities the user mapped long ago turns it into
+                # noise attached to a decision already made.
+                "no_statistics": _describe_missing_statistics(
+                    tuple(
+                        item for item in detection.without_statistics if item in offered_ids(filled)
+                    )
+                ),
+            },
+        )
+
+    async def async_step_reconfigure_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the whole mapping by hand, pre-filled with what is in force."""
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            return self._finish_reconfigure(entry, user_input, ())
+        return self.async_show_form(
+            step_id="reconfigure_manual",
+            data_schema=build_schema(unpack(entry.data), name=False),
+        )
+
+    def _finish_reconfigure(
+        self,
+        entry: ConfigEntry,
+        user_input: Mapping[str, Any],
+        ambiguities: Sequence[Ambiguity],
+    ) -> ConfigFlowResult:
+        """Write the new mapping and reload.
+
+        Only `data` is replaced. The tuning thresholds live in `options` and
+        are not on this form, so passing them through would mean carrying a
+        copy of every value the user set elsewhere just to avoid erasing it.
+        """
+        packed = pack(user_input)
+        for ambiguity in ambiguities:
+            choice = user_input.get(ambiguity.key)
+            if choice:
+                packed[CONF_ENTITIES][ambiguity.role] = list(ambiguity.options[choice])
+        return self.async_update_reload_and_abort(entry, data=packed)
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -322,24 +481,30 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class InverterAnalyticsOptionsFlow(OptionsFlow):
-    """Reconfigure the mapping without reinstalling."""
+    """What the inverter is called and where its thresholds sit.
+
+    The sensor mapping used to be here too, in the same form — twenty-two
+    fields, of which four were the ones an installation that already worked
+    ever came back to change. It now lives in the reconfigure flow, one item
+    away in the same menu, where detection can help fill it in.
+    """
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Show the form pre-filled with current values."""
+        """Show the form pre-filled with the values actually in force."""
         if user_input is not None:
             # Title and options are written together on purpose. Updating the
             # title separately fires the update listener, and Home Assistant
             # fires it again for the options write that follows — reloading the
             # integration twice for one rename. Writing both here means Home
             # Assistant's own write finds nothing changed and stays quiet.
-            packed = pack(user_input)
+            options = {CONF_NUMBERS: _tuning_numbers(user_input)}
             self.hass.config_entries.async_update_entry(
-                self.config_entry, title=user_input[CONF_NAME], options=packed
+                self.config_entry, title=user_input[CONF_NAME], options=options
             )
-            return self.async_create_entry(title="", data=packed)
+            return self.async_create_entry(title="", data=options)
 
-        current = self.config_entry.options or self.config_entry.data
-        defaults = _TUNING_DEFAULTS | unpack(current) | {CONF_NAME: self.config_entry.title}
+        current = (self.config_entry.options or {}).get(CONF_NUMBERS) or {}
+        defaults = _TUNING_DEFAULTS | dict(current) | {CONF_NAME: self.config_entry.title}
         return self.async_show_form(
-            step_id="init", data_schema=build_schema(defaults, advanced=True)
+            step_id="init", data_schema=build_schema(defaults, mapping=False, tuning=True)
         )

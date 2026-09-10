@@ -6,9 +6,66 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .analytics.cache import ResultCache
-from .const import DATA_CACHE, DOMAIN
+from .const import CONF_ENTITIES, CONF_INVERTED, CONF_NUMBERS, DATA_CACHE, DOMAIN
 from .panel import async_register_panel, async_remove_panel
+from .roles import normalise_entity_ids, tuning_role_keys
 from .websocket_api import async_register
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Bring an entry written by an older version up to the current shape."""
+    if entry.version > 1:
+        # Written by a newer version of the integration than the one running:
+        # its shape is unknown here, and guessing at it would corrupt a
+        # working configuration. Failing leaves the entry untouched.
+        return False
+
+    if entry.minor_version < 2:
+        _migrate_to_1_2(hass, entry)
+
+    return True
+
+
+def _migrate_to_1_2(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Split the mapping from the tuning thresholds.
+
+    Until now the options flow rewrote the entire configuration, and options
+    replaced data wholesale — so the mapping lived in whichever of the two was
+    written last. Options is now the four thresholds and nothing else, which
+    means a stale copy of the mapping left in options would have overridden
+    every later change made through reconfigure.
+
+    The source is options where the user ever opened the options form and data
+    otherwise, which is exactly what the old read did.
+    """
+    current = dict(entry.options) if entry.options else dict(entry.data)
+    numbers = dict(current.get(CONF_NUMBERS) or {})
+    tuning_keys = tuning_role_keys()
+
+    # Entries created before a role could hold several entities store a bare
+    # string where the rest store a list. normalise_entity_ids has absorbed
+    # that at every read since, and goes on doing so — a config dict reaches
+    # it from tests and from flows as well as from storage. What it could not
+    # do was fix the stored entry, because nothing rewrote one the user never
+    # reopened. This does, so the shape on disk is uniform from here on and
+    # the compatibility is a safety net rather than the mechanism.
+    entities = {
+        role: list(normalise_entity_ids(value))
+        for role, value in (current.get(CONF_ENTITIES) or {}).items()
+    }
+
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            CONF_ENTITIES: {role: ids for role, ids in entities.items() if ids},
+            CONF_NUMBERS: {key: value for key, value in numbers.items() if key not in tuning_keys},
+            CONF_INVERTED: current.get(CONF_INVERTED) or [],
+        },
+        options={
+            CONF_NUMBERS: {key: value for key, value in numbers.items() if key in tuning_keys}
+        },
+        minor_version=2,
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

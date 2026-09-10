@@ -3,11 +3,14 @@
 import pytest
 
 from custom_components.inverter_analytics.roles import (
+    FEATURES,
+    FEATURES_BY_KEY,
     ROLES,
     ROLES_BY_KEY,
     EntryConfig,
     RoleKind,
     entity_roles,
+    feature_availability,
     number_roles,
     part_identities,
     required_role_keys,
@@ -71,9 +74,28 @@ def test_entry_config_has_checks_every_key():
     assert config.has("load_power", "battery_soc") is False
 
 
-def test_entry_config_rejects_unknown_role_key():
-    with pytest.raises(KeyError):
-        EntryConfig.from_dict({"entities": {"nonsense": "sensor.x"}, "numbers": {}, "inverted": []})
+def test_entry_config_ignores_a_role_it_does_not_recognise(caplog):
+    """A stored entry can name a role this version has never heard of.
+
+    It was written by a version that had a role since removed, or by a newer
+    one that has a role this build does not. Raising would take the whole
+    integration down — every tab dark — over one key nothing was going to
+    read anyway. It is logged, because a mapping quietly shrinking looks
+    exactly like a mapping that was lost.
+    """
+    config = EntryConfig.from_dict(
+        {
+            "entities": {"load_power": "sensor.load", "nonsense": "sensor.x"},
+            "numbers": {"rated_power": 8000.0, "nonsense_pct": 3},
+            "inverted": ["nonsense"],
+        }
+    )
+    assert config.entity_id("load_power") == "sensor.load"
+    assert config.number("rated_power") == 8000.0
+    assert "nonsense" not in config.entities
+    assert "nonsense_pct" not in config.numbers
+    assert config.inverted == frozenset()
+    assert "nonsense" in caplog.text
 
 
 def test_entry_config_ignores_empty_entity_values():
@@ -217,3 +239,41 @@ def test_a_stored_number_that_is_not_a_number_names_its_role():
     """A stored entry can hold whatever a past version wrote."""
     with pytest.raises(ValueError, match="rated_power"):
         EntryConfig.from_dict({"numbers": {"rated_power": "twelve"}})
+
+
+def test_the_balance_feature_lists_exactly_the_counters_balance_reads():
+    """roles.py cannot import the analytics module that imports it.
+
+    So the six counters are written out twice, and the copy here is the one
+    the panel gates the tab on. If they drift, the tab either opens on an
+    entry that cannot fill it or stays shut on one that can.
+    """
+    from custom_components.inverter_analytics.analytics.balance import FLOW_ROLES
+
+    assert set(FEATURES_BY_KEY["balance"].requires) == set(FLOW_ROLES)
+
+
+def test_a_feature_needing_every_role_is_unavailable_until_it_has_them_all():
+    config = EntryConfig.from_dict({"entities": {"load_power": "sensor.load"}, "numbers": {}})
+    load = next(item for item in feature_availability(config) if item["key"] == "load")
+    assert load["available"] is False
+    assert load["missing"] == ["rated_power"]
+
+
+def test_a_feature_needing_any_role_opens_on_the_first_one():
+    """The Balance tab draws whatever counters it has.
+
+    Withholding it until all six are mapped would hide the only screen that
+    tells the user which six they are.
+    """
+    config = EntryConfig.from_dict({"entities": {"pv_energy_total": "sensor.pv"}, "numbers": {}})
+    balance = next(item for item in feature_availability(config) if item["key"] == "balance")
+    assert balance["available"] is True
+    assert "pv_energy_total" not in balance["missing"]
+    assert len(balance["missing"]) == 5
+
+
+def test_every_feature_names_roles_that_exist():
+    """A typo would make a feature permanently unavailable and never say why."""
+    for feature in FEATURES:
+        assert set(feature.requires) <= set(ROLES_BY_KEY), feature.key

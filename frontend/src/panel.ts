@@ -5,7 +5,8 @@ import { describeError } from "./format";
 import { singleFlight } from "./single-flight";
 import { buildLocation, parseLocation } from "./location";
 import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
-import type { ConfigResult, HomeAssistant } from "./types";
+import { INTEGRATION_URL, listRoles } from "./roles";
+import type { ConfigResult, EntryInfo, FeatureInfo, HomeAssistant } from "./types";
 import "./tabs/balance-tab";
 import "./tabs/battery-tab";
 import "./tabs/load-tab";
@@ -107,6 +108,19 @@ export class InverterAnalyticsPanel extends LitElement {
     }
   }
 
+  private get entry(): EntryInfo | undefined {
+    return this.config?.entries.find((item) => item.entry_id === this.entryId);
+  }
+
+  /**
+   * What the backend says about one tab. A tab with no feature of its own is
+   * treated as available: the panel must not hide a tab because a version of
+   * the integration older than the tab had nothing to say about it.
+   */
+  private feature(tab: string): FeatureInfo | undefined {
+    return this.entry?.features?.find((item) => item.key === tab);
+  }
+
   private selectTab(tab: string): void {
     this.tab = tab;
     this.writeLocation(true);
@@ -175,15 +189,53 @@ export class InverterAnalyticsPanel extends LitElement {
       </div>
 
       <nav class="tabs">
-        ${TABS.map(
-          (item) => html`<button
-            class=${item.id === this.tab ? "active" : ""}
+        ${TABS.map((item) => {
+          // Dimmed rather than hidden. A tab that disappears takes with it
+          // any hint that the feature exists, and the reason it is empty —
+          // an unmapped sensor — is one the user can act on the moment they
+          // are told which sensor it is.
+          const unavailable = this.feature(item.id)?.available === false;
+          return html`<button
+            class="${item.id === this.tab ? "active" : ""} ${unavailable ? "muted" : ""}"
             @click=${() => this.selectTab(item.id)}
-          >${item.label}</button>`,
-        )}
+          >${item.label}</button>`;
+        })}
       </nav>
 
       <main>
+        ${this.renderTab()}
+      </main>
+    `;
+  }
+
+  /**
+   * The tab, or an explanation of why it cannot be drawn.
+   *
+   * "No data" and "you have not told me which sensor that is" are different
+   * statements, and the page used to make only the first of them: asking for
+   * battery analytics from an inverter with no state-of-charge sensor mapped
+   * answered with the words "battery_soc is not configured" under the heading
+   * "Could not load data", which reads as a fault rather than as a setting.
+   */
+  private renderTab() {
+    const feature = this.feature(this.tab);
+    if (feature && !feature.available) {
+      return html`<div class="notice">
+        <p>
+          ${feature.label} needs ${listRoles(feature.missing)}, and
+          ${feature.missing.length === 1 ? "it is" : "none of them are"} mapped to this inverter.
+          Nothing here is broken and there is no data missing — this page has simply not been
+          told which of your sensors ${feature.missing.length === 1 ? "that is" : "those are"}.
+        </p>
+        <p>
+          Open the integration, choose <strong>Reconfigure</strong>, and it will offer what it
+          can find in your installation.
+        </p>
+        <a href=${INTEGRATION_URL}>Go to Inverter Analytics settings</a>
+      </div>`;
+    }
+
+    return html`
         ${this.tab === "load"
           ? html`<ia-load-tab
               .hass=${this.hass}
@@ -212,7 +264,6 @@ export class InverterAnalyticsPanel extends LitElement {
               .range=${this.range}
             ></ia-balance-tab>`
           : nothing}
-      </main>
     `;
   }
 
@@ -239,7 +290,11 @@ export class InverterAnalyticsPanel extends LitElement {
     }
     button.active { border-color: var(--primary-color); color: var(--primary-color); }
     .tabs { display: flex; gap: 4px; margin: 16px 0; flex-wrap: wrap; }
-    .notice { padding: 24px; color: var(--secondary-text-color); }
+    button.muted { color: var(--secondary-text-color); border-style: dashed; }
+    button.muted.active { color: var(--primary-color); }
+    .notice { padding: 24px; color: var(--secondary-text-color); max-width: 60ch; }
+    .notice p { margin: 0 0 12px; }
+    .notice a { color: var(--primary-color); }
     select {
       background: var(--card-background-color);
       color: var(--primary-text-color);
