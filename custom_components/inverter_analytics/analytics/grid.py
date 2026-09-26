@@ -269,6 +269,8 @@ def _autonomy(
     covered by the sun and the charge did not fall, because there is no
     discharge rate in that and inventing one would be worse than saying so.
     """
+    # Only outages with a charge reading at both ends can say anything about a
+    # rate, so evidence_hours is their total and not the period's outage time.
     evidence = [
         (item["soc_start"] - item["soc_end"], item["seconds"])
         for item in episodes
@@ -299,6 +301,11 @@ def _autonomy(
         return result | {"reason": "no_soc"}
     if not episodes:
         return result | {"reason": "no_outages"}
+    if not evidence:
+        # Outages, a charge sensor, and no reading at either end of any of
+        # them — a grid-powered dongle that goes unavailable for exactly the
+        # outage. Distinct from too little evidence, which has some.
+        return result | {"reason": "no_soc_in_outages"}
     if hours < AUTONOMY_MIN_HOURS:
         return result | {"reason": "too_little_evidence"}
     if drop <= 0:
@@ -412,6 +419,12 @@ def build_grid_payload(
         "kpi": {
             "count": len(outages),
             "off_seconds": off,
+            # Measured absence only is in off_seconds, while an outage's
+            # duration — and so "longest" and "mean" — includes the gaps
+            # bridged inside it. Without this figure beside them, a three-hour
+            # outage with a restart in the middle reports a longest that is
+            # larger than the whole time without grid.
+            "bridged_seconds": sum((item.bridged_seconds for item in outages), 0.0),
             "off_share": (off / measured) if measured > 0 else None,
             "longest_seconds": longest.seconds if longest else None,
             "longest_start": longest.start.isoformat() if longest else None,

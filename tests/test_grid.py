@@ -75,6 +75,20 @@ def test_a_short_gap_inside_an_outage_is_bridged_and_reported():
     assert found[0].bridged_seconds == 30.0
 
 
+def test_the_kpi_reports_the_bridged_time_it_left_out_of_the_off_total():
+    """The longest outage includes bridged time, so the off total has to own up to it."""
+    series = grid_series((0, 1.0), (60, 0.0), (120, None), (120.5, 0.0), (180, 1.0))
+    payload = build(series)
+    kpi = payload["kpi"]
+    assert kpi["bridged_seconds"] == 30.0
+    assert kpi["off_seconds"] == 7170.0, "measured absence only"
+    assert kpi["longest_seconds"] == kpi["off_seconds"] + kpi["bridged_seconds"]
+
+
+def test_nothing_bridged_is_a_zero_not_a_dash():
+    assert build(grid_series((0, 1.0)))["kpi"]["bridged_seconds"] == 0.0
+
+
 def test_a_long_gap_ends_the_outage_where_the_grid_was_last_known_absent():
     series = grid_series((0, 1.0), (60, 0.0), (120, None), (150, 0.0), (180, 1.0))
     found = episodes(series)
@@ -246,6 +260,16 @@ def test_autonomy_is_withheld_without_outages():
     autonomy = build(grid_series((0, 1.0)), soc=soc_series((0, 50.0)))["autonomy"]
     assert autonomy["reason"] == "no_outages"
     assert autonomy["hours_from_full"] is None
+
+
+def test_autonomy_is_withheld_when_no_charge_was_recorded_inside_the_outages():
+    """A charge sensor that goes unavailable for exactly the outage reads nothing."""
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, None), (200, 50.0))
+    autonomy = build(grid, soc=soc)["autonomy"]
+    assert autonomy["reason"] == "no_soc_in_outages"
+    assert autonomy["evidence_hours"] == 0.0
+    assert autonomy["rate_pct_per_hour"] is None
 
 
 def test_autonomy_needs_an_hour_of_evidence():
