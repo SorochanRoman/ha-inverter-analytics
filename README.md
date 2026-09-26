@@ -79,6 +79,24 @@ beyond pointing the integration at the ones you already have.
   counters are mapped. It is withheld for a period that ends at a very
   different state of charge, and says why: the gap between what went in and
   what came out is then mostly energy still in the battery, not energy lost.
+- **A Grid tab.** How often the grid went away, for how long, and when: the
+  count, the total, the longest, the share of measured time, and brief
+  interruptions too short to be outages; hours without grid by day and the
+  share by hour of day; and a table of every outage with the battery's charge
+  when it began, the lowest it reached and where it ended, plus the mean load
+  through it. An outage cut by the window's edge says "at least". A restart
+  of Home Assistant in the middle of an outage does not make two of it. The
+  grid-presence sensor is a binary sensor with no statistics, so a window
+  reaching past the recorder's retention says from which date it counts.
+- **Autonomy, read off the battery.** How long the battery would last from
+  full and from where it is now, at the discharge rate seen during this
+  period's outages — the nameplate capacity is never multiplied into it. It
+  is withheld, and says why, when the outages were too short to learn from
+  or the sun covered them.
+- **Outages inferred from flows**, for an installation with no presence
+  sensor: grid power at zero while the battery discharges. The tab carries a
+  banner saying that a night of zero export looks the same, and asks for a
+  sensor.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -117,7 +135,7 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-All four tabs are built. Seasonality cannot compare the same month across two years,
+All five tabs are built. Seasonality cannot compare the same month across two years,
 because a single query is capped at 400 days. The Balance tab shows no
 costs: tariffs are a domain of their own, and a wrong number about money
 is worse than no number. Detection covers the naming scheme of the
@@ -156,8 +174,8 @@ full list of what is deliberately missing and what remains unverified.
    It will offer the inverters it found; pick yours and check what it filled
    in, or choose manual mapping. Only load power and rated power are
    required. Per-phase load sensors enable the Phases section and PV
-   strings the string comparison; the rest is optional and feeds tabs that
-   are not built yet.
+   strings the string comparison; a grid-presence binary sensor enables the
+   Grid tab; the rest is optional.
 
 ## Updating
 

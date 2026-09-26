@@ -141,6 +141,29 @@ the defect was only visible on screen.
 
 ## 3. Still unverified
 
+- **The Grid tab, all of it.** Nothing in the outage work has been seen in a
+  live Home Assistant; it rests on unit tests over hand-built series. The live
+  run has to build a template `binary_sensor.grid_connected` from the
+  inverter's grid status and let it record, then a day's history holding a
+  100-second outage, a 20-second flicker, a three-hour outage with a
+  30-second `unavailable` in the middle through which the charge falls past
+  the low mark, and an outage still in progress at the moment of reading; then
+  confirm **Reconfigure → Fill in what detection found** offers
+  `grid_connected` pre-filled, and that adding a second matching binary sensor
+  turns it into the question with both options and no count in its label; then
+  read the 24 h period and find two outages plus the ongoing one in the table,
+  one brief interruption in the KPIs, the three-hour outage present once with
+  "(30 s unrecorded)", its lowest charge in the low colour and the ongoing one
+  as "at least", and, switching to 30 days, the counted-from note carrying the
+  recorder's own boundary; then check the autonomy rate against the charges
+  the table shows; then unmap `grid_connected`, map the external CTs and
+  battery power instead, and confirm the banner, the five-minute floor and the
+  absent brief-interruption figure.
+- **Inferred outages against a real zero-export night.** The rule is that
+  nothing crosses the grid connection while the battery discharges — which is
+  also what a house living off its own battery looks like. How often that
+  misfires on a real installation is unknown; the banner exists because it is
+  unknown, and it is not a substitute for finding out.
 - **Installation through HACS.** The integration was copied into the config
   directory directly.
 - **HACS validation in CI runs only for `main`.** It checks repository
@@ -186,6 +209,25 @@ could instead be corrected using the capacity and the drift — but that compoun
 a user-entered capacity with a percentage reading, and a corrected number that
 looks precise is worse than an absent one that explains itself.
 
+**The autonomy rate's denominator.** The state of charge lost across the
+period's outages is divided by their whole duration, not by the seconds the
+charge sensor actually had a state inside them. A sensor that dropped out for
+part of an outage therefore makes the discharge rate look gentler than it was.
+Dividing by covered seconds instead would mean carrying a second timeline
+through the calculation for a correction that only bites when the charge
+sensor is unreliable — and if it is, the figure it produces is not worth
+refining.
+
+**Autonomy uncorrected for sun during an outage.** An outage the sun partly
+covered has the battery recharging inside it, so the points lost per hour
+understate what a night would cost. Correcting it needs PV production during
+each outage and an assumption about how much of it reached the battery rather
+than the load — and a rate built on that assumption would look precise while
+resting on it. The tab instead prints the evidence beside the number: how many
+hours of outage it rests on and the mean load through them, so the reader can
+see what kind of outage it learned from. The one case where the sun wins
+outright — no net discharge at all — is withheld rather than estimated.
+
 **A real depth-of-discharge figure.** Measured across dip episodes it would be
 the threshold minus the minimum, since every episode starts at the threshold by
 construction. A true figure needs discharge runs detected from the charge
@@ -223,10 +265,15 @@ the live run keeps finding what it finds.
 
 Written from reviewing the finished code rather than its spec.
 
-- **`Ambiguity` is now genuinely multi-question** — each carries the field it is
-  asked through, and each answer applies to its own role — but only one
-  ambiguity is ever produced, so the second question has never existed outside
-  a test.
+- **`Ambiguity` now has its second question.** Each one carries the field it is
+  asked through and each answer applies to its own role, and the grid work
+  supplied the second case: more than one binary sensor matching the
+  grid-presence pattern raises "Which sensor says the grid is present?"
+  alongside the current-transformer choice. So the multi-question path is no
+  longer a mechanism only a test has walked — but it is still only code and
+  unit tests. Two ambiguities arriving together, and the flow asking both in
+  one step, has never happened in a live installation; section 3 says what the
+  live run must check.
 - **Phase identity is read from the entity id**, and falls back to position when
   the name reveals nothing, labelling that case "Phase 2" without claiming
   which phase the hardware calls it. A repeated index drops the whole role to
