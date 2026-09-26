@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
@@ -601,22 +602,37 @@ async def test_grid_command_says_what_to_map_when_nothing_is(
     assert "grid_connected" in response["error"]["message"]
 
 
+@pytest.mark.parametrize(
+    ("flows", "expected_series"),
+    [
+        (
+            {"grid_power_phase": ["sensor.grid_l1", "sensor.grid_l2"]},
+            ["battery_power", "grid_l1", "grid_l2"],
+        ),
+        ({"grid_power": ["sensor.grid_power"]}, ["battery_power", "grid_total"]),
+    ],
+    ids=["phases", "total"],
+)
 async def test_grid_command_infers_from_the_flows_without_a_presence_sensor(
-    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+    recorder_mock,
+    enable_custom_integrations,
+    hass: HomeAssistant,
+    hass_ws_client,
+    flows: dict[str, list[str]],
+    expected_series: list[str],
 ) -> None:
     """The fallback mode: no grid_connected, but the flows can be read.
 
-    Per-phase grid power, because no preset offers a total for it, so the
-    phases have to be summed before presence can be guessed at.
+    Either shape of grid power: a total, or the phases most presets offer
+    instead, which have to be summed before presence can be guessed at. The
+    phases are named from their entity ids, so an entry mapping L1 and L3
+    would report grid_l3 rather than a second phase it has not got.
     """
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Deye 8kW",
         data={
-            "entities": {
-                "battery_power": ["sensor.battery_power"],
-                "grid_power_phase": ["sensor.grid_l1", "sensor.grid_l2"],
-            },
+            "entities": {"battery_power": ["sensor.battery_power"], **flows},
             "numbers": {"rated_power": 8000.0},
             "inverted": [],
         },
@@ -626,13 +642,16 @@ async def test_grid_command_infers_from_the_flows_without_a_presence_sensor(
     await hass.async_block_till_done()
 
     end = dt_util.utcnow()
-    values = {"sensor.battery_power": "-2000", "sensor.grid_l1": "0", "sensor.grid_l2": "0"}
 
     def states(hass, entity_ids, window):
         """Half an hour of discharging with nothing crossing the connection."""
         return {
             entity_id: [
-                State(entity_id, values[entity_id], last_changed=end - timedelta(minutes=30))
+                State(
+                    entity_id,
+                    "-2000" if entity_id == "sensor.battery_power" else "0",
+                    last_changed=end - timedelta(minutes=30),
+                )
             ]
             for entity_id in entity_ids
         }
@@ -662,4 +681,4 @@ async def test_grid_command_infers_from_the_flows_without_a_presence_sensor(
     assert result["kpi"]["brief_interruptions"] is None
     assert result["episodes"][0]["ongoing"] is True
     assert result["has_soc"] is False and result["has_load"] is False
-    assert sorted(result["series"]) == ["battery_power", "grid_1", "grid_2"]
+    assert sorted(result["series"]) == expected_series

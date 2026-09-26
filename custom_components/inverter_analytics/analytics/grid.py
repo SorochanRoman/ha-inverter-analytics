@@ -18,7 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT, DEFAULT_GRID_ZERO_W
-from ..roles import EntryConfig
+from ..roles import EntryConfig, part_identities
 from .battery import restrict
 from .resample import (
     AlignedInterval,
@@ -462,6 +462,7 @@ async def async_grid_analytics(
     load_id = config.entity_id("load_power")
     numeric = [entity_id for entity_id in (soc_id, load_id) if entity_id]
     signs: dict[str, float] = {}
+    flow_ids: list[str] = []
     if source == SOURCE_INFERRED:
         flow_ids = [grid_id] if grid_id else list(phase_ids)
         numeric += [battery_id, *flow_ids]
@@ -486,13 +487,15 @@ async def async_grid_analytics(
             zero_w=config.number("grid_zero_w") or DEFAULT_GRID_ZERO_W,
             idle_w=config.number("battery_idle_w") or DEFAULT_BATTERY_IDLE_W,
         )
-        series_block = {
-            "battery_power": describe_series(battery_id, results[battery_id]),
-            **{
-                f"grid_{index + 1}": describe_series(eid, results[eid])
-                for index, eid in enumerate(flow_ids)
-            },
-        }
+        series_block = {"battery_power": describe_series(battery_id, results[battery_id])}
+        if grid_id:
+            series_block["grid_total"] = describe_series(grid_id, results[grid_id])
+        else:
+            # Named from the entity ids, not from their position: an entry that
+            # maps L1 and L3 would otherwise report L3 as the second phase.
+            identities = part_identities("grid_power_phase", flow_ids)
+            for identity, entity_id in zip(identities, flow_ids, strict=True):
+                series_block[identity.key] = describe_series(entity_id, results[entity_id])
 
     zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
     payload = build_grid_payload(
