@@ -9,6 +9,7 @@ import { INTEGRATION_URL, listRoles } from "./roles";
 import type { ConfigResult, EntryInfo, FeatureInfo, HomeAssistant } from "./types";
 import "./tabs/balance-tab";
 import "./tabs/battery-tab";
+import "./tabs/grid-tab";
 import "./tabs/load-tab";
 import "./tabs/seasonality-tab";
 
@@ -19,6 +20,7 @@ const TABS = [
   { id: "battery", label: "Battery" },
   { id: "seasonal", label: "Seasonality" },
   { id: "balance", label: "Balance" },
+  { id: "grid", label: "Grid" },
 ] as const;
 
 @customElement("inverter-analytics-panel")
@@ -263,6 +265,13 @@ export class InverterAnalyticsPanel extends LitElement {
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-balance-tab>`
+          : nothing}
+        ${this.tab === "grid"
+          ? html`<ia-grid-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-grid-tab>`
           : nothing}
     `;
   }
