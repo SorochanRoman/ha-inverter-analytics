@@ -16,6 +16,7 @@ from .const import (
     CONF_NUMBERS,
     DEFAULT_BATTERY_IDLE_W,
     DEFAULT_BATTERY_LOW_PCT,
+    DEFAULT_GRID_ZERO_W,
     DEFAULT_IMBALANCE_FLOOR_PCT,
     DEFAULT_IMBALANCE_THRESHOLD_PCT,
     DOMAIN,
@@ -52,6 +53,7 @@ _TUNING_DEFAULTS = {
     "imbalance_threshold_pct": DEFAULT_IMBALANCE_THRESHOLD_PCT,
     "battery_low_pct": DEFAULT_BATTERY_LOW_PCT,
     "battery_idle_w": DEFAULT_BATTERY_IDLE_W,
+    "grid_zero_w": DEFAULT_GRID_ZERO_W,
 }
 
 _DEVICE_CLASS_BY_KIND = {

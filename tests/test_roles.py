@@ -14,6 +14,7 @@ from custom_components.inverter_analytics.roles import (
     number_roles,
     part_identities,
     required_role_keys,
+    tuning_role_keys,
 )
 
 
@@ -187,6 +188,7 @@ def test_the_tuning_numbers_stay_out_of_the_first_run():
         "imbalance_threshold_pct",
         "battery_low_pct",
         "battery_idle_w",
+        "grid_zero_w",
     }
     assert not any(role.advanced for role in ROLES if role.required)
 
@@ -277,3 +279,52 @@ def test_every_feature_names_roles_that_exist():
     """A typo would make a feature permanently unavailable and never say why."""
     for feature in FEATURES:
         assert set(feature.requires) <= set(ROLES_BY_KEY), feature.key
+        for alternative in feature.alternatives:
+            assert set(alternative) <= set(ROLES_BY_KEY), feature.key
+
+
+def _grid(config: EntryConfig) -> dict:
+    return next(item for item in feature_availability(config) if item["key"] == "grid")
+
+
+def test_the_grid_feature_opens_on_a_presence_sensor():
+    config = EntryConfig.from_dict(
+        {"entities": {"grid_connected": "binary_sensor.grid"}, "numbers": {}}
+    )
+    assert _grid(config)["available"] is True
+    assert _grid(config)["missing"] == []
+
+
+def test_the_grid_feature_opens_on_power_flows_and_keeps_asking_for_the_sensor():
+    """Inferred outages are the fallback; the sensor stays worth mapping."""
+    total = EntryConfig.from_dict(
+        {
+            "entities": {"grid_power": "sensor.grid", "battery_power": "sensor.bat"},
+            "numbers": {},
+        }
+    )
+    phases = EntryConfig.from_dict(
+        {
+            "entities": {
+                "grid_power_phase": ["sensor.l1", "sensor.l2"],
+                "battery_power": "sensor.bat",
+            },
+            "numbers": {},
+        }
+    )
+    for config in (total, phases):
+        assert _grid(config)["available"] is True
+        assert _grid(config)["missing"] == ["grid_connected"]
+
+
+def test_grid_power_alone_does_not_open_the_grid_feature():
+    config = EntryConfig.from_dict({"entities": {"grid_power": "sensor.grid"}, "numbers": {}})
+    assert _grid(config)["available"] is False
+    assert _grid(config)["missing"] == ["grid_connected"]
+
+
+def test_grid_zero_is_a_tuning_number():
+    role = ROLES_BY_KEY["grid_zero_w"]
+    assert role.kind is RoleKind.NUMBER
+    assert role.advanced is True
+    assert "grid_zero_w" in tuning_role_keys()

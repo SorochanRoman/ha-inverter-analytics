@@ -66,6 +66,7 @@ ROLES: tuple[Role, ...] = (
     Role("imbalance_threshold_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("battery_low_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("battery_idle_w", RoleKind.NUMBER, "W", advanced=True),
+    Role("grid_zero_w", RoleKind.NUMBER, "W", advanced=True),
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}
@@ -99,6 +100,12 @@ class Feature:
     # only close with all six — so it is worth showing long before it is
     # complete, and its own payload reports what the six are missing.
     needs_all: bool = True
+    # Other role sets that open the feature on their own. `requires` stays
+    # what `missing` is reported against: the Grid tab opens on grid power
+    # and battery power, but inferring outages from flows is a fallback, and
+    # the presence sensor is still the thing worth asking for — so it stays
+    # listed as missing, and the repair card keeps saying so.
+    alternatives: tuple[tuple[str, ...], ...] = ()
 
 
 # The six energy counters are named here rather than imported from
@@ -118,6 +125,12 @@ FEATURES: tuple[Feature, ...] = (
     Feature("battery", "Battery analytics", ("battery_soc",)),
     Feature("seasonal", "Seasonality", ("load_power",)),
     Feature("balance", "Energy balance", _BALANCE_COUNTERS, needs_all=False),
+    Feature(
+        "grid",
+        "Grid outages",
+        ("grid_connected",),
+        alternatives=(("grid_power", "battery_power"), ("grid_power_phase", "battery_power")),
+    ),
 )
 
 FEATURES_BY_KEY: dict[str, Feature] = {feature.key: feature for feature in FEATURES}
@@ -374,6 +387,7 @@ def feature_availability(config: EntryConfig) -> list[dict[str, Any]]:
     for feature in FEATURES:
         missing = missing_roles(config, feature)
         available = not missing if feature.needs_all else len(missing) < len(feature.requires)
+        available = available or any(config.has(*roles) for roles in feature.alternatives)
         availability.append(
             {
                 "key": feature.key,

@@ -32,3 +32,7 @@ DEFAULT_IMBALANCE_THRESHOLD_PCT: Final = 30.0
 # a lead-acid one disagree about what counts as low.
 DEFAULT_BATTERY_LOW_PCT: Final = 20.0
 DEFAULT_BATTERY_IDLE_W: Final = 50.0
+
+# Only for outages inferred from power flows. A current-transformer reading
+# is never quite zero, and how far from zero depends on the clamp.
+DEFAULT_GRID_ZERO_W: Final = 10.0
