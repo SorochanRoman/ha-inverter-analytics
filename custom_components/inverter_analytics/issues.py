@@ -20,7 +20,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
-from .detect import classify, cluster_sensors, collect_sensors
+from .detect import classify, cluster_sensors, collect_sensors, grid_candidates
 from .remap import fed_by, fill, matching_cluster, offered_ids, wanted_fill
 from .roles import EntryConfig
 
@@ -64,7 +64,8 @@ def _check_unmapped_sensors(hass: HomeAssistant, entry: ConfigEntry, config: Ent
     sitting unread, and no part of the interface it visits would ever bring
     that up.
     """
-    cluster = matching_cluster(cluster_sensors(collect_sensors(hass)), config)
+    sensors = collect_sensors(hass)
+    cluster = matching_cluster(cluster_sensors(sensors), config)
     if cluster is None:
         _resolve(hass, UNMAPPED_SENSORS, entry)
         return
@@ -74,7 +75,7 @@ def _check_unmapped_sensors(hass: HomeAssistant, entry: ConfigEntry, config: Ent
     # would be a notification the user learns to dismiss without reading, and
     # that habit is expensive to have taught them by the time something does
     # matter.
-    filled = wanted_fill(config, fill(classify(cluster), config))
+    filled = wanted_fill(config, fill(classify(cluster, grid_candidates(sensors)), config))
     if not filled:
         _resolve(hass, UNMAPPED_SENSORS, entry)
         return

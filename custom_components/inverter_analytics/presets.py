@@ -42,3 +42,10 @@ CT_CHOICES: Final[Mapping[str, str]] = {
     ),
     "internal_ct": ("Internal CT — the inverter's own measurement of what passes through it"),
 }
+
+# A grid-presence sensor describes the site, not the inverter: it is usually a
+# template the user wrote, and shares neither the inverter's device nor its
+# name. Matched by name alone, over the binary_sensor domain only.
+GRID_PRESENCE_PATTERN: Final = (
+    r"^(?:.*_)?(?:on_grid|grid_(?:connected|status|online|present|available))$"
+)

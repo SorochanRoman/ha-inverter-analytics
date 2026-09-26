@@ -28,6 +28,7 @@ from .detect import (
     classify,
     cluster_sensors,
     collect_sensors,
+    grid_candidates,
 )
 from .presets import CT_CHOICES
 from .remap import fill, matching_cluster, offered_ids, open_ambiguities, unlocked_by
@@ -93,20 +94,25 @@ def _cluster_label(cluster: Cluster) -> str:
     return f"{cluster.label} — {len(cluster.sensors)} sensors{suffix}"
 
 
-def _ambiguity_selector(ambiguity: Ambiguity) -> selector.SelectSelector:
-    """The picker for one question the data could not settle.
+def _option_label(key: str, entities: tuple[str, ...]) -> str:
+    """One option's text, carrying the sensor count where that distinguishes it.
 
-    The number of sensors is part of the label: an incomplete clamp set still
-    raises the question, and the option that carries two phases where the other
-    carries three is otherwise indistinguishable from it.
+    The count tells the clamp sets apart: an incomplete set raises the question
+    too, and two phases against three is the only thing between them. A
+    grid-presence option is one entity id, which already names itself, and
+    "(1 sensors)" beside it would be noise.
     """
+    if key in CT_CHOICES:
+        return f"{CT_CHOICES[key]} ({len(entities)} sensors)"
+    return key
+
+
+def _ambiguity_selector(ambiguity: Ambiguity) -> selector.SelectSelector:
+    """The picker for one question the data could not settle."""
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=[
-                selector.SelectOptionDict(
-                    value=key,
-                    label=f"{CT_CHOICES.get(key, key)} ({len(entities)} sensors)",
-                )
+                selector.SelectOptionDict(value=key, label=_option_label(key, entities))
                 for key, entities in ambiguity.options.items()
             ]
         )
@@ -293,7 +299,8 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Offer the inverters found in this installation."""
-        clusters = cluster_sensors(collect_sensors(self.hass))
+        sensors = collect_sensors(self.hass)
+        clusters = cluster_sensors(sensors)
         if not clusters:
             return await self.async_step_manual()
 
@@ -305,7 +312,7 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
                 # The installation changed between rendering the form and
                 # submitting it; ask again rather than raising at the user.
                 return await self.async_step_user()
-            self._detection = classify(cluster)
+            self._detection = classify(cluster, grid_candidates(sensors))
             return await self.async_step_confirm()
 
         options = [
@@ -387,8 +394,11 @@ class InverterAnalyticsConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         entry = self._get_reconfigure_entry()
         config = EntryConfig.from_entry(entry)
-        cluster = matching_cluster(cluster_sensors(collect_sensors(self.hass)), config)
-        self._detection = classify(cluster) if cluster is not None else None
+        sensors = collect_sensors(self.hass)
+        cluster = matching_cluster(cluster_sensors(sensors), config)
+        self._detection = (
+            classify(cluster, grid_candidates(sensors)) if cluster is not None else None
+        )
 
         # With nothing to add, the menu would offer a choice between doing
         # nothing and mapping by hand. Go straight to the form.

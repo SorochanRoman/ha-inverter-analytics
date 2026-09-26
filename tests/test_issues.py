@@ -354,3 +354,17 @@ async def test_the_fix_flow_refuses_an_issue_it_does_not_own(
         await async_create_fix_flow(hass, "something_else", {"entry_id": "x"})
     with pytest.raises(ValueError):
         await async_create_fix_flow(hass, f"{UNMAPPED_SENSORS}_x", None)
+
+
+async def test_a_presence_sensor_nobody_mapped_is_offered_for_the_grid_tab(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    _register_solarman(hass)
+    hass.states.async_set("binary_sensor.grid_connected", "on")
+    entry = _entry({"load_power": [LOAD], **{role: [eid] for eid, role in COUNTERS.items()}})
+    await _setup(hass, entry)
+
+    issue = _issue(hass, UNMAPPED_SENSORS, entry)
+    assert issue is not None
+    assert issue.translation_placeholders["count"] == "1"
+    assert issue.translation_placeholders["features"] == "Grid outages"

@@ -33,6 +33,11 @@ _RELEVANT_DEVICE_CLASSES = frozenset({"power", "energy", "battery"})
 # The form field the current-transformer question is asked through.
 CT_CHOICE = "ct_choice"
 
+# The form field the grid-presence question is asked through.
+GRID_CHOICE = "grid_choice"
+
+_BINARY_DOMAIN = "binary_sensor."
+
 
 @dataclass(frozen=True, slots=True)
 class SensorInfo:
@@ -99,6 +104,10 @@ def cluster_sensors(sensors: Sequence[SensorInfo]) -> list[Cluster]:
     groups: dict[str, list[SensorInfo]] = defaultdict(list)
     grouped_by_device: set[str] = set()
     for sensor in sensors:
+        # binary_sensor has a device class called power too — "power
+        # detected" — and it must not be swept in beside a power reading.
+        if sensor.entity_id.startswith(_BINARY_DOMAIN):
+            continue
         if sensor.device_class not in _RELEVANT_DEVICE_CLASSES:
             continue
         if sensor.device_id:
@@ -126,12 +135,28 @@ def cluster_sensors(sensors: Sequence[SensorInfo]) -> list[Cluster]:
     return clusters
 
 
+def grid_candidates(sensors: Sequence[SensorInfo]) -> tuple[str, ...]:
+    """Binary sensors that look like they report whether the grid is present.
+
+    Offered to every cluster rather than clustered: grid presence is a
+    property of the site, and one sensor answers it for every inverter on it.
+    """
+    return tuple(
+        sorted(
+            sensor.entity_id
+            for sensor in sensors
+            if sensor.entity_id.startswith(_BINARY_DOMAIN)
+            and re.match(presets.GRID_PRESENCE_PATTERN, _object_id(sensor.entity_id))
+        )
+    )
+
+
 def collect_sensors(hass: HomeAssistant) -> list[SensorInfo]:
     """Read every sensor's detection-relevant attributes from the state machine."""
     entities = er.async_get(hass)
     devices = dr.async_get(hass)
     sensors: list[SensorInfo] = []
-    for state in hass.states.async_all("sensor"):
+    for state in hass.states.async_all(("sensor", "binary_sensor")):
         entry = entities.async_get(state.entity_id)
         device_id = entry.device_id if entry else None
         device = devices.async_get(device_id) if device_id else None
@@ -188,7 +213,7 @@ class Detection:
         return all(self.mapping.get(key) for key in ("load_power",))
 
 
-def classify(cluster: Cluster) -> Detection:
+def classify(cluster: Cluster, shared: Sequence[str] = ()) -> Detection:
     """Turn a cluster's sensors into a role mapping, an ambiguity list and a warning list."""
     indexed: dict[str, list[tuple[int, str]]] = defaultdict(list)
     ct_sets: dict[str, list[tuple[int, str]]] = defaultdict(list)
@@ -238,6 +263,21 @@ def classify(cluster: Cluster) -> Detection:
     # A lone internal CT set is deliberately not mapped: CT_CHOICES describes it
     # as the inverter's own measurement rather than the grid connection, so
     # assuming it here would contradict the text we show the user.
+
+    # Exactly one candidate needs no question. Several do: which of two
+    # sensors describes the grid is not something a name can settle.
+    if "grid_connected" not in mapping:
+        if len(shared) == 1:
+            mapping["grid_connected"] = (shared[0],)
+        elif len(shared) > 1:
+            ambiguities.append(
+                Ambiguity(
+                    key=GRID_CHOICE,
+                    role="grid_connected",
+                    question="Which sensor says the grid is present?",
+                    options={entity_id: (entity_id,) for entity_id in shared},
+                )
+            )
 
     return Detection(
         mapping=mapping,

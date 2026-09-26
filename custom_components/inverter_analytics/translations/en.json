@@ -14,6 +14,7 @@
         "data": {
           "name": "Name",
           "ct_choice": "Grid measurement",
+          "grid_choice": "Grid presence",
           "rated_power": "Rated power",
           "rated_power_per_phase": "Rated power per phase",
           "battery_capacity": "Battery capacity",
@@ -38,6 +39,7 @@
         },
         "data_description": {
           "ct_choice": "Which current transformers face the grid. This depends on how they were installed.",
+          "grid_choice": "More than one binary sensor in this installation looks like it reports whether the grid is present. Pick the one that does; it feeds the Grid tab.",
           "name": "Shown in the sidebar page when you have more than one inverter.",
           "rated_power": "The inverter's continuous rated power in watts, from its nameplate. Load bands and overload episodes are measured against it. For a SUN-12K this is 12000.",
           "rated_power_per_phase": "Optional. The per-phase limit in watts. Leave empty to assume a third of the rated power — the analytics will say when it has assumed.",
@@ -127,6 +129,7 @@
         "description": "{found} The fields that were already mapped are left as they are — nothing here overwrites a correction you made by hand. {no_statistics}",
         "data": {
           "ct_choice": "Grid measurement",
+          "grid_choice": "Grid presence",
           "rated_power": "Rated power",
           "rated_power_per_phase": "Rated power per phase",
           "battery_capacity": "Battery capacity",
@@ -151,6 +154,7 @@
         },
         "data_description": {
           "ct_choice": "Which current transformers face the grid. This depends on how they were installed.",
+          "grid_choice": "More than one binary sensor in this installation looks like it reports whether the grid is present. Pick the one that does; it feeds the Grid tab.",
           "rated_power": "The inverter's continuous rated power in watts, from its nameplate. Load bands and overload episodes are measured against it. For a SUN-12K this is 12000.",
           "rated_power_per_phase": "Optional. The per-phase limit in watts. Leave empty to assume a third of the rated power — the analytics will say when it has assumed.",
           "battery_capacity": "Usable capacity in kWh. Used to count equivalent full cycles.",

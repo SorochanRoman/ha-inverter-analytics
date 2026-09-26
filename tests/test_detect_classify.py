@@ -2,10 +2,12 @@
 
 from custom_components.inverter_analytics.detect import (
     CT_CHOICE,
+    GRID_CHOICE,
     Cluster,
     SensorInfo,
     classify,
     cluster_sensors,
+    grid_candidates,
 )
 from tests.fixtures.solarman_entities import SOLARMAN_SENSORS
 
@@ -177,3 +179,47 @@ def test_the_ct_question_carries_the_field_it_is_asked_through():
     ambiguity = classify(cluster).ambiguities[0]
     assert ambiguity.key == CT_CHOICE
     assert ambiguity.role == "grid_power_phase"
+
+
+def binary(entity_id: str, device_class: str | None = None) -> SensorInfo:
+    return SensorInfo(
+        entity_id=entity_id, device_class=device_class, unit=None, state_class=None, device_id=None
+    )
+
+
+def test_grid_candidates_are_binary_sensors_whose_name_says_so():
+    sensors = [
+        *SOLARMAN_SENSORS,
+        binary("binary_sensor.grid_connected"),
+        binary("binary_sensor.deye_on_grid"),
+        binary("binary_sensor.front_door"),
+        binary("binary_sensor.grid_alarm"),
+    ]
+    assert grid_candidates(sensors) == (
+        "binary_sensor.deye_on_grid",
+        "binary_sensor.grid_connected",
+    )
+
+
+def test_a_lone_grid_presence_sensor_is_offered_to_the_cluster():
+    detection = classify(_solarman(), shared=("binary_sensor.grid_connected",))
+    assert detection.mapping["grid_connected"] == ("binary_sensor.grid_connected",)
+
+
+def test_two_grid_presence_sensors_become_a_question():
+    detection = classify(
+        _solarman(), shared=("binary_sensor.grid_connected", "binary_sensor.on_grid")
+    )
+    assert "grid_connected" not in detection.mapping
+    question = next(a for a in detection.ambiguities if a.role == "grid_connected")
+    assert question.key == GRID_CHOICE
+    assert question.options == {
+        "binary_sensor.grid_connected": ("binary_sensor.grid_connected",),
+        "binary_sensor.on_grid": ("binary_sensor.on_grid",),
+    }
+
+
+def test_no_candidate_leaves_the_role_empty_and_asks_nothing():
+    detection = classify(_solarman())
+    assert "grid_connected" not in detection.mapping
+    assert all(a.role != "grid_connected" for a in detection.ambiguities)

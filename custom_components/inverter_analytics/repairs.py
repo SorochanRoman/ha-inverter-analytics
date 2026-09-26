@@ -20,7 +20,7 @@ import voluptuous as vol
 
 from .config_flow import pack, unpack
 from .const import DOMAIN
-from .detect import classify, cluster_sensors, collect_sensors
+from .detect import classify, cluster_sensors, collect_sensors, grid_candidates
 from .issues import UNMAPPED_SENSORS
 from .remap import fed_by, fill, matching_cluster, offered_ids, wanted_fill
 from .roles import EntryConfig
@@ -46,8 +46,13 @@ class UnmappedSensorsFlow(RepairsFlow):
             return self.async_abort(reason="entry_gone")
 
         config = EntryConfig.from_entry(entry)
-        cluster = matching_cluster(cluster_sensors(collect_sensors(self.hass)), config)
-        filled = wanted_fill(config, fill(classify(cluster), config)) if cluster else {}
+        sensors = collect_sensors(self.hass)
+        cluster = matching_cluster(cluster_sensors(sensors), config)
+        filled = (
+            wanted_fill(config, fill(classify(cluster, grid_candidates(sensors)), config))
+            if cluster
+            else {}
+        )
         if not filled:
             # Mapped by hand in the meantime, or the sensors are gone. Either
             # way the card is stale and closing it is the honest outcome.

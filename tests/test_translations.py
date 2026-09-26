@@ -8,7 +8,7 @@ import json
 import pathlib
 
 from custom_components.inverter_analytics.config_flow import build_schema
-from custom_components.inverter_analytics.detect import CT_CHOICE
+from custom_components.inverter_analytics.detect import CT_CHOICE, GRID_CHOICE
 
 TRANSLATIONS = pathlib.Path("custom_components/inverter_analytics/translations/en.json")
 
@@ -47,6 +47,7 @@ def test_every_schema_field_has_a_description():
 def test_the_confirm_step_covers_its_extra_field():
     confirm = _step("confirm")
     assert CT_CHOICE in confirm["data"]
+    assert GRID_CHOICE in confirm["data"]
     assert "{no_statistics}" in confirm["description"]
 
 
@@ -54,6 +55,7 @@ def test_the_detected_reconfigure_step_covers_the_same_extra_field():
     """It substitutes the same question into the same schema the wizard does."""
     detected = _step("reconfigure_detected")
     assert CT_CHOICE in detected["data"]
+    assert GRID_CHOICE in detected["data"]
     for placeholder in ("{found}", "{no_statistics}"):
         assert placeholder in detected["description"]
 
@@ -84,7 +86,7 @@ def test_no_step_labels_a_field_it_does_not_render():
     questions that stand in for a picker rather than being added to it.
     """
     for name, shape in STEP_SHAPES.items():
-        allowed = _schema_keys(**shape) | {CT_CHOICE}
+        allowed = _schema_keys(**shape) | {CT_CHOICE, GRID_CHOICE}
         for block in ("data", "data_description"):
             assert set(_step(name)[block]) <= allowed, f"{name}.{block} labels an absent field"
 

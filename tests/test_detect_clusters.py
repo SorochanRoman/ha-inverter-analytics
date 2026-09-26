@@ -117,3 +117,16 @@ def test_the_same_three_sensors_are_trusted_when_a_device_vouches_for_them():
         )
     )
     assert len(cluster_sensors(vouched)) == 1
+
+
+def test_a_binary_sensor_never_joins_a_cluster_even_with_a_power_class():
+    """binary_sensor has a device class called power too — "power detected"."""
+    binary = SensorInfo(
+        entity_id="binary_sensor.solarman_grid_connected",
+        device_class="power",
+        unit=None,
+        state_class=None,
+        device_id=None,
+    )
+    clusters = {c.key: c for c in cluster_sensors([*SOLARMAN_SENSORS, binary])}
+    assert all(s.entity_id != binary.entity_id for s in clusters["solarman"].sensors)
