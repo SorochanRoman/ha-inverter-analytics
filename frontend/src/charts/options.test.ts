@@ -415,6 +415,19 @@ describe("outage charts", () => {
     expect((option.xAxis as { data: string[] }).data).toEqual(["01-01", "01-02"]);
   });
 
+  it("names the outages that began on a day in the tooltip", () => {
+    // The count is the second by-day requirement and has no axis of its own.
+    const tooltip = outageDaysOption(days).tooltip as {
+      formatter: (params: { name: string; value: number; dataIndex: number }[]) => string;
+    };
+    const text = tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }]);
+    expect(text).toContain("01-01");
+    expect(text).toContain("2 h");
+    expect(text).toContain("2 outages began");
+    const quiet = tooltip.formatter([{ name: "01-02", value: 0, dataIndex: 1 }]);
+    expect(quiet).toContain("no outages began");
+  });
+
   it("draws the share of measured time per hour, with an unmeasured hour left empty", () => {
     const option = outageHoursOption(hours);
     const data = (option.series as { data: (number | null)[] }[])[0].data;

@@ -412,6 +412,19 @@ export function outageDaysOption(days: GridDay[]): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   return {
     ...base,
+    tooltip: {
+      ...(base.tooltip as Record<string, unknown>),
+      // How many outages began on a day is the other thing the by-day view has
+      // to answer, and a second axis for a count of two or three would cost
+      // more than it says. The tooltip is where it fits.
+      formatter: (params: { name: string; value: number; dataIndex: number }[]) => {
+        const point = params[0];
+        const count = days[point.dataIndex].count;
+        const began =
+          count === 0 ? "no outages began" : `${count} outage${count === 1 ? "" : "s"} began`;
+        return `${point.name}<br/>${point.value} h without grid<br/>${began}`;
+      },
+    },
     xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
     yAxis: { ...axis, type: "value", name: "hours" },
     series: [

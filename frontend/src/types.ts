@@ -321,7 +321,12 @@ export interface GridDay {
   count: number;
 }
 
-export type AutonomyReason = "no_soc" | "no_outages" | "too_little_evidence" | "no_net_discharge";
+export type AutonomyReason =
+  | "no_soc"
+  | "no_outages"
+  | "no_soc_in_outages"
+  | "too_little_evidence"
+  | "no_net_discharge";
 
 export interface Autonomy {
   rate_pct_per_hour: number | null;
@@ -335,7 +340,10 @@ export interface Autonomy {
 
 export interface GridKpi {
   count: number;
+  /** Measured absence only; the bridged gaps below are not in it. */
   off_seconds: number;
+  /** Gaps bridged inside outages, which longest_seconds and mean_seconds include. */
+  bridged_seconds: number;
   off_share: number | null;
   longest_seconds: number | null;
   longest_start: string | null;
