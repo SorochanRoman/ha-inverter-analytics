@@ -156,10 +156,13 @@ banner whenever it is in this mode:
 > outage, and a daytime outage the sun covers is not seen at all. Map a
 > sensor that reports grid presence to measure instead.
 
-Brief interruptions and gap bridging are not reported in this mode — neither
-has a meaning when the outages themselves are a guess. The payload's `source`
-is `"inferred"` rather than `"sensor"`, and every section that shows a number
-from it inherits the banner rather than repeating it.
+Brief interruptions are not reported in this mode — a flicker cannot be
+inferred, so a count of them would mean nothing. Gap bridging does apply, here
+as for a measured series: a Home Assistant restart cuts an inferred episode
+exactly as it cuts a measured one, and against the five-minute floor, not
+bridging would discard both halves of an outage long enough to count. The
+payload's `source` is `"inferred"` rather than `"sensor"`, and every section
+that shows a number from it inherits the banner rather than repeating it.
 
 `grid_zero_w` is a new advanced option — a current-transformer reading is
 never quite zero, and how far from zero depends on the clamp — defaulting to
