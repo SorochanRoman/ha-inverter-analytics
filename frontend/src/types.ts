@@ -288,3 +288,80 @@ export interface BalancePayload {
   window: { start: string; end: string };
   clamped: boolean;
 }
+
+export type OutageSource = "sensor" | "inferred";
+
+export interface OutageEpisode {
+  start: string;
+  end: string;
+  seconds: number;
+  /** Data gaps inside the outage that were assumed to be part of it. */
+  bridged_seconds: number;
+  started_before_window: boolean;
+  ongoing: boolean;
+  /** Present only when a state-of-charge sensor is mapped. */
+  soc_start?: number | null;
+  soc_end?: number | null;
+  soc_min?: number | null;
+  below_low?: boolean | null;
+  /** Present only when a load sensor is mapped. */
+  load_mean_w?: number | null;
+}
+
+export interface GridHour {
+  hour: number;
+  off_seconds: number;
+  measured_seconds: number;
+}
+
+export interface GridDay {
+  day: string;
+  off_seconds: number;
+  measured_seconds: number;
+  count: number;
+}
+
+export type AutonomyReason = "no_soc" | "no_outages" | "too_little_evidence" | "no_net_discharge";
+
+export interface Autonomy {
+  rate_pct_per_hour: number | null;
+  evidence_hours: number;
+  hours_from_full: number | null;
+  hours_from_now: number | null;
+  soc_now: number | null;
+  load_mean_w: number | null;
+  reason: AutonomyReason | null;
+}
+
+export interface GridKpi {
+  count: number;
+  off_seconds: number;
+  off_share: number | null;
+  longest_seconds: number | null;
+  longest_start: string | null;
+  mean_seconds: number | null;
+  /** Null in inferred mode, where a flicker cannot be seen. */
+  brief_interruptions: number | null;
+}
+
+export interface GridPayload {
+  source: OutageSource;
+  /** Where counting begins when the window reaches past the recorder's retention. */
+  counted_from: string | null;
+  coverage: number;
+  measured_seconds: number;
+  low_pct: number;
+  has_soc: boolean;
+  has_load: boolean;
+  kpi: GridKpi;
+  hours: GridHour[];
+  days: GridDay[];
+  episodes: OutageEpisode[];
+  autonomy: Autonomy;
+  series: Record<string, SeriesInfo>;
+  precision: Precision;
+  boundary: string | null;
+  timezone: string;
+  window: { start: string; end: string };
+  clamped: boolean;
+}

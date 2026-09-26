@@ -5,6 +5,8 @@ import type {
   BalanceDay,
   Band,
   BatteryPayload,
+  GridDay,
+  GridHour,
   HourBucket,
   Imbalance,
   LoadPayload,
@@ -24,6 +26,8 @@ import {
   monthHourHeatmapOption,
   monthLabel,
   monthlyOption,
+  outageDaysOption,
+  outageHoursOption,
   partsOption,
   socBandsOption,
   socHistogramOption,
@@ -389,5 +393,41 @@ describe("flow colours", () => {
     const colours = option.series.map((s: any) => s.itemStyle.color);
     expect(new Set(colours).size).toBe(colours.length);
     expect(colours).not.toContain(SERIES.overload);
+  });
+});
+
+describe("outage charts", () => {
+  const days: GridDay[] = [
+    { day: "2026-01-01", off_seconds: 7200, measured_seconds: 86400, count: 2 },
+    { day: "2026-01-02", off_seconds: 0, measured_seconds: 86400, count: 0 },
+  ];
+  const hours: GridHour[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    off_seconds: hour === 20 ? 1800 : 0,
+    measured_seconds: hour === 5 ? 0 : 3600,
+  }));
+
+  it("draws hours without grid per day, in the overload colour", () => {
+    const option = outageDaysOption(days);
+    const series = option.series as { data: unknown[]; itemStyle: { color: string } }[];
+    expect(series[0].data).toEqual([2, 0]);
+    expect(series[0].itemStyle.color).toBe(SERIES.overload);
+    expect((option.xAxis as { data: string[] }).data).toEqual(["01-01", "01-02"]);
+  });
+
+  it("draws the share of measured time per hour, with an unmeasured hour left empty", () => {
+    const option = outageHoursOption(hours);
+    const data = (option.series as { data: (number | null)[] }[])[0].data;
+    expect(data[20]).toBe(50);
+    expect(data[5]).toBeNull();
+    expect(data[0]).toBe(0);
+  });
+
+  it("uses only keys the registered components can render", () => {
+    for (const option of [outageDaysOption(days), outageHoursOption(hours)]) {
+      for (const key of Object.keys(option)) {
+        expect(SUPPORTED_OPTION_KEYS.has(key), key).toBe(true);
+      }
+    }
   });
 });

@@ -3,6 +3,8 @@ import type {
   BalanceDay,
   Band,
   BatteryPayload,
+  GridDay,
+  GridHour,
   HourBucket,
   Imbalance,
   LoadPayload,
@@ -403,5 +405,46 @@ export function dailyFlowsOption(
       // A day the counter has no accounting for stays a hole, not a zero.
       data: days.map((day) => (role in day.flows ? round(day.flows[role], 3) : null)),
     })),
+  };
+}
+
+export function outageDaysOption(days: GridDay[]): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  return {
+    ...base,
+    xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
+    yAxis: { ...axis, type: "value", name: "hours" },
+    series: [
+      {
+        type: "bar",
+        // Days the sensor had no data for are not in the list at all, so
+        // every bar here stands on measured time.
+        data: days.map((day) => round(day.off_seconds / 3600, 2)),
+        itemStyle: { color: SERIES.overload },
+      },
+    ],
+  };
+}
+
+export function outageHoursOption(hours: GridHour[]): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  return {
+    ...base,
+    xAxis: { ...axis, type: "category", data: hours.map((item) => `${item.hour}`) },
+    yAxis: { ...axis, type: "value", name: "% of measured time", min: 0, max: 100 },
+    series: [
+      {
+        type: "bar",
+        // A share rather than raw hours: under uneven coverage raw hours
+        // compare an hour the recorder saw ten times with one it saw twice.
+        // An hour with no measured time stays a hole, not a zero.
+        data: hours.map((item) =>
+          item.measured_seconds > 0
+            ? round((item.off_seconds / item.measured_seconds) * 100, 2)
+            : null,
+        ),
+        itemStyle: { color: SERIES.overload },
+      },
+    ],
   };
 }

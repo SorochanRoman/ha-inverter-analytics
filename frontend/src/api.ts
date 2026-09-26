@@ -2,6 +2,7 @@ import type {
   BalancePayload,
   BatteryPayload,
   ConfigResult,
+  GridPayload,
   HomeAssistant,
   LoadPayload,
   SeasonalityPayload,
@@ -63,6 +64,20 @@ export function fetchBalance(
 ): Promise<BalancePayload> {
   return hass.connection.sendMessagePromise<BalancePayload>({
     type: "inverter_analytics/balance",
+    entry_id: entryId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  });
+}
+
+export function fetchGrid(
+  hass: HomeAssistant,
+  entryId: string,
+  start: Date,
+  end: Date,
+): Promise<GridPayload> {
+  return hass.connection.sendMessagePromise<GridPayload>({
+    type: "inverter_analytics/grid",
     entry_id: entryId,
     start: start.toISOString(),
     end: end.toISOString(),
