@@ -198,10 +198,10 @@ it and will never offer an update. From the directory holding
 
 ```bash
 curl -L -o release.tar.gz \
-  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.3.0.tar.gz
+  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.4.0.tar.gz
 rm -rf custom_components/inverter_analytics
 tar -xzf release.tar.gz --strip-components=2 -C custom_components \
-    ha-inverter-analytics-0.3.0/custom_components/inverter_analytics
+    ha-inverter-analytics-0.4.0/custom_components/inverter_analytics
 rm release.tar.gz
 ```
 
