@@ -2,8 +2,8 @@
 
 Everything here works from a binary series — one while the grid is present,
 zero while it is absent, a gap where nobody knows — that has already been
-read. build_grid_payload touches no Home Assistant API; async_grid_analytics,
-added in a later task, is the thin layer that reads the sensors.
+read. build_grid_payload touches no Home Assistant API; async_grid_analytics
+is the thin layer that reads the sensors.
 """
 
 from __future__ import annotations
@@ -14,6 +14,11 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
+from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
+
+from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT, DEFAULT_GRID_ZERO_W
+from ..roles import EntryConfig
 from .battery import restrict
 from .resample import (
     AlignedInterval,
@@ -27,7 +32,15 @@ from .resample import (
     time_weighted_mean,
     to_intervals,
 )
-from .source import Window
+from .source import (
+    Precision,
+    SeriesResult,
+    Window,
+    async_binary_series,
+    async_series_many,
+    countable_window,
+    describe_series,
+)
 
 # The same floor every other episode on the page uses. Shorter interruptions
 # are real and are counted, but as a figure of their own rather than as rows.
@@ -419,3 +432,85 @@ def build_grid_payload(
         "episodes": episodes,
         "autonomy": _autonomy(episodes, soc, low_pct),
     }
+
+
+async def async_grid_analytics(
+    hass: HomeAssistant, config: EntryConfig, window: Window
+) -> dict[str, Any]:
+    """Read the sensors and compute the outage analytics.
+
+    Raw states only, whichever mode: a binary sensor has no statistics, and
+    an hourly mean of grid power cannot say when inside the hour it was zero.
+    """
+    countable = countable_window(hass, window)
+    presence_id = config.entity_id("grid_connected")
+    battery_id = config.entity_id("battery_power")
+    grid_id = config.entity_id("grid_power")
+    phase_ids = config.entity_ids("grid_power_phase")
+
+    if presence_id:
+        source = SOURCE_SENSOR
+    elif battery_id and (grid_id or phase_ids):
+        source = SOURCE_INFERRED
+    else:
+        raise ValueError(
+            "grid_connected is not configured, and outages cannot be inferred "
+            "without grid power and battery power"
+        )
+
+    soc_id = config.entity_id("battery_soc")
+    load_id = config.entity_id("load_power")
+    numeric = [entity_id for entity_id in (soc_id, load_id) if entity_id]
+    signs: dict[str, float] = {}
+    if source == SOURCE_INFERRED:
+        flow_ids = [grid_id] if grid_id else list(phase_ids)
+        numeric += [battery_id, *flow_ids]
+        signs[battery_id] = config.sign("battery_power")
+        signs |= {
+            entity_id: config.sign("grid_power" if grid_id else "grid_power_phase")
+            for entity_id in flow_ids
+        }
+
+    results = await async_series_many(hass, numeric, countable.window, signs) if numeric else {}
+
+    if source == SOURCE_SENSOR:
+        grid = await async_binary_series(hass, presence_id, countable.window)
+        series_block = {
+            "grid_connected": describe_series(presence_id, SeriesResult(grid, Precision.RAW, None))
+        }
+    else:
+        flows = [results[entity_id].series for entity_id in flow_ids]
+        grid = infer_grid_series(
+            flows[0] if grid_id else sum_series(flows),
+            results[battery_id].series,
+            zero_w=config.number("grid_zero_w") or DEFAULT_GRID_ZERO_W,
+            idle_w=config.number("battery_idle_w") or DEFAULT_BATTERY_IDLE_W,
+        )
+        series_block = {
+            "battery_power": describe_series(battery_id, results[battery_id]),
+            **{
+                f"grid_{index + 1}": describe_series(eid, results[eid])
+                for index, eid in enumerate(flow_ids)
+            },
+        }
+
+    zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
+    payload = build_grid_payload(
+        grid,
+        window=countable.window,
+        tz=zone,
+        source=source,
+        low_pct=config.number("battery_low_pct") or DEFAULT_BATTERY_LOW_PCT,
+        soc=results[soc_id].series if soc_id else None,
+        load=results[load_id].series if load_id else None,
+        counted_from=countable.counted_from,
+    )
+    if soc_id:
+        series_block["battery_soc"] = describe_series(soc_id, results[soc_id])
+    if load_id:
+        series_block["load_total"] = describe_series(load_id, results[load_id])
+    payload["series"] = series_block
+    payload["precision"] = Precision.RAW.value
+    payload["boundary"] = None
+    payload["timezone"] = str(zone)
+    return payload

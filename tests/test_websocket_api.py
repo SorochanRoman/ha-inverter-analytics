@@ -3,7 +3,7 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.recorder.common import (
@@ -311,6 +311,7 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         "ws_battery",
         "ws_seasonality",
         "ws_balance",
+        "ws_grid",
     ]
 
 
@@ -529,3 +530,136 @@ async def test_balance_command_says_what_to_map_when_nothing_is(
     assert response["success"] is False
     assert response["error"]["code"] == "invalid_config"
     assert "energy counters" in response["error"]["message"]
+
+
+async def test_grid_command_counts_outages_from_the_presence_sensor(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "grid_connected": ["binary_sensor.grid"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("binary_sensor.grid", "on")
+    await async_wait_recording_done(hass)
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/grid",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(hours=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["source"] == "sensor"
+    assert result["precision"] == "raw"
+    assert result["kpi"]["count"] == 0
+    assert result["measured_seconds"] > 0
+    assert result["has_load"] is True and result["has_soc"] is False
+    assert result["series"]["grid_connected"]["entity_id"] == "binary_sensor.grid"
+
+
+async def test_grid_command_says_what_to_map_when_nothing_is(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/grid",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "invalid_config"
+    assert "grid_connected" in response["error"]["message"]
+
+
+async def test_grid_command_infers_from_the_flows_without_a_presence_sensor(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The fallback mode: no grid_connected, but the flows can be read.
+
+    Per-phase grid power, because no preset offers a total for it, so the
+    phases have to be summed before presence can be guessed at.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {
+                "battery_power": ["sensor.battery_power"],
+                "grid_power_phase": ["sensor.grid_l1", "sensor.grid_l2"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    end = dt_util.utcnow()
+    values = {"sensor.battery_power": "-2000", "sensor.grid_l1": "0", "sensor.grid_l2": "0"}
+
+    def states(hass, entity_ids, window):
+        """Half an hour of discharging with nothing crossing the connection."""
+        return {
+            entity_id: [
+                State(entity_id, values[entity_id], last_changed=end - timedelta(minutes=30))
+            ]
+            for entity_id in entity_ids
+        }
+
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source._read_raw_states",
+        side_effect=states,
+    ):
+        await client.send_json_auto_id(
+            {
+                "type": "inverter_analytics/grid",
+                "entry_id": entry.entry_id,
+                "start": (end - timedelta(hours=1)).isoformat(),
+                "end": end.isoformat(),
+            }
+        )
+        response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["source"] == "inferred"
+    assert result["precision"] == "raw"
+    assert result["kpi"]["count"] == 1
+    assert result["kpi"]["off_seconds"] == 1800.0
+    # A flicker cannot be inferred, so there is no count of brief ones either.
+    assert result["kpi"]["brief_interruptions"] is None
+    assert result["episodes"][0]["ongoing"] is True
+    assert result["has_soc"] is False and result["has_load"] is False
+    assert sorted(result["series"]) == ["battery_power", "grid_1", "grid_2"]

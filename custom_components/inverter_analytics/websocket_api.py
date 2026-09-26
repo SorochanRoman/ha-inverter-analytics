@@ -14,6 +14,7 @@ import voluptuous as vol
 
 from .analytics.balance import async_balance_analytics
 from .analytics.battery import async_battery_analytics
+from .analytics.grid import async_grid_analytics
 from .analytics.load import async_load_analytics
 from .analytics.seasonality import async_seasonality_analytics
 from .analytics.source import Window, raw_available_from
@@ -54,6 +55,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_battery)
     websocket_api.async_register_command(hass, ws_seasonality)
     websocket_api.async_register_command(hass, ws_balance)
+    websocket_api.async_register_command(hass, ws_grid)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -196,3 +198,14 @@ async def ws_balance(
 ) -> None:
     """Return the energy balance for a window."""
     await _async_windowed_response(hass, connection, msg, "balance", async_balance_analytics)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/grid", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_grid(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the grid outage analytics for a window."""
+    await _async_windowed_response(hass, connection, msg, "grid", async_grid_analytics)
