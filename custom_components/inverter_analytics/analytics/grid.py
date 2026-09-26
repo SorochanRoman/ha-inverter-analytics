@@ -9,16 +9,18 @@ added in a later task, is the thin layer that reads the sensors.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
 from .battery import restrict
 from .resample import (
+    AlignedInterval,
     Interval,
     Sample,
     Series,
+    align,
     coverage,
     hour_of_day_durations,
     split_local_hours,
@@ -298,6 +300,62 @@ def _autonomy(
             (soc_now - low_pct) / rate if soc_now is not None and soc_now > low_pct else None
         ),
     }
+
+
+def _aligned_to_series(
+    aligned: Sequence[AlignedInterval],
+    start: datetime,
+    end: datetime,
+    value_of: Callable[[tuple[float, ...]], float],
+) -> Series:
+    """Turn aligned intervals back into a series, with a gap wherever they break."""
+    samples: list[Sample] = []
+    previous_end: datetime | None = None
+    for item in aligned:
+        if previous_end is not None and item.start > previous_end:
+            samples.append(Sample(previous_end, None))
+        samples.append(Sample(item.start, value_of(item.values)))
+        previous_end = item.end
+    if previous_end is not None and previous_end < end:
+        samples.append(Sample(previous_end, None))
+    return Series.of(start, end, samples)
+
+
+def sum_series(parts: Sequence[Series]) -> Series:
+    """Per-phase readings added on a common timeline.
+
+    No preset produces a grid-power total, only phases; this is where the
+    "total wins" rule has nothing to apply to and the sum has to stand in.
+    A gap in any phase is a gap in the sum, as it is everywhere else here.
+    """
+    if not parts:
+        raise ValueError("nothing to sum")
+    return _aligned_to_series(align(list(parts)), parts[0].start, parts[0].end, sum)
+
+
+def infer_grid_series(
+    grid_power: Series, battery_power: Series, *, zero_w: float, idle_w: float
+) -> Series:
+    """Guess at grid presence from what the flows look like.
+
+    Off-grid when nothing crosses the grid connection while the battery is
+    discharging. This is the weakest thing on the page and the tab says so:
+    a night the battery carries the house with nothing crossing the grid
+    connection looks exactly like an outage, and a daytime outage the sun
+    covers is not seen at all. It exists for an installation that has no
+    presence sensor to map, and the banner asks for one.
+
+    battery_power arrives with the configured sign applied, so discharging
+    is negative here whatever the vendor's convention.
+    """
+
+    def presence(values: tuple[float, ...]) -> float:
+        grid, battery = values
+        return 0.0 if abs(grid) <= zero_w and battery < -idle_w else 1.0
+
+    return _aligned_to_series(
+        align([grid_power, battery_power]), grid_power.start, grid_power.end, presence
+    )
 
 
 def build_grid_payload(

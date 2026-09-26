@@ -6,9 +6,12 @@ from zoneinfo import ZoneInfo
 from custom_components.inverter_analytics.analytics.grid import (
     OUTAGE_BRIDGE_SECONDS,
     OUTAGE_MIN_SECONDS,
+    SOURCE_INFERRED,
     SOURCE_SENSOR,
     build_grid_payload,
+    infer_grid_series,
     outage_episodes,
+    sum_series,
 )
 from custom_components.inverter_analytics.analytics.resample import Sample, Series, to_intervals
 from custom_components.inverter_analytics.analytics.source import Window
@@ -274,3 +277,36 @@ def test_autonomy_reports_the_mean_load_during_the_outages():
     autonomy = build(grid, soc=soc, load=load)["autonomy"]
     # 60 minutes at 1000 W, 30 at 400 W.
     assert autonomy["load_mean_w"] == 800.0
+
+
+def test_inferred_outage_needs_zero_grid_and_a_discharging_battery():
+    grid_power = soc_series((0, 500.0), (60, 0.0), (120, 3.0), (180, 400.0))
+    battery = soc_series((0, 200.0), (60, -800.0), (120, -10.0), (150, -800.0))
+    inferred = infer_grid_series(grid_power, battery, zero_w=10.0, idle_w=50.0)
+    values = [(int((i.start - BASE).total_seconds() / 60), i.value) for i in to_intervals(inferred)]
+    # 60-120: grid at zero, battery discharging -> off.
+    # 120-150: grid at zero, battery resting -> not an outage.
+    # 150-180: grid near zero, battery discharging -> off.
+    assert values == [(0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (180, 1.0)]
+
+
+def test_a_gap_in_either_input_is_a_gap_in_the_inference():
+    grid_power = soc_series((0, 0.0), (60, None), (120, 0.0))
+    battery = soc_series((0, -800.0))
+    inferred = infer_grid_series(grid_power, battery, zero_w=10.0, idle_w=50.0)
+    starts = [int((i.start - BASE).total_seconds() / 60) for i in to_intervals(inferred)]
+    assert starts == [0, 120]
+
+
+def test_phases_are_summed_before_the_inference():
+    parts = [soc_series((0, 5.0), (60, 200.0)), soc_series((0, 3.0)), soc_series((0, -6.0))]
+    total = sum_series(parts)
+    assert [i.value for i in to_intervals(total)] == [2.0, 197.0]
+
+
+def test_inferred_mode_uses_the_longer_floor_and_reports_no_flickers():
+    grid = grid_series((0, 1.0), (60, 0.0), (63, 1.0), (100, 0.0), (110, 1.0))
+    payload = build(grid, source=SOURCE_INFERRED)
+    assert payload["source"] == "inferred"
+    assert payload["kpi"]["count"] == 1, "three minutes is under the inferred floor"
+    assert payload["kpi"]["brief_interruptions"] is None
