@@ -83,6 +83,59 @@ def states_to_samples(states: Iterable[State], sign: float) -> list[Sample]:
     return samples
 
 
+_BINARY_ON = "on"
+_BINARY_OFF = "off"
+
+
+def binary_states_to_samples(states: Iterable[State]) -> list[Sample]:
+    """Convert a binary sensor's states into samples: on is one, off is zero.
+
+    Anything else — unavailable, unknown — is a gap, never a value. An
+    integration that lost its connection has said nothing about the grid, and
+    reading its silence as an outage would count every restart as one.
+    """
+    samples: list[Sample] = []
+    for state in states:
+        raw = (state.state or "").lower()
+        if raw == _BINARY_ON:
+            value: float | None = 1.0
+        elif raw == _BINARY_OFF:
+            value = 0.0
+        else:
+            value = None
+        samples.append(Sample(state.last_changed, value))
+    return samples
+
+
+@dataclass(frozen=True, slots=True)
+class Countable:
+    """The part of a window that raw states can answer.
+
+    counted_from is the recorder's boundary when the request began before
+    it, and None when the whole window is inside retention. A window that
+    ends before the boundary has a zero-length countable part: there is
+    nothing to read, and the caller says so rather than reading nothing.
+    """
+
+    window: Window
+    counted_from: datetime | None
+
+
+def countable_window(hass: HomeAssistant, window: Window) -> Countable:
+    """Clip a window to where raw states still exist.
+
+    For a sensor with no long-term statistics — every binary sensor — this
+    is the only history there is, and a thirty-day request answered from
+    ten days without saying so is exactly the reading this project exists
+    to prevent.
+    """
+    boundary = raw_available_from(hass)
+    if window.start >= boundary:
+        return Countable(window, None)
+    start = min(boundary, window.end)
+    return Countable(Window(start, window.end), boundary)
+
+
 STATISTICS_PERIOD = timedelta(hours=1)
 
 
@@ -345,3 +398,14 @@ async def async_series(
     """Build a series of states for a window, automatically choosing the source."""
     results = await async_series_many(hass, [entity_id], window, {entity_id: sign})
     return results[entity_id].series
+
+
+async def async_binary_series(hass: HomeAssistant, entity_id: str, window: Window) -> Series:
+    """A binary sensor's states over a window, from raw states only.
+
+    Home Assistant compiles hourly statistics for numeric sensors with a
+    state_class; a binary sensor has neither, so there is no second source
+    to fall back to and no precision to choose.
+    """
+    states = await _async_raw_states(hass, [entity_id], window)
+    return Series.of(window.start, window.end, binary_states_to_samples(states.get(entity_id, [])))

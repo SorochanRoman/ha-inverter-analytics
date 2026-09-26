@@ -16,6 +16,9 @@ from custom_components.inverter_analytics.analytics.resample import (
 from custom_components.inverter_analytics.analytics.source import (
     Precision,
     Window,
+    async_binary_series,
+    binary_states_to_samples,
+    countable_window,
     plan_precision,
     raw_available_from,
     states_to_samples,
@@ -150,3 +153,52 @@ def test_statistics_do_not_run_past_the_hour_they_describe():
     assert len(intervals) == 1
     assert intervals[0].seconds == 3600.0
     assert coverage(series) == 0.1
+
+
+def test_binary_states_become_one_and_zero_and_anything_else_a_gap():
+    states = [
+        State("binary_sensor.grid", "on"),
+        State("binary_sensor.grid", "off"),
+        State("binary_sensor.grid", "unavailable"),
+        State("binary_sensor.grid", "unknown"),
+    ]
+    assert [sample.value for sample in binary_states_to_samples(states)] == [1.0, 0.0, None, None]
+
+
+@freeze_time(NOW)
+def test_countable_window_starts_where_the_recorder_does(hass: HomeAssistant, recorder_keep_days):
+    boundary = NOW - timedelta(days=10)
+
+    whole = countable_window(hass, Window(NOW - timedelta(days=30), NOW))
+    assert whole.window == Window(boundary, NOW)
+    assert whole.counted_from == boundary
+
+    recent = countable_window(hass, Window(NOW - timedelta(days=2), NOW))
+    assert recent.window == Window(NOW - timedelta(days=2), NOW)
+    assert recent.counted_from is None
+
+
+@freeze_time(NOW)
+def test_a_window_the_recorder_no_longer_holds_is_countable_for_nothing(
+    hass: HomeAssistant, recorder_keep_days
+):
+    gone = countable_window(hass, Window(NOW - timedelta(days=30), NOW - timedelta(days=20)))
+    assert gone.window.seconds == 0.0
+    assert gone.counted_from == NOW - timedelta(days=10)
+
+
+async def test_binary_series_reads_raw_states_only(hass: HomeAssistant):
+    window = Window(NOW - timedelta(hours=1), NOW)
+    states = [State("binary_sensor.grid", "off", last_changed=NOW - timedelta(minutes=30))]
+    with (
+        patch(
+            "custom_components.inverter_analytics.analytics.source._async_raw_states",
+            return_value={"binary_sensor.grid": states},
+        ) as raw,
+        patch("custom_components.inverter_analytics.analytics.source._async_lts_rows") as lts,
+    ):
+        series = await async_binary_series(hass, "binary_sensor.grid", window)
+    assert raw.called
+    assert not lts.called
+    assert series.start == window.start and series.end == window.end
+    assert [sample.value for sample in series.samples] == [0.0]
