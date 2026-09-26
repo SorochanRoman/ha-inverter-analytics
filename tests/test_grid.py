@@ -171,3 +171,106 @@ def test_the_payload_names_its_source_and_the_cutoff():
     assert payload["source"] == "sensor"
     assert payload["counted_from"] == at(-60).isoformat()
     assert build(grid_series((0, 1.0)))["counted_from"] is None
+
+
+def soc_series(*points: tuple[float, float | None], end: float = 240.0) -> Series:
+    return Series.of(BASE, at(end), [Sample(at(m), v) for m, v in points])
+
+
+def test_each_outage_carries_the_charge_in_force_at_its_start_and_end_and_its_minimum():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, 90.0), (30, 80.0), (100, 40.0), (150, 15.0), (170, 25.0), (200, 60.0))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_start"] == 80.0, "the sample before the outage is the value in force"
+    assert episode["soc_end"] == 25.0
+    assert episode["soc_min"] == 15.0
+    assert episode["below_low"] is True
+
+
+def test_a_minimum_before_the_outage_does_not_count():
+    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0))
+    soc = soc_series((0, 10.0), (30, 80.0), (90, 70.0))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_min"] == 70.0
+    assert episode["below_low"] is False
+
+
+def test_no_charge_data_inside_an_outage_is_a_dash():
+    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0))
+    soc = soc_series((0, None), (150, 50.0))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_start"] is None
+    assert episode["soc_end"] is None
+    assert episode["soc_min"] is None
+    assert episode["below_low"] is None
+
+
+def test_the_columns_are_absent_when_the_sensors_are():
+    episode = build(grid_series((0, 1.0), (60, 0.0), (120, 1.0)))["episodes"][0]
+    assert "soc_start" not in episode
+    assert "load_mean_w" not in episode
+    payload = build(grid_series((0, 1.0)))
+    assert payload["has_soc"] is False and payload["has_load"] is False
+
+
+def test_the_mean_load_during_an_outage_is_time_weighted():
+    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0))
+    load = soc_series((0, 100.0), (90, 1000.0))
+    episode = build(grid, load=load)["episodes"][0]
+    assert episode["load_mean_w"] == 550.0
+
+
+def test_autonomy_reads_the_discharge_rate_off_the_outages():
+    # Two outages, an hour each; 20 points lost in the first, 10 in the second.
+    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (210, 1.0))
+    soc = soc_series((0, 100.0), (60, 100.0), (120, 80.0), (150, 80.0), (210, 70.0), (230, 65.0))
+    autonomy = build(grid, soc=soc)["autonomy"]
+    assert autonomy["reason"] is None
+    assert autonomy["rate_pct_per_hour"] == 15.0
+    assert autonomy["evidence_hours"] == 2.0
+    # From full to the 20% mark at 15 points an hour.
+    assert autonomy["hours_from_full"] == 80.0 / 15.0
+    # From where it is now: the last known charge, 65%.
+    assert autonomy["soc_now"] == 65.0
+    assert autonomy["hours_from_now"] == 45.0 / 15.0
+
+
+def test_autonomy_is_withheld_without_a_charge_sensor():
+    assert build(grid_series((0, 1.0), (60, 0.0), (120, 1.0)))["autonomy"]["reason"] == "no_soc"
+
+
+def test_autonomy_is_withheld_without_outages():
+    autonomy = build(grid_series((0, 1.0)), soc=soc_series((0, 50.0)))["autonomy"]
+    assert autonomy["reason"] == "no_outages"
+    assert autonomy["hours_from_full"] is None
+
+
+def test_autonomy_needs_an_hour_of_evidence():
+    grid = grid_series((0, 1.0), (60, 0.0), (90, 1.0))
+    soc = soc_series((0, 100.0), (90, 80.0))
+    autonomy = build(grid, soc=soc)["autonomy"]
+    assert autonomy["reason"] == "too_little_evidence"
+    assert autonomy["evidence_hours"] == 0.5
+
+
+def test_autonomy_is_withheld_when_the_sun_covered_the_outages():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, 50.0), (180, 70.0))
+    assert build(grid, soc=soc)["autonomy"]["reason"] == "no_net_discharge"
+
+
+def test_hours_from_now_is_absent_below_the_low_mark():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, 60.0), (180, 15.0))
+    autonomy = build(grid, soc=soc)["autonomy"]
+    assert autonomy["reason"] is None
+    assert autonomy["hours_from_now"] is None
+
+
+def test_autonomy_reports_the_mean_load_during_the_outages():
+    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (180, 1.0))
+    soc = soc_series((0, 100.0), (180, 70.0))
+    load = soc_series((0, 1000.0), (150, 400.0))
+    autonomy = build(grid, soc=soc, load=load)["autonomy"]
+    # 60 minutes at 1000 W, 30 at 400 W.
+    assert autonomy["load_mean_w"] == 800.0

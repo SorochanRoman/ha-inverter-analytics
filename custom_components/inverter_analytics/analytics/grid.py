@@ -14,12 +14,15 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
+from .battery import restrict
 from .resample import (
     Interval,
+    Sample,
     Series,
     coverage,
     hour_of_day_durations,
     split_local_hours,
+    time_weighted_mean,
     to_intervals,
 )
 from .source import Window
@@ -37,6 +40,11 @@ OUTAGE_BRIDGE_SECONDS = 600.0
 # Outages inferred from power flows have their own floor. A flicker cannot be
 # inferred, and pretending to count them would be noise.
 INFERRED_MIN_SECONDS = 300.0
+
+# Below this much outage the discharge rate is one afternoon's weather.
+AUTONOMY_MIN_HOURS = 1.0
+
+SECONDS_PER_HOUR = 3600.0
 
 SOURCE_SENSOR = "sensor"
 SOURCE_INFERRED = "inferred"
@@ -175,6 +183,123 @@ def _describe(outage: Outage) -> dict[str, Any]:
     }
 
 
+def _between(series: Series, start: datetime, end: datetime) -> Series:
+    """The part of a series inside [start, end), keeping the value in force at start."""
+    clipped = restrict(series, start)
+    return Series(
+        clipped.start,
+        min(clipped.end, end),
+        tuple(sample for sample in clipped.samples if sample.ts < end),
+    )
+
+
+def _in_force(series: Series, moment: datetime) -> float | None:
+    """The value holding at a moment: the last sample at or before it.
+
+    A state persists until the next one replaces it, so the reading written
+    at the very instant the grid returned is the charge the outage ended on.
+    A gap there — the last sample being unavailable — is None, not the value
+    before the gap.
+    """
+    latest: Sample | None = None
+    for sample in series.samples:
+        if sample.ts > moment:
+            break
+        latest = sample
+    return latest.value if latest else None
+
+
+def _battery_columns(
+    outage: Outage, soc: Series | None, load: Series | None, low_pct: float
+) -> dict[str, Any]:
+    """What the battery did through one outage, from raw states.
+
+    The values at the start and the end are whatever was in force at those
+    moments, which is what the recorder means by a state; nothing is
+    interpolated across an outage. The minimum is real: this works from raw
+    states, so a fall to 8% for twenty minutes is an 8%, not the 34% an hourly
+    mean would make of it.
+    """
+    columns: dict[str, Any] = {}
+    if soc is not None:
+        part = to_intervals(_between(soc, outage.start, outage.end))
+        lowest = min((item.value for item in part), default=None)
+        columns |= {
+            "soc_start": _in_force(soc, outage.start),
+            "soc_end": _in_force(soc, outage.end),
+            "soc_min": lowest,
+            "below_low": None if lowest is None else lowest < low_pct,
+        }
+    if load is not None:
+        part = to_intervals(_between(load, outage.start, outage.end))
+        columns["load_mean_w"] = time_weighted_mean(part)
+    return columns
+
+
+def _last_known(series: Series | None) -> float | None:
+    if series is None:
+        return None
+    intervals = to_intervals(series)
+    return intervals[-1].value if intervals else None
+
+
+def _autonomy(
+    episodes: Sequence[dict[str, Any]], soc: Series | None, low_pct: float
+) -> dict[str, Any]:
+    """How long the battery would last, at the rate seen during this period's outages.
+
+    Read off the battery itself rather than multiplied out of a nameplate
+    capacity: the state of charge lost per hour of outage. Withheld, with the
+    reason, when there is nothing to read it from — and when the outages were
+    covered by the sun and the charge did not fall, because there is no
+    discharge rate in that and inventing one would be worse than saying so.
+    """
+    evidence = [
+        (item["soc_start"] - item["soc_end"], item["seconds"])
+        for item in episodes
+        if item.get("soc_start") is not None and item.get("soc_end") is not None
+    ]
+    hours = sum(seconds for _, seconds in evidence) / SECONDS_PER_HOUR
+    drop = sum(points for points, _ in evidence)
+    loads = [
+        (item["load_mean_w"], item["seconds"])
+        for item in episodes
+        if item.get("load_mean_w") is not None
+    ]
+    load_seconds = sum(seconds for _, seconds in loads)
+    result: dict[str, Any] = {
+        "rate_pct_per_hour": None,
+        "evidence_hours": hours,
+        "hours_from_full": None,
+        "hours_from_now": None,
+        "soc_now": _last_known(soc),
+        "load_mean_w": (
+            sum(watts * seconds for watts, seconds in loads) / load_seconds
+            if load_seconds
+            else None
+        ),
+        "reason": None,
+    }
+    if soc is None:
+        return result | {"reason": "no_soc"}
+    if not episodes:
+        return result | {"reason": "no_outages"}
+    if hours < AUTONOMY_MIN_HOURS:
+        return result | {"reason": "too_little_evidence"}
+    if drop <= 0:
+        return result | {"reason": "no_net_discharge"}
+
+    rate = drop / hours
+    soc_now = result["soc_now"]
+    return result | {
+        "rate_pct_per_hour": rate,
+        "hours_from_full": (100.0 - low_pct) / rate,
+        "hours_from_now": (
+            (soc_now - low_pct) / rate if soc_now is not None and soc_now > low_pct else None
+        ),
+    }
+
+
 def build_grid_payload(
     grid: Series,
     *,
@@ -201,6 +326,9 @@ def build_grid_payload(
         intervals, window=window, min_seconds=min_seconds, bridge_seconds=OUTAGE_BRIDGE_SECONDS
     )
     longest = max(outages, key=lambda item: item.seconds, default=None)
+    episodes = [
+        _describe(outage) | _battery_columns(outage, soc, load, low_pct) for outage in outages
+    ]
 
     return {
         "source": source,
@@ -230,5 +358,6 @@ def build_grid_payload(
         },
         "hours": _by_hour(intervals, tz),
         "days": _by_day(intervals, outages, tz),
-        "episodes": [_describe(outage) for outage in outages],
+        "episodes": episodes,
+        "autonomy": _autonomy(episodes, soc, low_pct),
     }
