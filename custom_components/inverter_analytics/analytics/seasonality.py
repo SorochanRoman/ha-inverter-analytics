@@ -71,7 +71,7 @@ def _month_span_seconds(year: int, month: int, tz: tzinfo) -> float:
     return (following.astimezone(UTC) - start.astimezone(UTC)).total_seconds()
 
 
-def _months_touched(window: Window, tz: tzinfo) -> dict[str, float]:
+def months_touched(window: Window, tz: tzinfo) -> dict[str, float]:
     """Every month the window reaches into, with the length of the whole month.
 
     The whole month, deliberately, not the part the window asked about. The
@@ -146,7 +146,7 @@ def build_seasonality_payload(
         pv_hourly = _Hourly()
         pv_hourly.add_all(to_intervals(pv), tz)
 
-    spans = _months_touched(window, tz)
+    spans = months_touched(window, tz)
     load_months = _by_month(load_hourly)
     load_peaks = _peak_hourly_by_month(load_hourly)
     pv_months = _by_month(pv_hourly) if pv_hourly else {}
