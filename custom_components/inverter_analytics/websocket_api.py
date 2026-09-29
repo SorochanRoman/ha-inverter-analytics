@@ -17,6 +17,7 @@ from .analytics.battery import async_battery_analytics
 from .analytics.grid import async_grid_analytics
 from .analytics.load import async_load_analytics
 from .analytics.seasonality import async_seasonality_analytics
+from .analytics.sizing import async_sizing_analytics
 from .analytics.source import Window, raw_available_from
 from .const import DATA_CACHE, DOMAIN
 from .roles import EntryConfig, feature_availability
@@ -56,6 +57,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_seasonality)
     websocket_api.async_register_command(hass, ws_balance)
     websocket_api.async_register_command(hass, ws_grid)
+    websocket_api.async_register_command(hass, ws_sizing)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -209,3 +211,14 @@ async def ws_grid(
 ) -> None:
     """Return the grid outage analytics for a window."""
     await _async_windowed_response(hass, connection, msg, "grid", async_grid_analytics)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/sizing", **_WINDOW_SCHEMA}
+)
+@websocket_api.async_response
+async def ws_sizing(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the sizing verdicts for a window."""
+    await _async_windowed_response(hass, connection, msg, "sizing", async_sizing_analytics)

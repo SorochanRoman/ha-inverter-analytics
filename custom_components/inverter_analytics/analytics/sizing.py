@@ -2,8 +2,8 @@
 
 Everything here works from hourly statistics rows that have already been
 read — the mean, floor and peak of each hour — and from the counters' hourly
-energy. Nothing touches Home Assistant until async_sizing_analytics, which a
-later task adds at the bottom of this module.
+energy. Nothing touches Home Assistant until async_sizing_analytics at the
+bottom of this module, which is the thin layer that reads the sensors.
 
 A single score is deliberately not built. It would combine three unrelated
 questions with weights nobody measured, and it would hide the one thing the
@@ -18,9 +18,21 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
+from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
+
+from ..const import DEFAULT_BATTERY_FULL_PCT, DEFAULT_BATTERY_LOW_PCT
+from ..roles import EntryConfig
 from .load import HIGH_LOAD_SHARE
 from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
-from .source import EnergySeries, HourlyRow, HourlySeries, Window
+from .source import (
+    EnergySeries,
+    HourlyRow,
+    HourlySeries,
+    Window,
+    async_energy_many,
+    async_hourly_extremes_many,
+)
 
 ENOUGH = "enough"
 BORDERLINE = "borderline"
@@ -371,3 +383,96 @@ def build_sizing_payload(
             and covered_end >= window.end
         ),
     }
+
+
+_SOLAR_ROLES = ("pv_energy_total", "load_energy_total")
+
+
+def _no_statistics(hass: HomeAssistant, entity_ids: Sequence[str]) -> list[str]:
+    """Mapped sensors that keep no statistics, because they have no state_class."""
+    gone = []
+    for entity_id in entity_ids:
+        state = hass.states.get(entity_id)
+        if state is not None and not state.attributes.get("state_class"):
+            gone.append(entity_id)
+    return gone
+
+
+async def async_sizing_analytics(
+    hass: HomeAssistant, config: EntryConfig, window: Window
+) -> dict[str, Any]:
+    """Read the statistics and compute the three verdicts."""
+    load_id = config.entity_id("load_power")
+    soc_id = config.entity_id("battery_soc")
+    rated_power = config.number("rated_power")
+    solar_ids = {role: config.entity_id(role) for role in _SOLAR_ROLES}
+    import_id = config.entity_id("grid_import_total")
+    has_solar = all(solar_ids.values())
+    # rated_power is a required role, so a missing or zero one means a
+    # corrupted entry — but read as a threshold it would put every hour "at
+    # rated" and print "short" over a system nobody measured.
+    has_rated = rated_power is not None and rated_power > 0
+
+    if not (load_id and has_rated) and not soc_id and not has_solar:
+        raise ValueError(
+            "sizing needs load_power with rated_power, or battery_soc, or the "
+            "pv_energy_total and load_energy_total counters"
+        )
+
+    low_pct = config.number("battery_low_pct") or DEFAULT_BATTERY_LOW_PCT
+    full_pct = config.number("battery_full_pct") or DEFAULT_BATTERY_FULL_PCT
+    # Both marks are user-editable, and crossed they make every day full and
+    # low at once — a battery judged "short" by arithmetic alone. The card
+    # says which pair is wrong instead of pretending to a verdict.
+    thresholds_inverted = full_pct <= low_pct
+
+    judged_load = load_id if has_rated else None
+    judged_soc = None if thresholds_inverted else soc_id
+    extremes = await async_hourly_extremes_many(
+        hass, [entity_id for entity_id in (judged_load, judged_soc) if entity_id], window
+    )
+    energy_ids = {role: entity_id for role, entity_id in solar_ids.items() if entity_id}
+    if has_solar and import_id:
+        energy_ids["grid_import_total"] = import_id
+    energy: dict[str, EnergySeries] = {}
+    if has_solar:
+        energy_by_id = await async_energy_many(hass, list(energy_ids.values()), window)
+        energy = {role: energy_by_id[entity_id] for role, entity_id in energy_ids.items()}
+
+    zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
+    payload = build_sizing_payload(
+        window=window,
+        tz=zone,
+        rated_power=rated_power or 0.0,
+        load=extremes.get(judged_load) if judged_load else None,
+        soc=extremes.get(judged_soc) if judged_soc else None,
+        energy=energy,
+        low_pct=low_pct,
+        full_pct=full_pct,
+    )
+    payload["cards"] = {
+        "inverter": {
+            "missing": ([] if load_id else ["load_power"]) + ([] if has_rated else ["rated_power"]),
+            "no_statistics": _no_statistics(hass, [load_id] if load_id else []),
+        },
+        "battery": {
+            "missing": [] if soc_id else ["battery_soc"],
+            "no_statistics": _no_statistics(hass, [soc_id] if soc_id else []),
+            "thresholds_inverted": thresholds_inverted,
+        },
+        "solar": {
+            "missing": [role for role, entity_id in solar_ids.items() if not entity_id],
+            "no_statistics": _no_statistics(hass, list(energy_ids.values())),
+        },
+    }
+    payload["entities"] = {
+        role: entity_id
+        for role, entity_id in {"load_power": load_id, "battery_soc": soc_id, **energy_ids}.items()
+        if entity_id
+    }
+    payload["timezone"] = str(zone)
+    # Statistics whatever the window: there is no precision choice to report,
+    # but the badge exists on every tab and its absence would look like an omission.
+    payload["precision"] = "lts"
+    payload["boundary"] = None
+    return payload

@@ -313,6 +313,7 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         "ws_seasonality",
         "ws_balance",
         "ws_grid",
+        "ws_sizing",
     ]
 
 
@@ -682,3 +683,164 @@ async def test_grid_command_infers_from_the_flows_without_a_presence_sensor(
     assert result["episodes"][0]["ongoing"] is True
     assert result["has_soc"] is False and result["has_load"] is False
     assert sorted(result["series"]) == expected_series
+
+
+async def test_sizing_command_returns_the_period_and_months(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {"load_power": ["sensor.load_power"], "battery_soc": ["sensor.soc"]},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.load_power", "1500", {"state_class": "measurement"})
+    # A charge sensor with no state_class keeps no statistics at all.
+    hass.states.async_set("sensor.soc", "80")
+
+    end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    rows = {
+        "sensor.load_power": [
+            {"start": end - timedelta(hours=2), "mean": 1500.0, "min": 900.0, "max": 7000.0}
+        ]
+    }
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ):
+        await client.send_json_auto_id(
+            {
+                "type": "inverter_analytics/sizing",
+                "entry_id": entry.entry_id,
+                "start": (end - timedelta(days=1)).isoformat(),
+                "end": end.isoformat(),
+            }
+        )
+        response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["precision"] == "lts"
+    assert result["timezone"] == "Europe/Kyiv"
+    assert result["period"]["inverter"]["verdict"] == "borderline"
+    assert result["period"]["battery"]["reason"] == "no_data"
+    assert result["period"]["solar"] is None
+    assert result["cards"]["inverter"]["missing"] == []
+    assert result["cards"]["battery"]["no_statistics"] == ["sensor.soc"]
+    assert result["cards"]["battery"]["thresholds_inverted"] is False
+    assert result["cards"]["solar"]["missing"] == ["pv_energy_total", "load_energy_total"]
+    assert result["months"], "a one-day window touches at least one month"
+
+
+async def test_sizing_command_says_what_to_map_when_nothing_is(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bare",
+        data={"entities": {}, "numbers": {"rated_power": 8000.0}, "inverted": []},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/sizing",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+    assert response["success"] is False
+    assert response["error"]["code"] == "invalid_config"
+    assert "load_power" in response["error"]["message"]
+
+
+async def test_sizing_without_a_usable_rated_power_cannot_judge_the_inverter(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Rated zero would read every hour as "at rated"; the card names the number instead."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="No rating",
+        data={
+            "entities": {"load_power": ["sensor.load_power"], "battery_soc": ["sensor.soc"]},
+            "numbers": {"rated_power": 0.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/sizing",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["period"]["inverter"] is None
+    assert result["cards"]["inverter"]["missing"] == ["rated_power"]
+
+
+async def test_sizing_withholds_the_battery_card_when_full_is_below_low(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """An inverted pair of thresholds makes every day both full and low."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Crossed thresholds",
+        data={
+            "entities": {"battery_soc": ["sensor.soc"]},
+            "numbers": {
+                "rated_power": 8000.0,
+                "battery_low_pct": 90.0,
+                "battery_full_pct": 50.0,
+            },
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/sizing",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["period"]["battery"] is None
+    assert result["cards"]["battery"] == {
+        "missing": [],
+        "no_statistics": [],
+        "thresholds_inverted": True,
+    }
