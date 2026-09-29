@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
@@ -178,25 +179,52 @@ def solar_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _energy_by_month(series: EnergySeries | None, tz: tzinfo) -> dict[str, float]:
-    """A counter's hourly changes summed into the local month each hour starts in."""
+@dataclass(frozen=True, slots=True)
+class _Counters:
+    """What the energy counters contribute to one span, with the hours behind it.
+
+    The hours are carried beside the kilowatt-hours because a counter that is
+    mapped but has no statistics for the span sums to zero, and zero
+    production is a verdict where no production data is not one.
+    """
+
+    pv_kwh: float
+    load_kwh: float
+    import_kwh: float | None
+    pv_hours: int
+    consumption_hours: int
+
+
+def _energy_by_month(
+    series: EnergySeries | None, tz: tzinfo
+) -> tuple[dict[str, float], dict[str, int]]:
+    """A counter's hours summed into the local month each starts in, and counted there."""
     totals: dict[str, float] = defaultdict(float)
+    hours: dict[str, int] = defaultdict(int)
     for row in series.rows if series else ():
-        totals[month_key(row.start.astimezone(tz))] += row.change
-    return totals
+        key = month_key(row.start.astimezone(tz))
+        totals[key] += row.change
+        hours[key] += 1
+    return totals, hours
+
+
+def _coverage(measured_hours: float, span_hours: float) -> float:
+    """The share of a span that has rows behind it, never above one."""
+    return min(measured_hours / span_hours, 1.0) if span_hours > 0 else 0.0
 
 
 def _solar_block(
-    energy: Mapping[str, EnergySeries],
-    pv_kwh: float,
-    load_kwh: float,
-    import_kwh: float | None,
-    battery: Mapping[str, Any] | None,
+    energy: Mapping[str, EnergySeries], counters: _Counters, battery: Mapping[str, Any] | None
 ) -> dict[str, Any] | None:
     """The solar card, or None when the two counters it needs are not mapped."""
     if "pv_energy_total" not in energy or "load_energy_total" not in energy:
         return None
-    return solar_verdict(solar_evidence(pv_kwh, load_kwh, import_kwh, battery))
+    evidence = solar_evidence(counters.pv_kwh, counters.load_kwh, counters.import_kwh, battery)
+    if counters.pv_hours == 0:
+        # A counter with no rows for this span sums to zero, and reading that
+        # as a month without sun would print "short" over an unmeasured month.
+        return withheld("no_data", evidence)
+    return solar_verdict(evidence)
 
 
 def _covered(
@@ -227,62 +255,99 @@ def build_sizing_payload(
     evidence with the same rules, never by averaging the months — a year with
     one short month is a year in which the inverter was short for a month,
     and the strip says which one.
+
+    Every card carries the coverage of the sensors it was read from, which is
+    not the month's: a full month of load beside twelve days of charge would
+    otherwise present the battery verdict under a full-month banner.
     """
-    load_rows = load.rows if load else ()
-    soc_rows = soc.rows if soc else ()
+    load_rows = load.rows if load is not None else ()
+    soc_rows = soc.rows if soc is not None else ()
     load_months = rows_by_month(load_rows, tz)
     soc_months = rows_by_month(soc_rows, tz)
-    pv_months = _energy_by_month(energy.get("pv_energy_total"), tz)
-    consumption_months = _energy_by_month(energy.get("load_energy_total"), tz)
+    pv_months, pv_month_hours = _energy_by_month(energy.get("pv_energy_total"), tz)
+    consumption_months, consumption_month_hours = _energy_by_month(
+        energy.get("load_energy_total"), tz
+    )
     import_series = energy.get("grid_import_total")
-    import_months = _energy_by_month(import_series, tz)
+    import_months, _import_month_hours = _energy_by_month(import_series, tz)
 
     def judge(
         load_part: Sequence[HourlyRow],
         soc_part: Sequence[HourlyRow],
-        pv_kwh: float,
-        load_kwh: float,
-        import_kwh: float | None,
+        counters: _Counters,
+        *,
+        span_hours: float,
     ) -> dict[str, Any]:
         battery = (
-            battery_evidence(soc_part, tz, low_pct=low_pct, full_pct=full_pct) if soc else None
+            battery_evidence(soc_part, tz, low_pct=low_pct, full_pct=full_pct)
+            if soc is not None
+            else None
         )
-        return {
+        blocks: dict[str, dict[str, Any] | None] = {
             "inverter": (
-                inverter_verdict(inverter_evidence(load_part, rated_power)) if load else None
+                inverter_verdict(inverter_evidence(load_part, rated_power))
+                if load is not None
+                else None
             ),
             "battery": battery_verdict(battery) if battery is not None else None,
-            "solar": _solar_block(energy, pv_kwh, load_kwh, import_kwh, battery),
+            "solar": _solar_block(energy, counters, battery),
         }
+        measured = {
+            "inverter": len(load_part),
+            "battery": len(soc_part),
+            # The pair is only as measured as its thinner half: a share of
+            # consumption needs both counters to have seen the same span.
+            "solar": min(counters.pv_hours, counters.consumption_hours),
+        }
+        for role, block in blocks.items():
+            # Withheld blocks too: "no verdict" and "no verdict, and here is
+            # how little was seen" are different things to read.
+            if block is not None:
+                block["coverage"] = _coverage(measured[role], span_hours)
+        return blocks
 
     months = []
     for key, month_seconds in sorted(months_touched(window, tz).items()):
-        # Coverage from whichever mapped sensor has rows; the first with any.
-        measured = max(len(load_months.get(key, ())), len(soc_months.get(key, ())))
-        coverage = min(measured * SECONDS_PER_HOUR / month_seconds, 1.0) if month_seconds else 0.0
+        load_part = load_months.get(key, ())
+        soc_part = soc_months.get(key, ())
+        counters = _Counters(
+            pv_kwh=pv_months.get(key, 0.0),
+            load_kwh=consumption_months.get(key, 0.0),
+            import_kwh=import_months.get(key) if import_series is not None else None,
+            pv_hours=pv_month_hours.get(key, 0),
+            consumption_hours=consumption_month_hours.get(key, 0),
+        )
+        span_hours = month_seconds / SECONDS_PER_HOUR
+        # The month is as covered as its best-covered mapped sensor. Counters
+        # count: a month the Solar card reads in full is a month with data,
+        # whether or not a load sensor was ever mapped.
+        measured = max(len(load_part), len(soc_part), counters.pv_hours, counters.consumption_hours)
+        coverage = _coverage(measured, span_hours)
         months.append(
             {
                 "key": key,
                 "coverage": coverage,
                 "complete": coverage >= INCOMPLETE_COVERAGE,
-                **judge(
-                    load_months.get(key, ()),
-                    soc_months.get(key, ()),
-                    pv_months.get(key, 0.0),
-                    consumption_months.get(key, 0.0),
-                    import_months.get(key) if import_series else None,
-                ),
+                **judge(load_part, soc_part, counters, span_hours=span_hours),
             }
         )
 
     covered_start, covered_end = _covered(load, soc, energy)
+    period_counters = _Counters(
+        pv_kwh=sum(pv_months.values()),
+        load_kwh=sum(consumption_months.values()),
+        # Mapped but empty is not "imported nothing": summing no rows to zero
+        # would report a window nobody measured as fully self-sufficient.
+        import_kwh=sum(import_months.values()) if import_months else None,
+        pv_hours=sum(pv_month_hours.values()),
+        consumption_hours=sum(consumption_month_hours.values()),
+    )
     return {
         "period": judge(
             load_rows,
             soc_rows,
-            sum(pv_months.values()),
-            sum(consumption_months.values()),
-            sum(import_months.values()) if import_series else None,
+            period_counters,
+            span_hours=window.seconds / SECONDS_PER_HOUR,
         ),
         "months": months,
         "incomplete_below": INCOMPLETE_COVERAGE,

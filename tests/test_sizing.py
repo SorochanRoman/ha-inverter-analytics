@@ -3,6 +3,8 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from custom_components.inverter_analytics.analytics.sizing import (
     BORDERLINE,
     ENOUGH,
@@ -28,6 +30,8 @@ from custom_components.inverter_analytics.analytics.source import (
 KYIV = ZoneInfo("Europe/Kyiv")
 BASE = datetime(2026, 3, 1, tzinfo=UTC)
 RATED = 8000.0
+# Kyiv puts its clocks forward on 2026-03-29, so the local month is an hour short.
+MARCH_HOURS = 743
 
 
 def hour(
@@ -316,10 +320,123 @@ def test_solar_months_sum_the_counters_and_borrow_the_battery_days():
     # Forty-eight accumulated additions of 0.1 kWh come to 4.799999999999999, so
     # the ratio misses 0.8 by one unit in the last place. The rule is the value,
     # not the representation.
-    assert round(march["solar"]["evidence"]["self_sufficiency"], 10) == 0.8
+    assert march["solar"]["evidence"]["self_sufficiency"] == pytest.approx(0.8)
     assert march["solar"]["evidence"]["fill_share"] == 0.5
     assert march["solar"]["verdict"] == BORDERLINE
     assert march["solar"]["note"] == "covers_but_battery_not_filling"
     assert march["inverter"] is None
     assert payload["covered_start"] == window.start.isoformat()
     assert payload["covers_whole_window"] is True
+
+
+def _full_march_load(window: Window) -> HourlySeries:
+    return HourlySeries(
+        tuple(
+            HourlyRow(window.start + timedelta(hours=h), 1000.0, 500.0, 2000.0)
+            for h in range(MARCH_HOURS)
+        )
+    )
+
+
+def test_each_card_carries_the_coverage_of_its_own_sensor():
+    window = _window(31)
+    soc = HourlySeries(tuple(row for day in range(5) for row in soc_day(day, low=40.0, high=100.0)))
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=_full_march_load(window),
+        soc=soc,
+        energy={},
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    march = payload["months"][0]
+    assert march["coverage"] == 1.0, "the best-covered sensor saw the whole month"
+    assert march["complete"] is True
+    assert march["inverter"]["coverage"] == 1.0
+    # Five days of charge under a full-month banner is exactly the reading a
+    # single month-wide coverage figure would hide.
+    assert march["battery"]["coverage"] == pytest.approx(120 / MARCH_HOURS)
+
+
+def test_a_month_seen_only_through_the_counters_is_covered_by_them():
+    window = _window(31)
+    energy = {
+        "pv_energy_total": _energy(1.0, window.start, MARCH_HOURS),
+        "load_energy_total": _energy(0.5, window.start, MARCH_HOURS),
+    }
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=None,
+        energy=energy,
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    march = payload["months"][0]
+    assert march["coverage"] == 1.0
+    assert march["complete"] is True, "counters alone cover a month as well as any sensor"
+    assert march["solar"]["coverage"] == 1.0
+    assert march["solar"]["verdict"] == ENOUGH
+
+
+def test_a_withheld_card_still_says_how_little_it_saw():
+    window = _window(31)
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=HourlySeries(()),
+        soc=None,
+        energy={},
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    inverter = payload["months"][0]["inverter"]
+    assert inverter["reason"] == "no_data"
+    assert inverter["coverage"] == 0.0
+
+
+def test_a_mapped_import_counter_with_no_rows_is_not_full_self_sufficiency():
+    window = _window(2)
+    energy = {
+        "pv_energy_total": _energy(1.0, window.start, 48),
+        "load_energy_total": _energy(0.5, window.start, 48),
+        "grid_import_total": EnergySeries(()),
+    }
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=None,
+        energy=energy,
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    assert payload["period"]["solar"]["evidence"]["self_sufficiency"] is None
+    assert payload["months"][0]["solar"]["evidence"]["self_sufficiency"] is None
+
+
+def test_a_mapped_pv_counter_with_no_rows_withholds_the_solar_verdict():
+    window = _window(2)
+    energy = {
+        "pv_energy_total": EnergySeries(()),
+        "load_energy_total": _energy(0.5, window.start, 48),
+    }
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=None,
+        energy=energy,
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    for block in (payload["period"]["solar"], payload["months"][0]["solar"]):
+        assert block["verdict"] is None, "no production statistics is not zero production"
+        assert block["reason"] == "no_data"
