@@ -6,6 +6,7 @@ import type {
   HomeAssistant,
   LoadPayload,
   SeasonalityPayload,
+  SizingPayload,
 } from "./types";
 
 export function fetchConfig(hass: HomeAssistant): Promise<ConfigResult> {
@@ -78,6 +79,20 @@ export function fetchGrid(
 ): Promise<GridPayload> {
   return hass.connection.sendMessagePromise<GridPayload>({
     type: "inverter_analytics/grid",
+    entry_id: entryId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  });
+}
+
+export function fetchSizing(
+  hass: HomeAssistant,
+  entryId: string,
+  start: Date,
+  end: Date,
+): Promise<SizingPayload> {
+  return hass.connection.sendMessagePromise<SizingPayload>({
+    type: "inverter_analytics/sizing",
     entry_id: entryId,
     start: start.toISOString(),
     end: end.toISOString(),

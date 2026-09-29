@@ -373,3 +373,64 @@ export interface GridPayload {
   window: { start: string; end: string };
   clamped: boolean;
 }
+
+export type Verdict = "enough" | "borderline" | "short";
+export type SizingCardKey = "inverter" | "battery" | "solar";
+
+export interface VerdictBlock {
+  verdict: Verdict | null;
+  /** Why no verdict: "no_data" or, for the battery, "never_full". */
+  reason: string | null;
+  evidence: Record<string, number | null>;
+  /**
+   * The share of the span this card's own sensor had statistics for, which is
+   * not the month's: a full month of load beside twelve days of charge would
+   * otherwise present the battery verdict under a full-month banner.
+   */
+  coverage: number;
+  /** Solar only: production covers the load but the battery is not filling. */
+  note?: "covers_but_battery_not_filling";
+}
+
+export interface SizingMonth {
+  key: string;
+  coverage: number;
+  complete: boolean;
+  inverter: VerdictBlock | null;
+  battery: VerdictBlock | null;
+  solar: VerdictBlock | null;
+}
+
+export interface SizingCard {
+  missing: string[];
+  no_statistics: string[];
+  /** Battery only: the full mark is at or below the low mark, so no day can be judged. */
+  thresholds_inverted?: boolean;
+}
+
+export interface SizingPayload {
+  period: Record<SizingCardKey, VerdictBlock | null>;
+  months: SizingMonth[];
+  incomplete_below: number;
+  rules: {
+    inverter_short_share: number;
+    inverter_borderline_share: number;
+    high_load_share: number;
+    battery_short_share: number;
+    solar_enough_share: number;
+    solar_borderline_share: number;
+    solar_fill_share: number;
+    low_pct: number;
+    full_pct: number;
+  };
+  cards: Record<SizingCardKey, SizingCard>;
+  entities: Record<string, string>;
+  covered_start: string | null;
+  covered_end: string | null;
+  covers_whole_window: boolean;
+  timezone: string;
+  precision: Precision;
+  boundary: string | null;
+  window: { start: string; end: string };
+  clamped: boolean;
+}

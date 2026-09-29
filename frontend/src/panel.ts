@@ -12,6 +12,7 @@ import "./tabs/battery-tab";
 import "./tabs/grid-tab";
 import "./tabs/load-tab";
 import "./tabs/seasonality-tab";
+import "./tabs/sizing-tab";
 
 const BASE_PATH = "/inverter-analytics";
 
@@ -21,6 +22,7 @@ const TABS = [
   { id: "seasonal", label: "Seasonality" },
   { id: "balance", label: "Balance" },
   { id: "grid", label: "Grid" },
+  { id: "sizing", label: "Sizing" },
 ] as const;
 
 @customElement("inverter-analytics-panel")
@@ -272,6 +274,13 @@ export class InverterAnalyticsPanel extends LitElement {
               .entryId=${this.entryId}
               .range=${this.range}
             ></ia-grid-tab>`
+          : nothing}
+        ${this.tab === "sizing"
+          ? html`<ia-sizing-tab
+              .hass=${this.hass}
+              .entryId=${this.entryId}
+              .range=${this.range}
+            ></ia-sizing-tab>`
           : nothing}
     `;
   }
