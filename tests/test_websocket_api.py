@@ -793,6 +793,43 @@ async def test_sizing_ignores_the_import_counter_when_judging_the_solar_card(
     assert result["period"]["solar"]["verdict"] == "enough"
 
 
+async def test_sizing_answers_a_pv_counter_alone_with_a_card_that_names_the_missing_role(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The tab opens on any one of its four roles, so no such entry may get an error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Production counter only",
+        data={
+            "entities": {"pv_energy_total": ["sensor.pv_energy"]},
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.pv_energy", "120", {"state_class": "total_increasing"})
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow()
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/sizing",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["period"]["solar"] is None, "the share needs both counters"
+    assert result["cards"]["solar"]["missing"] == ["load_energy_total"]
+    assert result["cards"]["inverter"]["missing"] == ["load_power"]
+
+
 async def test_sizing_command_says_what_to_map_when_nothing_is(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:

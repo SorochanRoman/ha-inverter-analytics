@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import DEFAULT_BATTERY_FULL_PCT, DEFAULT_BATTERY_LOW_PCT
 from ..roles import EntryConfig
+from .balance import MIN_DENOMINATOR_KWH
 from .load import HIGH_LOAD_SHARE
 from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
 from .source import (
@@ -47,9 +48,10 @@ SOLAR_ENOUGH_SHARE = 1.0
 SOLAR_BORDERLINE_SHARE = 0.7
 SOLAR_FILL_SHARE = 0.8
 
-# Below this much consumption a share of it is arithmetic noise; the same
-# floor Balance uses for its ratios.
-MIN_LOAD_KWH = 0.1
+# The share of the consumption counter's hours the import counter must also
+# have before (load - import) / load is a share of the same span. One hour the
+# recorder never compiled must not drop the figure; a missing month must.
+IMPORT_COVERAGE_FLOOR = 0.9
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -153,7 +155,9 @@ def solar_evidence(
     pv_kwh: float, load_kwh: float, import_kwh: float | None, battery: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """Production as a share of consumption, self-sufficiency, and how often the battery filled."""
-    enough_load = load_kwh >= MIN_LOAD_KWH
+    # Below this much consumption a share of it is arithmetic noise; Balance
+    # names the floor and its ratios use the same one.
+    enough_load = load_kwh >= MIN_DENOMINATOR_KWH
     fill_share = None
     if battery and battery["days_with_data"]:
         fill_share = battery["days_full"] / battery["days_with_data"]
@@ -205,6 +209,22 @@ class _Counters:
     import_kwh: float | None
     pv_hours: int
     consumption_hours: int
+    import_hours: int
+
+    @property
+    def comparable_import_kwh(self) -> float | None:
+        """The import total, or None when it covers less of the span than the load.
+
+        Self-sufficiency is (load - import) / load, and the subtraction is
+        only honest while both counters saw the same hours. An import counter
+        that started recording three weeks into a ninety-day window would
+        otherwise print a self-sufficiency of 92% that nothing measured.
+        """
+        if self.import_kwh is None:
+            return None
+        if self.import_hours < IMPORT_COVERAGE_FLOOR * self.consumption_hours:
+            return None
+        return self.import_kwh
 
 
 def _energy_by_month(
@@ -231,7 +251,9 @@ def _solar_block(
     """The solar card, or None when the two counters it needs are not mapped."""
     if "pv_energy_total" not in energy or "load_energy_total" not in energy:
         return None
-    evidence = solar_evidence(counters.pv_kwh, counters.load_kwh, counters.import_kwh, battery)
+    evidence = solar_evidence(
+        counters.pv_kwh, counters.load_kwh, counters.comparable_import_kwh, battery
+    )
     if counters.pv_hours == 0:
         # A counter with no rows for this span sums to zero, and reading that
         # as a month without sun would print "short" over an unmeasured month.
@@ -281,7 +303,7 @@ def build_sizing_payload(
         energy.get("load_energy_total"), tz
     )
     import_series = energy.get("grid_import_total")
-    import_months, _import_month_hours = _energy_by_month(import_series, tz)
+    import_months, import_month_hours = _energy_by_month(import_series, tz)
 
     def judge(
         load_part: Sequence[HourlyRow],
@@ -328,6 +350,7 @@ def build_sizing_payload(
             import_kwh=import_months.get(key) if import_series is not None else None,
             pv_hours=pv_month_hours.get(key, 0),
             consumption_hours=consumption_month_hours.get(key, 0),
+            import_hours=import_month_hours.get(key, 0),
         )
         span_hours = month_seconds / SECONDS_PER_HOUR
         # The month is as covered as its best-covered mapped sensor. Counters
@@ -353,6 +376,7 @@ def build_sizing_payload(
         import_kwh=sum(import_months.values()) if import_months else None,
         pv_hours=sum(pv_month_hours.values()),
         consumption_hours=sum(consumption_month_hours.values()),
+        import_hours=sum(import_month_hours.values()),
     )
     return {
         "period": judge(
@@ -413,10 +437,13 @@ async def async_sizing_analytics(
     # rated" and print "short" over a system nobody measured.
     has_rated = rated_power is not None and rated_power > 0
 
-    if not (load_id and has_rated) and not soc_id and not has_solar:
+    # The same roles the tab opens on, so a mapping that shows the tab is never
+    # answered with an error: every partial shape below is a card that names
+    # the role it is short of, which is the answer the reader can act on.
+    if not load_id and not soc_id and not any(solar_ids.values()):
         raise ValueError(
-            "sizing needs load_power with rated_power, or battery_soc, or the "
-            "pv_energy_total and load_energy_total counters"
+            "sizing needs at least one of load_power, battery_soc, "
+            "pv_energy_total or load_energy_total"
         )
 
     low_pct = config.number("battery_low_pct") or DEFAULT_BATTERY_LOW_PCT

@@ -421,6 +421,43 @@ def test_a_mapped_import_counter_with_no_rows_is_not_full_self_sufficiency():
     assert payload["months"][0]["solar"]["evidence"]["self_sufficiency"] is None
 
 
+def _self_sufficiency(import_series: EnergySeries) -> float | None:
+    """The period's self-sufficiency with this import counter beside a full window."""
+    window = _window(2)
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=None,
+        energy={
+            "pv_energy_total": _energy(1.0, window.start, 48),
+            "load_energy_total": _energy(0.5, window.start, 48),
+            "grid_import_total": import_series,
+        },
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    return payload["period"]["solar"]["evidence"]["self_sufficiency"]
+
+
+def test_an_import_counter_that_saw_half_the_window_gives_no_self_sufficiency():
+    """(load - import) / load over mismatched spans would overstate it."""
+    window = _window(2)
+    half = _energy(0.1, window.start + timedelta(hours=24), 24)
+    assert _self_sufficiency(half) is None
+    assert _self_sufficiency(_energy(0.1, window.start, 48)) == pytest.approx(0.8)
+
+
+def test_one_uncompiled_import_hour_does_not_drop_self_sufficiency():
+    """A single missing hour is the recorder, not a gap worth withholding for."""
+    window = _window(2)
+    almost = EnergySeries(
+        tuple(EnergyRow(window.start + timedelta(hours=h), 0.1) for h in range(48) if h != 7)
+    )
+    assert _self_sufficiency(almost) is not None
+
+
 def test_a_mapped_pv_counter_with_no_rows_withholds_the_solar_verdict():
     window = _window(2)
     energy = {
