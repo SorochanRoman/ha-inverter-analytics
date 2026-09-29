@@ -141,6 +141,12 @@ the defect was only visible on screen.
 
 ## 3. Still unverified
 
+- **The Sizing tab, all of it.** Built and unit-tested; not yet read from a
+  live instance. The live run imports hourly statistics with `min` and `max`
+  for the load and the state of charge, and the counters, over three seeded
+  months — one clearly enough, one clearly short, one in which the battery
+  never fills — and reads the three cards and the monthly strip back,
+  including the grey partial month at each end and the *never filled* reason.
 - **The Grid tab, all of it.** Nothing in the outage work has been seen in a
   live Home Assistant; it rests on unit tests over hand-built series. The live
   run has to build a template `binary_sensor.grid_connected` from the
@@ -232,6 +238,16 @@ outright — no net discharge at all — is withheld rather than estimated.
 the threshold minus the minimum, since every episode starts at the threshold by
 construction. A true figure needs discharge runs detected from the charge
 itself, which is noise-sensitive work no current tab needs.
+
+**The sizing thresholds.** 1% and 5% of hours for the inverter, a quarter of
+days for the battery, 100% / 70% of consumption and 80% of days filling for the
+sun are judgement, not measurement. They are constants printed on the tab
+rather than options, because a threshold a user can move is a verdict a user
+can make say what they want; if a real installation shows them to be badly
+placed, they move in code, with the reason recorded here. The same reasoning
+puts a coverage figure on every card and not only on the month row: the row is
+as covered as its best-covered sensor, counters included, so one sensor with a
+full month of rows would otherwise vouch for a card read from twelve days.
 
 **The units guard.** `SensorInfo.unit` is still collected and still unread. A
 kW-reporting sensor mapped to a W role is off by a thousand, and detection could

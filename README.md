@@ -97,6 +97,15 @@ beyond pointing the integration at the ones you already have.
   sensor: grid power at zero while the battery discharges. The tab carries a
   banner saying that a night of zero export looks the same, and asks for a
   sensor.
+- **A Sizing tab.** Three verdicts — the inverter against the load, the battery
+  against the nights, the sun against the consumption — each *enough*,
+  *borderline* or *short*, for the period and for every month in it, with the
+  figure it was read from and the rule it was read with printed beside it.
+  Every month is judged from hourly statistics — the peak and the floor of
+  each hour, not the mean — so last winter is read the same way as last week.
+  A day the battery ran low after filling counts against the battery; a day
+  it ran low without filling counts against the sun. There is no combined
+  score: which part is short is the whole point.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -135,7 +144,7 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-All five tabs are built. Seasonality cannot compare the same month across two years,
+All six tabs are built. Seasonality cannot compare the same month across two years,
 because a single query is capped at 400 days. The Balance tab shows no
 costs: tariffs are a domain of their own, and a wrong number about money
 is worse than no number. Detection covers the naming scheme of the
