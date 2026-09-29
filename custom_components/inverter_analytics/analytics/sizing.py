@@ -18,8 +18,8 @@ from datetime import datetime, tzinfo
 from typing import Any
 
 from .load import HIGH_LOAD_SHARE
-from .seasonality import month_key
-from .source import HourlyRow
+from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
+from .source import EnergySeries, HourlyRow, HourlySeries, Window
 
 ENOUGH = "enough"
 BORDERLINE = "borderline"
@@ -30,6 +30,13 @@ SHORT = "short"
 INVERTER_SHORT_SHARE = 0.01
 INVERTER_BORDERLINE_SHARE = 0.05
 BATTERY_SHORT_SHARE = 0.25
+SOLAR_ENOUGH_SHARE = 1.0
+SOLAR_BORDERLINE_SHARE = 0.7
+SOLAR_FILL_SHARE = 0.8
+
+# Below this much consumption a share of it is arithmetic noise; the same
+# floor Balance uses for its ratios.
+MIN_LOAD_KWH = 0.1
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -127,3 +134,175 @@ def battery_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
     else:
         verdict = ENOUGH
     return {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
+
+
+def solar_evidence(
+    pv_kwh: float, load_kwh: float, import_kwh: float | None, battery: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Production as a share of consumption, self-sufficiency, and how often the battery filled."""
+    enough_load = load_kwh >= MIN_LOAD_KWH
+    fill_share = None
+    if battery and battery["days_with_data"]:
+        fill_share = battery["days_full"] / battery["days_with_data"]
+    return {
+        "pv_kwh": pv_kwh,
+        "load_kwh": load_kwh,
+        "production_share": (pv_kwh / load_kwh) if enough_load else None,
+        "self_sufficiency": (
+            max(0.0, min(1.0, (load_kwh - import_kwh) / load_kwh))
+            if enough_load and import_kwh is not None
+            else None
+        ),
+        "fill_share": fill_share,
+    }
+
+
+def solar_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
+    """enough at full cover with the battery filling; borderline from 70% cover; short below."""
+    share = evidence["production_share"]
+    if share is None:
+        return withheld("no_data", evidence)
+    fill = evidence["fill_share"]
+    filling = fill is None or fill >= SOLAR_FILL_SHARE
+    if share >= SOLAR_ENOUGH_SHARE and filling:
+        verdict = ENOUGH
+    elif share >= SOLAR_BORDERLINE_SHARE:
+        verdict = BORDERLINE
+    else:
+        verdict = SHORT
+    result: dict[str, Any] = {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
+    # Export by day and import by night is a real shape, and a bare
+    # "borderline" would hide it; the card says it in words.
+    if share >= SOLAR_ENOUGH_SHARE and not filling:
+        result["note"] = "covers_but_battery_not_filling"
+    return result
+
+
+def _energy_by_month(series: EnergySeries | None, tz: tzinfo) -> dict[str, float]:
+    """A counter's hourly changes summed into the local month each hour starts in."""
+    totals: dict[str, float] = defaultdict(float)
+    for row in series.rows if series else ():
+        totals[month_key(row.start.astimezone(tz))] += row.change
+    return totals
+
+
+def _solar_block(
+    energy: Mapping[str, EnergySeries],
+    pv_kwh: float,
+    load_kwh: float,
+    import_kwh: float | None,
+    battery: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """The solar card, or None when the two counters it needs are not mapped."""
+    if "pv_energy_total" not in energy or "load_energy_total" not in energy:
+        return None
+    return solar_verdict(solar_evidence(pv_kwh, load_kwh, import_kwh, battery))
+
+
+def _covered(
+    load: HourlySeries | None, soc: HourlySeries | None, energy: Mapping[str, EnergySeries]
+) -> tuple[datetime | None, datetime | None]:
+    """The span the mapped sensors actually have data for, as Balance reports it."""
+    series = [item for item in (load, soc, *energy.values()) if item is not None]
+    starts = [item.covered_start for item in series if item.covered_start]
+    ends = [item.covered_end for item in series if item.covered_end]
+    return (min(starts) if starts else None, max(ends) if ends else None)
+
+
+def build_sizing_payload(
+    *,
+    window: Window,
+    tz: tzinfo,
+    rated_power: float,
+    load: HourlySeries | None,
+    soc: HourlySeries | None,
+    energy: Mapping[str, EnergySeries],
+    low_pct: float,
+    full_pct: float,
+) -> dict[str, Any]:
+    """The three verdicts for the period and for every month the window touches.
+
+    A card whose sensors are not mapped is None, not a withheld verdict: the
+    tab names the role. The period verdict is read from the whole window's
+    evidence with the same rules, never by averaging the months — a year with
+    one short month is a year in which the inverter was short for a month,
+    and the strip says which one.
+    """
+    load_rows = load.rows if load else ()
+    soc_rows = soc.rows if soc else ()
+    load_months = rows_by_month(load_rows, tz)
+    soc_months = rows_by_month(soc_rows, tz)
+    pv_months = _energy_by_month(energy.get("pv_energy_total"), tz)
+    consumption_months = _energy_by_month(energy.get("load_energy_total"), tz)
+    import_series = energy.get("grid_import_total")
+    import_months = _energy_by_month(import_series, tz)
+
+    def judge(
+        load_part: Sequence[HourlyRow],
+        soc_part: Sequence[HourlyRow],
+        pv_kwh: float,
+        load_kwh: float,
+        import_kwh: float | None,
+    ) -> dict[str, Any]:
+        battery = (
+            battery_evidence(soc_part, tz, low_pct=low_pct, full_pct=full_pct) if soc else None
+        )
+        return {
+            "inverter": (
+                inverter_verdict(inverter_evidence(load_part, rated_power)) if load else None
+            ),
+            "battery": battery_verdict(battery) if battery is not None else None,
+            "solar": _solar_block(energy, pv_kwh, load_kwh, import_kwh, battery),
+        }
+
+    months = []
+    for key, month_seconds in sorted(months_touched(window, tz).items()):
+        # Coverage from whichever mapped sensor has rows; the first with any.
+        measured = max(len(load_months.get(key, ())), len(soc_months.get(key, ())))
+        coverage = min(measured * SECONDS_PER_HOUR / month_seconds, 1.0) if month_seconds else 0.0
+        months.append(
+            {
+                "key": key,
+                "coverage": coverage,
+                "complete": coverage >= INCOMPLETE_COVERAGE,
+                **judge(
+                    load_months.get(key, ()),
+                    soc_months.get(key, ()),
+                    pv_months.get(key, 0.0),
+                    consumption_months.get(key, 0.0),
+                    import_months.get(key) if import_series else None,
+                ),
+            }
+        )
+
+    covered_start, covered_end = _covered(load, soc, energy)
+    return {
+        "period": judge(
+            load_rows,
+            soc_rows,
+            sum(pv_months.values()),
+            sum(consumption_months.values()),
+            sum(import_months.values()) if import_series else None,
+        ),
+        "months": months,
+        "incomplete_below": INCOMPLETE_COVERAGE,
+        "rules": {
+            "inverter_short_share": INVERTER_SHORT_SHARE,
+            "inverter_borderline_share": INVERTER_BORDERLINE_SHARE,
+            "high_load_share": HIGH_LOAD_SHARE,
+            "battery_short_share": BATTERY_SHORT_SHARE,
+            "solar_enough_share": SOLAR_ENOUGH_SHARE,
+            "solar_borderline_share": SOLAR_BORDERLINE_SHARE,
+            "solar_fill_share": SOLAR_FILL_SHARE,
+            "low_pct": low_pct,
+            "full_pct": full_pct,
+        },
+        "covered_start": covered_start.isoformat() if covered_start else None,
+        "covered_end": covered_end.isoformat() if covered_end else None,
+        "covers_whole_window": bool(
+            covered_start
+            and covered_end
+            and covered_start <= window.start
+            and covered_end >= window.end
+        ),
+    }

@@ -9,12 +9,21 @@ from custom_components.inverter_analytics.analytics.sizing import (
     SHORT,
     battery_evidence,
     battery_verdict,
+    build_sizing_payload,
     inverter_evidence,
     inverter_verdict,
     local_day,
     rows_by_month,
+    solar_evidence,
+    solar_verdict,
 )
-from custom_components.inverter_analytics.analytics.source import HourlyRow
+from custom_components.inverter_analytics.analytics.source import (
+    EnergyRow,
+    EnergySeries,
+    HourlyRow,
+    HourlySeries,
+    Window,
+)
 
 KYIV = ZoneInfo("Europe/Kyiv")
 BASE = datetime(2026, 3, 1, tzinfo=UTC)
@@ -157,3 +166,160 @@ def test_days_follow_the_local_clock_across_the_spring_change():
     evidence = battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0)
     assert evidence["days_with_data"] == 2
     assert evidence["days_full_and_low"] == 1
+
+
+def solar(share: float, fill: float | None = None, load_kwh: float = 100.0):
+    battery = None if fill is None else {"days_with_data": 100, "days_full": round(fill * 100)}
+    return solar_verdict(solar_evidence(load_kwh * share, load_kwh, None, battery))
+
+
+def test_solar_is_enough_at_full_cover_with_the_battery_filling_most_days():
+    assert solar(1.0, fill=0.8)["verdict"] == ENOUGH
+    assert solar(1.0, fill=0.79)["verdict"] == BORDERLINE
+    assert solar(1.0, fill=0.79)["note"] == "covers_but_battery_not_filling"
+    assert solar(1.0)["verdict"] == ENOUGH, "with no battery mapped, cover alone decides"
+
+
+def test_solar_borderline_and_short_boundaries():
+    assert solar(0.7)["verdict"] == BORDERLINE
+    assert solar(0.69)["verdict"] == SHORT
+
+
+def test_solar_evidence_carries_self_sufficiency_when_import_is_known():
+    evidence = solar_evidence(80.0, 100.0, 30.0, None)
+    assert evidence["self_sufficiency"] == 0.7
+    assert evidence["production_share"] == 0.8
+    assert evidence["fill_share"] is None
+
+
+def test_too_little_consumption_to_take_a_share_of():
+    result = solar_verdict(solar_evidence(1.0, 0.05, None, None))
+    assert result["verdict"] is None and result["reason"] == "no_data"
+
+
+def _energy(kwh_per_hour: float, start: datetime, hours: int) -> EnergySeries:
+    return EnergySeries(
+        tuple(EnergyRow(start + timedelta(hours=h), kwh_per_hour) for h in range(hours))
+    )
+
+
+def _window(days: int) -> Window:
+    start = datetime(2026, 3, 1, tzinfo=KYIV).astimezone(UTC)
+    return Window(start, start + timedelta(days=days))
+
+
+def test_the_payload_judges_every_month_the_window_touches():
+    window = Window(
+        datetime(2026, 2, 20, tzinfo=KYIV).astimezone(UTC),
+        datetime(2026, 4, 5, tzinfo=KYIV).astimezone(UTC),
+    )
+    march = datetime(2026, 3, 1, tzinfo=KYIV).astimezone(UTC)
+    load = HourlySeries(
+        tuple(HourlyRow(march + timedelta(hours=h), 1000.0, 500.0, 2000.0) for h in range(31 * 24))
+    )
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=load,
+        soc=None,
+        energy={},
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    months = {month["key"]: month for month in payload["months"]}
+    assert list(months) == ["2026-02", "2026-03", "2026-04"]
+    assert months["2026-03"]["complete"] is True
+    assert months["2026-03"]["inverter"]["verdict"] == ENOUGH
+    assert months["2026-02"]["coverage"] == 0.0
+    assert months["2026-02"]["inverter"]["reason"] == "no_data"
+    assert months["2026-03"]["battery"] is None, "no charge sensor mapped"
+    assert months["2026-03"]["solar"] is None, "no counters mapped"
+    assert payload["period"]["inverter"]["verdict"] == ENOUGH
+    assert payload["rules"]["full_pct"] == 95.0
+
+
+def test_a_partly_seen_month_keeps_its_verdict_and_is_marked_incomplete():
+    window = _window(31)
+    load = HourlySeries(
+        tuple(
+            HourlyRow(window.start + timedelta(hours=h), 1000.0, 500.0, 2000.0)
+            for h in range(10 * 24)
+        )
+    )
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=load,
+        soc=None,
+        energy={},
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    march = payload["months"][0]
+    assert march["complete"] is False
+    assert round(march["coverage"], 2) == 0.32
+    assert march["inverter"]["verdict"] == ENOUGH
+
+
+def test_the_period_verdict_is_read_from_summed_evidence_not_averaged_verdicts():
+    """A year of enough months with one short month is a borderline year."""
+    window = Window(
+        datetime(2026, 1, 1, tzinfo=KYIV).astimezone(UTC),
+        datetime(2026, 4, 1, tzinfo=KYIV).astimezone(UTC),
+    )
+    rows = []
+    for h in range(90 * 24):
+        moment = window.start + timedelta(hours=h)
+        # Nine hours at rated power, all inside February: 9/672 > 1% for the month,
+        # 9/2160 < 1% for the period.
+        at_rated = moment.astimezone(KYIV).month == 2 and h % 24 == 12 and (h // 24) % 3 == 0
+        rows.append(HourlyRow(moment, 1000.0, 500.0, RATED if at_rated else 2000.0))
+    load = HourlySeries(tuple(rows))
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=load,
+        soc=None,
+        energy={},
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    months = {month["key"]: month["inverter"]["verdict"] for month in payload["months"]}
+    assert months["2026-02"] == SHORT
+    assert months["2026-01"] == ENOUGH and months["2026-03"] == ENOUGH
+    assert payload["period"]["inverter"]["verdict"] == BORDERLINE
+
+
+def test_solar_months_sum_the_counters_and_borrow_the_battery_days():
+    window = _window(2)
+    soc = HourlySeries(tuple(soc_day(0, low=40.0, high=100.0) + soc_day(1, low=40.0, high=80.0)))
+    energy = {
+        "pv_energy_total": _energy(1.0, window.start, 48),
+        "load_energy_total": _energy(0.5, window.start, 48),
+        "grid_import_total": _energy(0.1, window.start, 48),
+    }
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=soc,
+        energy=energy,
+        low_pct=20.0,
+        full_pct=95.0,
+    )
+    march = payload["months"][0]
+    assert march["solar"]["evidence"]["production_share"] == 2.0
+    # Forty-eight accumulated additions of 0.1 kWh come to 4.799999999999999, so
+    # the ratio misses 0.8 by one unit in the last place. The rule is the value,
+    # not the representation.
+    assert round(march["solar"]["evidence"]["self_sufficiency"], 10) == 0.8
+    assert march["solar"]["evidence"]["fill_share"] == 0.5
+    assert march["solar"]["verdict"] == BORDERLINE
+    assert march["solar"]["note"] == "covers_but_battery_not_filling"
+    assert march["inverter"] is None
+    assert payload["covered_start"] == window.start.isoformat()
+    assert payload["covers_whole_window"] is True
