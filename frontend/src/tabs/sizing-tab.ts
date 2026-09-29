@@ -18,7 +18,7 @@ import type {
   SizingPayload,
   VerdictBlock,
 } from "../types";
-import { reasonSentence, verdictLabel } from "../verdict";
+import { reasonHint, reasonSentence, verdictLabel } from "../verdict";
 
 const CARDS: { key: SizingCardKey; title: string }[] = [
   { key: "inverter", title: "Inverter, against the load" },
@@ -149,15 +149,27 @@ export class IaSizingTab extends LitElement {
     `;
   }
 
-  private ruleSentence(card: SizingCardKey, rules: SizingPayload["rules"], locale: string): string {
+  /**
+   * The rule the verdict was read by, in the reader's own numbers.
+   *
+   * Takes the whole payload and not just the rules because the solar rule is
+   * not the same rule on every installation: with no charge sensor mapped
+   * there is no fill share, and printing the clause anyway would describe a
+   * condition the verdict never tested.
+   */
+  private ruleSentence(card: SizingCardKey, payload: SizingPayload, locale: string): string {
+    const rules = payload.rules;
     const pct = (value: number) => formatPercent(value, locale);
     if (card === "inverter") {
       return `Short when the load reached rated power in more than ${pct(rules.inverter_short_share)} of hours; borderline on any such hour, or above ${pct(rules.high_load_share)} of rated in more than ${pct(rules.inverter_borderline_share)} of hours.`;
     }
     if (card === "battery") {
-      return `Counted over days the battery filled to ${pct(rules.full_pct / 100)}: short when it still fell to ${pct(rules.low_pct / 100)} on at least ${pct(rules.battery_short_share)} of days; borderline when it happened at all. Days it ran low without filling count against the sun, not the battery.`;
+      return `Counted over days with data: short when the battery filled to ${pct(rules.full_pct / 100)} and still fell to ${pct(rules.low_pct / 100)} on at least ${pct(rules.battery_short_share)} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`;
     }
-    return `Enough when production is at least ${pct(rules.solar_enough_share)} of consumption and the battery filled on at least ${pct(rules.solar_fill_share)} of days; borderline from ${pct(rules.solar_borderline_share)} of consumption; short below.`;
+    const fill = payload.cards.battery.missing.length
+      ? ""
+      : ` and the battery filled on at least ${pct(rules.solar_fill_share)} of days`;
+    return `Enough when production is at least ${pct(rules.solar_enough_share)} of consumption${fill}; borderline from ${pct(rules.solar_borderline_share)} of consumption; short below.`;
   }
 
   /**
@@ -202,9 +214,11 @@ export class IaSizingTab extends LitElement {
    * verdict about twelve days, and a flat "Short" above the period selector
    * does not say so. Silent above the threshold: the ordinary case is a card
    * that saw the whole period, and a line saying so on every card is noise.
+   * Silent at nothing at all, too: the withheld sentence above it has already
+   * said there are no statistics, and "read from 0%" only repeats it.
    */
   private renderCoverageNote(block: VerdictBlock, payload: SizingPayload) {
-    if (block.coverage >= payload.incomplete_below) return nothing;
+    if (block.coverage === 0 || block.coverage >= payload.incomplete_below) return nothing;
     const locale = this.hass.locale.language;
     return html`<p class="note">
       Read from ${formatCoverage(block.coverage, locale)} of the period.
@@ -239,7 +253,7 @@ export class IaSizingTab extends LitElement {
               import by night.
             </p>`
           : nothing}
-        <p class="note">${this.ruleSentence(card, payload.rules, locale)}</p>
+        <p class="note">${this.ruleSentence(card, payload, locale)}</p>
       `;
     }
     return html`<div class="card">
@@ -265,7 +279,10 @@ export class IaSizingTab extends LitElement {
       return html`<td class=${block.verdict ?? "none"}>
         ${verdictLabel(block.verdict)}
         ${block.verdict === null
-          ? nothing
+          ? // Why there is no verdict: a month the battery never filled is the
+            // rule working, a month with no statistics is missing data, and
+            // "No verdict" alone reads the same for both.
+            html`<span class="hint">${reasonHint(card, block.reason ?? "no_data")}</span>`
           : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
         ${thin
           ? html`<span class="hint">from ${formatCoverage(block.coverage, locale)}</span>`
@@ -348,9 +365,9 @@ export class IaSizingTab extends LitElement {
 
       <section>
         <h2>How the verdicts are read</h2>
-        <p class="note">Inverter — ${this.ruleSentence("inverter", payload.rules, locale)}</p>
-        <p class="note">Battery — ${this.ruleSentence("battery", payload.rules, locale)}</p>
-        <p class="note">Sun — ${this.ruleSentence("solar", payload.rules, locale)}</p>
+        <p class="note">Inverter — ${this.ruleSentence("inverter", payload, locale)}</p>
+        <p class="note">Battery — ${this.ruleSentence("battery", payload, locale)}</p>
+        <p class="note">Sun — ${this.ruleSentence("solar", payload, locale)}</p>
         <p class="note">
           Every month is judged from hourly statistics — the peak and the floor of each hour, not
           the mean — so a verdict for last winter is read the same way as one for last week. Nothing

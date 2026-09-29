@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reasonSentence, verdictLabel } from "./verdict";
+import { reasonHint, reasonSentence, verdictLabel } from "./verdict";
 
 describe("verdict copy", () => {
   it("names each verdict", () => {
@@ -20,5 +20,11 @@ describe("verdict copy", () => {
     // longer exists — and the card must still print a sentence.
     expect(reasonSentence("battery", "no_data")).toMatch(/no statistics/);
     expect(reasonSentence("solar", "something_new")).toBe(reasonSentence("solar", "no_data"));
+  });
+
+  it("tells a never-filled month apart from an unmeasured one in a cell", () => {
+    expect(reasonHint("battery", "never_full")).toBe("never filled");
+    expect(reasonHint("battery", "no_data")).toBe("no data");
+    expect(reasonHint("solar", "never_full")).toBe("no data");
   });
 });

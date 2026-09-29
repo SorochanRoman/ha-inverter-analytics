@@ -25042,17 +25042,20 @@ const ZL = {
 function $g(r, t) {
   return r === "battery" && t === "never_full" ? "The battery never filled in this span, so the nights say nothing about its size." : ZL[r];
 }
-var KL = Object.defineProperty, QL = Object.getOwnPropertyDescriptor, zi = (r, t, e, i) => {
-  for (var n = i > 1 ? void 0 : i ? QL(t, e) : t, a = r.length - 1, o; a >= 0; a--)
+function KL(r, t) {
+  return r === "battery" && t === "never_full" ? "never filled" : "no data";
+}
+var QL = Object.defineProperty, jL = Object.getOwnPropertyDescriptor, zi = (r, t, e, i) => {
+  for (var n = i > 1 ? void 0 : i ? jL(t, e) : t, a = r.length - 1, o; a >= 0; a--)
     (o = r[a]) && (n = (i ? o(t, e, n) : o(n)) || n);
-  return i && n && KL(t, e, n), n;
+  return i && n && QL(t, e, n), n;
 };
-const jL = [
+const JL = [
   { key: "inverter", title: "Inverter, against the load" },
   { key: "battery", title: "Battery, against the nights" },
   { key: "solar", title: "Sun, against the consumption" }
 ], ie = "—";
-function JL(r, t) {
+function tP(r, t) {
   const [e, i] = r.split("-").map(Number);
   return new Date(e, i - 1, 1).toLocaleDateString(t, {
     month: "short",
@@ -25128,9 +25131,22 @@ let _r = class extends Ht {
     )}
     `;
   }
+  /**
+   * The rule the verdict was read by, in the reader's own numbers.
+   *
+   * Takes the whole payload and not just the rules because the solar rule is
+   * not the same rule on every installation: with no charge sensor mapped
+   * there is no fill share, and printing the clause anyway would describe a
+   * condition the verdict never tested.
+   */
   ruleSentence(r, t, e) {
-    const i = (n) => q(n, e);
-    return r === "inverter" ? `Short when the load reached rated power in more than ${i(t.inverter_short_share)} of hours; borderline on any such hour, or above ${i(t.high_load_share)} of rated in more than ${i(t.inverter_borderline_share)} of hours.` : r === "battery" ? `Counted over days the battery filled to ${i(t.full_pct / 100)}: short when it still fell to ${i(t.low_pct / 100)} on at least ${i(t.battery_short_share)} of days; borderline when it happened at all. Days it ran low without filling count against the sun, not the battery.` : `Enough when production is at least ${i(t.solar_enough_share)} of consumption and the battery filled on at least ${i(t.solar_fill_share)} of days; borderline from ${i(t.solar_borderline_share)} of consumption; short below.`;
+    const i = t.rules, n = (o) => q(o, e);
+    if (r === "inverter")
+      return `Short when the load reached rated power in more than ${n(i.inverter_short_share)} of hours; borderline on any such hour, or above ${n(i.high_load_share)} of rated in more than ${n(i.inverter_borderline_share)} of hours.`;
+    if (r === "battery")
+      return `Counted over days with data: short when the battery filled to ${n(i.full_pct / 100)} and still fell to ${n(i.low_pct / 100)} on at least ${n(i.battery_short_share)} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`;
+    const a = t.cards.battery.missing.length ? "" : ` and the battery filled on at least ${n(i.solar_fill_share)} of days`;
+    return `Enough when production is at least ${n(i.solar_enough_share)} of consumption${a}; borderline from ${n(i.solar_borderline_share)} of consumption; short below.`;
   }
   /**
    * What the card is short of before any verdict can be read, or null.
@@ -25164,9 +25180,11 @@ let _r = class extends Ht {
    * verdict about twelve days, and a flat "Short" above the period selector
    * does not say so. Silent above the threshold: the ordinary case is a card
    * that saw the whole period, and a line saying so on every card is noise.
+   * Silent at nothing at all, too: the withheld sentence above it has already
+   * said there are no statistics, and "read from 0%" only repeats it.
    */
   renderCoverageNote(r, t) {
-    if (r.coverage >= t.incomplete_below) return $;
+    if (r.coverage === 0 || r.coverage >= t.incomplete_below) return $;
     const e = this.hass.locale.language;
     return L`<p class="note">
       Read from ${lr(r.coverage, e)} of the period.
@@ -25186,7 +25204,7 @@ let _r = class extends Ht {
               ${q(n.evidence.fill_share ?? 0, i)} of days — export by day and
               import by night.
             </p>` : $}
-        <p class="note">${this.ruleSentence(r, e.rules, i)}</p>
+        <p class="note">${this.ruleSentence(r, e, i)}</p>
       `, L`<div class="card">
       <span class="name">${t}</span>
       <span class="value ${n?.verdict ?? "none"}">${kg(n?.verdict ?? null)}</span>
@@ -25201,7 +25219,12 @@ let _r = class extends Ht {
       const o = n.complete && a.coverage < r.incomplete_below;
       return L`<td class=${a.verdict ?? "none"}>
         ${kg(a.verdict)}
-        ${a.verdict === null ? $ : L`<span class="hint">${this.cellFigure(i, a, t)}</span>`}
+        ${a.verdict === null ? (
+        // Why there is no verdict: a month the battery never filled is the
+        // rule working, a month with no statistics is missing data, and
+        // "No verdict" alone reads the same for both.
+        L`<span class="hint">${KL(i, a.reason ?? "no_data")}</span>`
+      ) : L`<span class="hint">${this.cellFigure(i, a, t)}</span>`}
         ${o ? L`<span class="hint">from ${lr(a.coverage, t)}</span>` : $}
       </td>`;
     };
@@ -25218,7 +25241,7 @@ let _r = class extends Ht {
         ${r.months.map(
       (i) => L`<tr class=${i.complete ? "" : "partial"}>
             <td>
-              ${JL(i.key, t)}
+              ${tP(i.key, t)}
               ${i.coverage === 0 ? L`<span class="hint">no data</span>` : i.complete ? $ : L`<span class="hint"
                       >from ${lr(i.coverage, t)} of the month</span
                     >`}
@@ -25251,7 +25274,7 @@ let _r = class extends Ht {
       </div>
 
       <section>
-        <div class="cards">${jL.map((e) => this.renderCard(e.key, e.title, r))}</div>
+        <div class="cards">${JL.map((e) => this.renderCard(e.key, e.title, r))}</div>
       </section>
 
       <section>
@@ -25266,9 +25289,9 @@ let _r = class extends Ht {
 
       <section>
         <h2>How the verdicts are read</h2>
-        <p class="note">Inverter — ${this.ruleSentence("inverter", r.rules, t)}</p>
-        <p class="note">Battery — ${this.ruleSentence("battery", r.rules, t)}</p>
-        <p class="note">Sun — ${this.ruleSentence("solar", r.rules, t)}</p>
+        <p class="note">Inverter — ${this.ruleSentence("inverter", r, t)}</p>
+        <p class="note">Battery — ${this.ruleSentence("battery", r, t)}</p>
+        <p class="note">Sun — ${this.ruleSentence("solar", r, t)}</p>
         <p class="note">
           Every month is judged from hourly statistics — the peak and the floor of each hour, not
           the mean — so a verdict for last winter is read the same way as one for last week. Nothing
@@ -25367,12 +25390,12 @@ zi([
 _r = zi([
   ke("ia-sizing-tab")
 ], _r);
-var tP = Object.defineProperty, eP = Object.getOwnPropertyDescriptor, Sr = (r, t, e, i) => {
-  for (var n = i > 1 ? void 0 : i ? eP(t, e) : t, a = r.length - 1, o; a >= 0; a--)
+var eP = Object.defineProperty, rP = Object.getOwnPropertyDescriptor, Sr = (r, t, e, i) => {
+  for (var n = i > 1 ? void 0 : i ? rP(t, e) : t, a = r.length - 1, o; a >= 0; a--)
     (o = r[a]) && (n = (i ? o(t, e, n) : o(n)) || n);
-  return i && n && tP(t, e, n), n;
+  return i && n && eP(t, e, n), n;
 };
-const rP = "/inverter-analytics", Bg = [
+const iP = "/inverter-analytics", Bg = [
   { id: "load", label: "Load" },
   { id: "battery", label: "Battery" },
   { id: "seasonal", label: "Seasonality" },
@@ -25408,7 +25431,7 @@ let Oe = class extends Ht {
    * a filter before leaving the page.
    */
   writeLocation(r = !1) {
-    const t = s1(rP, {
+    const t = s1(iP, {
       tab: this.tab,
       range: this.range,
       entryId: this.entryId

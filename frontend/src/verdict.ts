@@ -41,3 +41,14 @@ export function reasonSentence(card: SizingCardKey, reason: string): string {
   }
   return NO_DATA[card];
 }
+
+/**
+ * The same reason in the two or three words a month cell has room for.
+ *
+ * A month the battery never filled and a month with no statistics at all are
+ * both "No verdict" in the strip, and they are not the same reading: the
+ * first is the tab's own rule doing its job, the second is missing data.
+ */
+export function reasonHint(card: SizingCardKey, reason: string): string {
+  return card === "battery" && reason === "never_full" ? "never filled" : "no data";
+}
