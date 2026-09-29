@@ -346,6 +346,12 @@ def test_the_sizing_feature_opens_on_any_one_of_its_sensor_sets():
         "pv_energy_total",
         "load_energy_total",
     }
+    # rated_power is required of every entry and is not a sensor set of its
+    # own. Listed among roles that any one of opens the tab, it alone would
+    # open it on an entry with no sensor mapped at all — and the command
+    # behind the tab refuses exactly that entry.
+    bare = EntryConfig.from_dict({"entities": {}, "numbers": {"rated_power": 8000.0}})
+    assert _sizing(bare)["available"] is False
 
 
 def test_battery_full_is_a_tuning_number():

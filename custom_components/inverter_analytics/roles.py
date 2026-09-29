@@ -133,12 +133,14 @@ FEATURES: tuple[Feature, ...] = (
         alternatives=(("grid_power", "battery_power"), ("grid_power_phase", "battery_power")),
     ),
     # Opens with any one of its three sensor sets; each card on the tab says
-    # what it is short of. rated_power is required of every entry, so the
-    # inverter card needs only load_power beyond it.
+    # what it is short of. rated_power is deliberately not listed: it is
+    # required of every entry, so under needs_all=False it alone would open
+    # the tab on an entry with no sensor mapped at all — and the command
+    # behind the tab refuses exactly that entry.
     Feature(
         "sizing",
         "Sizing",
-        ("load_power", "rated_power", "battery_soc", "pv_energy_total", "load_energy_total"),
+        ("load_power", "battery_soc", "pv_energy_total", "load_energy_total"),
         needs_all=False,
     ),
 )
