@@ -66,6 +66,7 @@ ROLES: tuple[Role, ...] = (
     Role("imbalance_threshold_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("battery_low_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("battery_idle_w", RoleKind.NUMBER, "W", advanced=True),
+    Role("battery_full_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("grid_zero_w", RoleKind.NUMBER, "W", advanced=True),
 )
 
@@ -130,6 +131,15 @@ FEATURES: tuple[Feature, ...] = (
         "Grid outages",
         ("grid_connected",),
         alternatives=(("grid_power", "battery_power"), ("grid_power_phase", "battery_power")),
+    ),
+    # Opens with any one of its three sensor sets; each card on the tab says
+    # what it is short of. rated_power is required of every entry, so the
+    # inverter card needs only load_power beyond it.
+    Feature(
+        "sizing",
+        "Sizing",
+        ("load_power", "rated_power", "battery_soc", "pv_energy_total", "load_energy_total"),
+        needs_all=False,
     ),
 )
 

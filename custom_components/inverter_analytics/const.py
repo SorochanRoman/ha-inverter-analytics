@@ -33,6 +33,11 @@ DEFAULT_IMBALANCE_THRESHOLD_PCT: Final = 30.0
 DEFAULT_BATTERY_LOW_PCT: Final = 20.0
 DEFAULT_BATTERY_IDLE_W: Final = 50.0
 
+# The charge at which a battery counts as filled for the day. Many battery
+# management systems cap the charge below a hundred, and a battery that
+# reaches 90% every day has been given everything it can hold.
+DEFAULT_BATTERY_FULL_PCT: Final = 95.0
+
 # Only for outages inferred from power flows. A current-transformer reading
 # is never quite zero, and how far from zero depends on the clamp.
 DEFAULT_GRID_ZERO_W: Final = 10.0

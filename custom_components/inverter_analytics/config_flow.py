@@ -14,6 +14,7 @@ from .const import (
     CONF_ENTITIES,
     CONF_INVERTED,
     CONF_NUMBERS,
+    DEFAULT_BATTERY_FULL_PCT,
     DEFAULT_BATTERY_IDLE_W,
     DEFAULT_BATTERY_LOW_PCT,
     DEFAULT_GRID_ZERO_W,
@@ -54,6 +55,7 @@ _TUNING_DEFAULTS = {
     "imbalance_threshold_pct": DEFAULT_IMBALANCE_THRESHOLD_PCT,
     "battery_low_pct": DEFAULT_BATTERY_LOW_PCT,
     "battery_idle_w": DEFAULT_BATTERY_IDLE_W,
+    "battery_full_pct": DEFAULT_BATTERY_FULL_PCT,
     "grid_zero_w": DEFAULT_GRID_ZERO_W,
 }
 

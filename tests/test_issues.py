@@ -82,7 +82,7 @@ async def test_an_entry_mapped_before_a_tab_existed_is_told_about_it(
     assert issue.translation_placeholders["name"] == "Deye"
     # A fixable issue shows a title and a Fix button and nothing else, so
     # naming the tab there is what makes the card worth pressing.
-    assert issue.translation_placeholders["features"] == "Energy balance"
+    assert issue.translation_placeholders["features"] == "Energy balance, Sizing"
     assert issue.data == {"entry_id": entry.entry_id}
 
 
@@ -244,7 +244,7 @@ async def test_the_fix_flow_maps_what_it_showed_and_clears_the_card(
     # anything in particular.
     for entity_id in COUNTERS:
         assert entity_id in result["description_placeholders"]["entities"]
-    assert result["description_placeholders"]["features"] == "Energy balance"
+    assert result["description_placeholders"]["features"] == "Energy balance, Sizing"
 
     result = await flow.async_step_confirm({})
     await hass.async_block_till_done()

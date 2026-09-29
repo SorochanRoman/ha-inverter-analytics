@@ -246,6 +246,7 @@
           "imbalance_threshold_pct": "Imbalance threshold",
           "battery_low_pct": "Low battery charge",
           "battery_idle_w": "Battery idle power",
+        "battery_full_pct": "Full battery charge",
           "grid_zero_w": "Grid zero power"
         },
         "data_description": {
@@ -254,6 +255,7 @@
           "imbalance_threshold_pct": "The spread between phases counted as a problem, as a share of their average. Time above it is reported, and runs above it become episodes. Default 30%.",
           "battery_low_pct": "The state of charge counted as low. Time below it is reported, and runs below it become dip episodes. What counts as low differs by chemistry — a lithium pack and a lead-acid one are not comparable here. Default 20%.",
           "battery_idle_w": "Battery power below this, in either direction, is treated as resting rather than charging or discharging. Without it a pack drawing a few watts of standby would be reported as working all night. Default 50 W.",
+        "battery_full_pct": "The state of charge at which the battery counts as filled for the day, on the Sizing tab. Many battery management systems cap the charge below a hundred, and a battery that reaches 90% every day has been given everything it can hold. Default 95%.",
           "grid_zero_w": "Only used when outages are inferred from power flows, on an inverter with no grid-presence sensor mapped. Grid power within this many watts of zero counts as no exchange with the grid. A current-transformer reading is never quite zero; how far from it depends on the clamp. Default 10 W."
         }
       }

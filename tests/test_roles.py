@@ -189,6 +189,7 @@ def test_the_tuning_numbers_stay_out_of_the_first_run():
         "battery_low_pct",
         "battery_idle_w",
         "grid_zero_w",
+        "battery_full_pct",
     }
     assert not any(role.advanced for role in ROLES if role.required)
 
@@ -328,3 +329,28 @@ def test_grid_zero_is_a_tuning_number():
     assert role.kind is RoleKind.NUMBER
     assert role.advanced is True
     assert "grid_zero_w" in tuning_role_keys()
+
+
+def _sizing(config: EntryConfig) -> dict:
+    return next(item for item in feature_availability(config) if item["key"] == "sizing")
+
+
+def test_the_sizing_feature_opens_on_any_one_of_its_sensor_sets():
+    """Each card reports its own missing roles; the tab is worth showing with one."""
+    config = EntryConfig.from_dict(
+        {"entities": {"load_power": "sensor.load"}, "numbers": {"rated_power": 8000.0}}
+    )
+    assert _sizing(config)["available"] is True
+    assert set(_sizing(config)["missing"]) == {
+        "battery_soc",
+        "pv_energy_total",
+        "load_energy_total",
+    }
+
+
+def test_battery_full_is_a_tuning_number():
+    role = ROLES_BY_KEY["battery_full_pct"]
+    assert role.kind is RoleKind.NUMBER
+    assert role.unit == "%"
+    assert role.advanced is True
+    assert "battery_full_pct" in tuning_role_keys()
