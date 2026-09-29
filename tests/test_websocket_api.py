@@ -740,6 +740,59 @@ async def test_sizing_command_returns_the_period_and_months(
     assert result["months"], "a one-day window touches at least one month"
 
 
+async def test_sizing_ignores_the_import_counter_when_judging_the_solar_card(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The import counter feeds self-sufficiency alone, never the verdict."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Import without statistics",
+        data={
+            "entities": {
+                "pv_energy_total": ["sensor.pv_energy"],
+                "load_energy_total": ["sensor.load_energy"],
+                "grid_import_total": ["sensor.grid_import"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.pv_energy", "120", {"state_class": "total_increasing"})
+    hass.states.async_set("sensor.load_energy", "100", {"state_class": "total_increasing"})
+    # Mapped, and keeping no statistics of its own.
+    hass.states.async_set("sensor.grid_import", "40")
+
+    end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    rows = {
+        "sensor.pv_energy": [{"start": end - timedelta(hours=2), "change": 4.0}],
+        "sensor.load_energy": [{"start": end - timedelta(hours=2), "change": 3.0}],
+    }
+
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ):
+        await client.send_json_auto_id(
+            {
+                "type": "inverter_analytics/sizing",
+                "entry_id": entry.entry_id,
+                "start": (end - timedelta(days=1)).isoformat(),
+                "end": end.isoformat(),
+            }
+        )
+        response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["cards"]["solar"]["no_statistics"] == []
+    assert result["cards"]["solar"]["missing"] == []
+    assert result["period"]["solar"]["verdict"] == "enough"
+
+
 async def test_sizing_command_says_what_to_map_when_nothing_is(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:

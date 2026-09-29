@@ -462,7 +462,13 @@ async def async_sizing_analytics(
         },
         "solar": {
             "missing": [role for role, entity_id in solar_ids.items() if not entity_id],
-            "no_statistics": _no_statistics(hass, list(energy_ids.values())),
+            # The two counters the verdict is read from, and not the import
+            # counter beside them: that one feeds self_sufficiency alone, and
+            # naming it here would print "this card cannot be read" over a
+            # verdict that was read perfectly well.
+            "no_statistics": _no_statistics(
+                hass, [entity_id for entity_id in solar_ids.values() if entity_id]
+            ),
         },
     }
     payload["entities"] = {

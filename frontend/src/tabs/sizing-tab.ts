@@ -196,6 +196,21 @@ export class IaSizingTab extends LitElement {
     return null;
   }
 
+  /**
+   * How little of the period this card's own sensor was seen for, when that
+   * is little. A verdict read from twelve days of a ninety-day window is a
+   * verdict about twelve days, and a flat "Short" above the period selector
+   * does not say so. Silent above the threshold: the ordinary case is a card
+   * that saw the whole period, and a line saying so on every card is noise.
+   */
+  private renderCoverageNote(block: VerdictBlock, payload: SizingPayload) {
+    if (block.coverage >= payload.incomplete_below) return nothing;
+    const locale = this.hass.locale.language;
+    return html`<p class="note">
+      Read from ${formatCoverage(block.coverage, locale)} of the period.
+    </p>`;
+  }
+
   private renderCard(card: SizingCardKey, title: string, payload: SizingPayload) {
     const locale = this.hass.locale.language;
     const block = payload.period[card];
@@ -209,10 +224,14 @@ export class IaSizingTab extends LitElement {
       // a sentence: an empty card reads as a bug.
       body = html`<p class="note">${reasonSentence(card, "no_data")}</p>`;
     } else if (block.verdict === null) {
-      body = html`<p class="note">${reasonSentence(card, block.reason ?? "no_data")}</p>`;
+      body = html`
+        <p class="note">${reasonSentence(card, block.reason ?? "no_data")}</p>
+        ${this.renderCoverageNote(block, payload)}
+      `;
     } else {
       body = html`
         ${this.renderEvidence(card, block, payload.rules, locale)}
+        ${this.renderCoverageNote(block, payload)}
         ${block.note === "covers_but_battery_not_filling"
           ? html`<p class="note">
               Production covers the load, but the battery filled on only
