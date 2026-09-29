@@ -339,6 +339,83 @@ async def async_energy_many(
     return results
 
 
+@dataclass(frozen=True, slots=True)
+class HourlyRow:
+    """One hour of a numeric sensor as the recorder compiled it: its mean, floor and peak."""
+
+    start: datetime
+    mean: float
+    min: float
+    max: float
+
+
+@dataclass(frozen=True, slots=True)
+class HourlySeries:
+    """A sensor's hourly extremes, with the span they actually cover."""
+
+    rows: tuple[HourlyRow, ...]
+
+    @property
+    def covered_start(self) -> datetime | None:
+        """The first hour with statistics, or None if there are none."""
+        return self.rows[0].start if self.rows else None
+
+    @property
+    def covered_end(self) -> datetime | None:
+        """The end of the last hour with statistics."""
+        return (self.rows[-1].start + STATISTICS_PERIOD) if self.rows else None
+
+
+def _read_hourly_extremes(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, list[Mapping[str, Any]]]:
+    """Hourly mean, minimum and maximum for several entities, in one query."""
+    result = statistics_during_period(
+        hass, window.start, window.end, set(entity_ids), "hour", None, {"mean", "min", "max"}
+    )
+    return {entity_id: list(result.get(entity_id, [])) for entity_id in entity_ids}
+
+
+async def async_hourly_extremes_many(
+    hass: HomeAssistant, entity_ids: Sequence[str], window: Window
+) -> dict[str, HourlySeries]:
+    """Read hourly mean, minimum and maximum for several sensors in one query.
+
+    The mean is what every other reader takes from statistics; the minimum
+    and maximum are what a sizing verdict needs. The maximum of the load in an
+    hour is the true peak of that hour and the minimum of the charge is its
+    true floor — neither is smoothed the way the mean is, so a verdict read
+    from them beyond the recorder's retention is as honest as one read from
+    yesterday. Always from statistics, for every window: mixing raw states
+    for recent days would make those days incomparable with the rest.
+
+    A row missing its minimum or maximum is an hour the recorder did not
+    finish compiling, which is not an hour of zero load; it is dropped, and
+    the covered span does not include it.
+    """
+    unique = list(dict.fromkeys(entity_ids))
+    if not unique:
+        return {}
+
+    recorder = get_instance(hass)
+    raw = await recorder.async_add_executor_job(
+        partial(_read_hourly_extremes, hass, tuple(unique), window)
+    )
+
+    results: dict[str, HourlySeries] = {}
+    for entity_id in unique:
+        rows = []
+        for row in raw.get(entity_id, []):
+            start = row.get("start")
+            moment = dt_util.utc_from_timestamp(start) if isinstance(start, (int, float)) else start
+            values = (row.get("mean"), row.get("min"), row.get("max"))
+            if moment is None or any(value is None for value in values):
+                continue
+            rows.append(HourlyRow(moment, *(float(value) for value in values)))
+        results[entity_id] = HourlySeries(tuple(rows))
+    return results
+
+
 def describe_series(entity_id: str, result: SeriesResult) -> dict[str, Any]:
     """One entry of a payload's per-series provenance block."""
     return {

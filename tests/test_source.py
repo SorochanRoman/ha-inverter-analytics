@@ -14,9 +14,12 @@ from custom_components.inverter_analytics.analytics.resample import (
     to_intervals,
 )
 from custom_components.inverter_analytics.analytics.source import (
+    HourlyRow,
+    HourlySeries,
     Precision,
     Window,
     async_binary_series,
+    async_hourly_extremes_many,
     binary_states_to_samples,
     countable_window,
     plan_precision,
@@ -202,3 +205,51 @@ async def test_binary_series_reads_raw_states_only(hass: HomeAssistant):
     assert not lts.called
     assert series.start == window.start and series.end == window.end
     assert [sample.value for sample in series.samples] == [0.0]
+
+
+async def test_hourly_extremes_carry_mean_min_and_max_and_drop_uncompiled_hours(
+    recorder_mock, hass: HomeAssistant
+):
+    ts = datetime(2026, 1, 1, tzinfo=UTC)
+    rows = {
+        "sensor.load": [
+            {"start": ts.timestamp(), "mean": 500.0, "min": 100.0, "max": 7900.0},
+            # An hour the recorder did not finish compiling: not an hour of zero load.
+            {
+                "start": (ts + timedelta(hours=1)).timestamp(),
+                "mean": 600.0,
+                "min": None,
+                "max": None,
+            },
+            {"start": ts + timedelta(hours=2), "mean": 700.0, "min": 200.0, "max": 8200.0},
+        ]
+    }
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ) as read:
+        result = await async_hourly_extremes_many(
+            hass, ["sensor.load", "sensor.load"], Window(ts, ts + timedelta(hours=3))
+        )
+    assert read.call_args.args[6] == {"mean", "min", "max"}
+    assert read.call_args.args[3] == {"sensor.load"}, "an id mapped twice is read once"
+    series = result["sensor.load"]
+    assert [row.max for row in series.rows] == [7900.0, 8200.0]
+    assert series.rows[0] == HourlyRow(ts, 500.0, 100.0, 7900.0)
+    assert series.covered_start == ts
+    assert series.covered_end == ts + timedelta(hours=3)
+
+
+async def test_hourly_extremes_report_no_span_for_an_entity_without_rows(
+    recorder_mock, hass: HomeAssistant
+):
+    ts = datetime(2026, 1, 1, tzinfo=UTC)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value={},
+    ):
+        result = await async_hourly_extremes_many(
+            hass, ["sensor.soc"], Window(ts, ts + timedelta(hours=1))
+        )
+    assert result["sensor.soc"] == HourlySeries(())
+    assert result["sensor.soc"].covered_start is None
