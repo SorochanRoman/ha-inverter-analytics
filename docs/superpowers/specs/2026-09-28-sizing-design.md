@@ -104,7 +104,7 @@ Days that hit the low mark are split by whether they had reached full:
 Evidence: the two counts, the number of days with data, and the month's
 lowest state of charge.
 
-Rule, over days that reached full:
+Rule, over days with data:
 
 - `short` when "full and still at the low mark" is at least
   `BATTERY_SHORT_SHARE = 0.25` of days with data;
