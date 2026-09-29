@@ -29,6 +29,7 @@ SHORT = "short"
 # they are named here and printed on the card, where they can be argued with.
 INVERTER_SHORT_SHARE = 0.01
 INVERTER_BORDERLINE_SHARE = 0.05
+BATTERY_SHORT_SHARE = 0.25
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -76,6 +77,52 @@ def inverter_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
     if at_rated > INVERTER_SHORT_SHARE:
         verdict = SHORT
     elif evidence["hours_at_rated"] > 0 or above_high > INVERTER_BORDERLINE_SHARE:
+        verdict = BORDERLINE
+    else:
+        verdict = ENOUGH
+    return {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
+
+
+def battery_evidence(
+    rows: Sequence[HourlyRow], tz: tzinfo, *, low_pct: float, full_pct: float
+) -> dict[str, Any]:
+    """Days that filled, days that hit the low mark, and how the two overlap.
+
+    A day is judged on its hourly floors and peaks in the local zone. A day
+    that hit the low mark after reaching full was given everything the battery
+    can hold and it was not enough for the night — that is the battery being
+    small. A day that hit the low mark without ever filling was not a fair
+    test of the battery: that is the sun, or a charging policy, and it feeds
+    the solar verdict instead.
+    """
+    full: dict[str, bool] = defaultdict(bool)
+    low: dict[str, bool] = defaultdict(bool)
+    for row in rows:
+        day = local_day(row.start, tz)
+        full[day] = full[day] or row.max >= full_pct
+        low[day] = low[day] or row.min < low_pct
+    days = set(full) | set(low)
+    return {
+        "days_with_data": len(days),
+        "days_full": sum(1 for day in days if full[day]),
+        "days_full_and_low": sum(1 for day in days if full[day] and low[day]),
+        "days_low_without_full": sum(1 for day in days if low[day] and not full[day]),
+        "lowest_pct": min((row.min for row in rows), default=None),
+    }
+
+
+def battery_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
+    """short at a quarter of days full-and-low; borderline on any; none if it never filled."""
+    days = evidence["days_with_data"]
+    if days == 0:
+        return withheld("no_data", evidence)
+    if evidence["days_full"] == 0:
+        # The nights say nothing about a battery that was never filled.
+        return withheld("never_full", evidence)
+    share = evidence["days_full_and_low"] / days
+    if share >= BATTERY_SHORT_SHARE:
+        verdict = SHORT
+    elif evidence["days_full_and_low"] > 0:
         verdict = BORDERLINE
     else:
         verdict = ENOUGH

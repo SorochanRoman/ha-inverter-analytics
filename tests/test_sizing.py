@@ -7,6 +7,8 @@ from custom_components.inverter_analytics.analytics.sizing import (
     BORDERLINE,
     ENOUGH,
     SHORT,
+    battery_evidence,
+    battery_verdict,
     inverter_evidence,
     inverter_verdict,
     local_day,
@@ -75,7 +77,83 @@ def test_no_hours_means_no_verdict_with_a_reason():
 
 
 def test_rows_are_grouped_by_the_local_month():
-    # 2026-03-31 22:30 UTC is already April in Kyiv (UTC+3 after the clock change).
+    # 2026-03-31 22:00 UTC is already April in Kyiv (UTC+3 after the clock change).
     rows = [HourlyRow(datetime(2026, 3, 31, 22, tzinfo=UTC), 1.0, 1.0, 1.0)]
     assert list(rows_by_month(rows, KYIV)) == ["2026-04"]
     assert local_day(datetime(2026, 3, 31, 22, tzinfo=UTC), KYIV) == "2026-04-01"
+
+
+def soc_day(day: int, *, low: float, high: float) -> list[HourlyRow]:
+    """A local Kyiv day of 24 hourly rows, with one hour at each extreme."""
+    start = datetime(2026, 3, 1 + day, tzinfo=KYIV).astimezone(UTC)
+    rows = [HourlyRow(start + timedelta(hours=h), 60.0, 55.0, 65.0) for h in range(24)]
+    rows[3] = HourlyRow(rows[3].start, 40.0, low, 60.0)
+    rows[14] = HourlyRow(rows[14].start, 80.0, 70.0, high)
+    return rows
+
+
+def battery(rows):
+    return battery_verdict(battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0))
+
+
+def test_days_are_split_by_whether_the_battery_had_filled():
+    rows = (
+        soc_day(0, low=15.0, high=100.0)  # full, and still at the low mark
+        + soc_day(1, low=15.0, high=80.0)  # low without filling: the sun's fault
+        + soc_day(2, low=30.0, high=96.0)  # full, and fine
+        + soc_day(3, low=30.0, high=80.0)  # neither
+    )
+    evidence = battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0)
+    assert evidence["days_with_data"] == 4
+    assert evidence["days_full"] == 2
+    assert evidence["days_full_and_low"] == 1
+    assert evidence["days_low_without_full"] == 1
+    assert evidence["lowest_pct"] == 15.0
+
+
+def test_full_and_low_on_a_quarter_of_days_is_short():
+    rows = soc_day(0, low=15.0, high=100.0) + [
+        row for day in range(1, 4) for row in soc_day(day, low=40.0, high=100.0)
+    ]
+    assert battery(rows)["verdict"] == SHORT
+
+
+def test_full_and_low_once_in_five_days_is_borderline():
+    rows = soc_day(0, low=15.0, high=100.0) + [
+        row for day in range(1, 5) for row in soc_day(day, low=40.0, high=100.0)
+    ]
+    assert battery(rows)["verdict"] == BORDERLINE
+
+
+def test_a_battery_that_fills_and_never_hits_the_low_mark_is_enough():
+    rows = [row for day in range(3) for row in soc_day(day, low=40.0, high=100.0)]
+    assert battery(rows)["verdict"] == ENOUGH
+
+
+def test_low_days_without_filling_do_not_count_against_the_battery():
+    rows = soc_day(0, low=15.0, high=80.0) + soc_day(1, low=40.0, high=100.0)
+    assert battery(rows)["verdict"] == ENOUGH
+
+
+def test_a_month_that_never_filled_has_no_battery_verdict():
+    rows = soc_day(0, low=15.0, high=80.0) + soc_day(1, low=15.0, high=80.0)
+    result = battery(rows)
+    assert result["verdict"] is None
+    assert result["reason"] == "never_full"
+    assert result["evidence"]["days_low_without_full"] == 2
+
+
+def test_no_rows_means_no_data():
+    assert battery([])["reason"] == "no_data"
+
+
+def test_days_follow_the_local_clock_across_the_spring_change():
+    # 2026-03-29 in Kyiv has 23 hours; a row at 22:00 UTC on the 28th is already the 29th.
+    rows = [
+        HourlyRow(datetime(2026, 3, 28, 22, tzinfo=UTC), 50.0, 15.0, 100.0),  # 00:00 Kyiv, 29th
+        HourlyRow(datetime(2026, 3, 29, 20, tzinfo=UTC), 50.0, 40.0, 60.0),  # 23:00 Kyiv, 29th
+        HourlyRow(datetime(2026, 3, 29, 21, tzinfo=UTC), 50.0, 40.0, 60.0),  # 00:00 Kyiv, 30th
+    ]
+    evidence = battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0)
+    assert evidence["days_with_data"] == 2
+    assert evidence["days_full_and_low"] == 1
