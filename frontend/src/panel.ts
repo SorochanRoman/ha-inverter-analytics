@@ -148,7 +148,7 @@ export class InverterAnalyticsPanel extends LitElement {
       return html`<div class="notice">
         ${m.panel.couldNotLoad({ error: this.error })}
         <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
-          ${m.panel.tryAgain}
+          ${m.common.tryAgain}
         </button>
       </div>`;
     }

@@ -16,6 +16,8 @@ export class IaPhasesSection extends LitElement {
   private i18n = new I18nController(this);
 
   private renderCards() {
+    const m = this.i18n.m;
+    const t = m.sections.phases;
     const { rating_per_phase } = this.phases;
     return html`<div class="cards">
       ${this.phases.per_phase.map((phase) => {
@@ -23,15 +25,17 @@ export class IaPhasesSection extends LitElement {
         return html`<div class="card">
           <span class="name">${phase.label}</span>
           <span class="value">${formatPower(phase.mean, this.locale)}</span>
-          <span class="row"><span>Peak</span><span>${formatPower(phase.peak, this.locale)}</span></span>
+          <span class="row"><span>${m.common.peak}</span><span>${formatPower(phase.peak, this.locale)}</span></span>
           <span class="row"><span>P95</span><span>${formatPower(phase.p95, this.locale)}</span></span>
-          <span class="row"><span>Share of load</span><span>${formatPercent(phase.share, this.locale)}</span></span>
+          <span class="row"><span>${t.shareOfLoad}</span><span>${formatPercent(phase.share, this.locale)}</span></span>
           <span class="row">
-            <span>Peak vs ${formatPower(rating_per_phase, this.locale)}</span>
+            <span>${t.peakVs({ rating: formatPower(rating_per_phase, this.locale) })}</span>
             <span>${formatPercent(phase.headroom, this.locale)}</span>
           </span>
           ${coverage !== undefined && coverage < 0.95
-            ? html`<span class="warn">Covers ${formatCoverage(coverage, this.locale)} of the period</span>`
+            ? html`<span class="warn">
+                ${m.common.coversOfPeriod({ share: formatCoverage(coverage, this.locale) })}
+              </span>`
             : nothing}
         </div>`;
       })}
@@ -39,53 +43,59 @@ export class IaPhasesSection extends LitElement {
   }
 
   private renderImbalance() {
+    const m = this.i18n.m;
+    const t = m.sections.phases;
     const { imbalance } = this.phases;
     if (imbalance.mean === null) {
       return html`<p class="empty">
-        Total load never rose above ${formatPower(imbalance.floor_w, this.locale)}, so there was
-        nothing to measure the spread against in this period.
+        ${t.neverAboveFloor({ floor: formatPower(imbalance.floor_w, this.locale) })}
       </p>`;
     }
     return html`
       <div class="cards">
         <div class="card">
-          <span class="name">Mean imbalance</span>
+          <span class="name">${t.meanImbalance}</span>
           <span class="value">${formatPercent(imbalance.mean, this.locale)}</span>
         </div>
         <div class="card">
-          <span class="name">P95 imbalance</span>
+          <span class="name">${t.p95Imbalance}</span>
           <span class="value">${formatPercent(imbalance.p95, this.locale)}</span>
         </div>
         <div class="card">
-          <span class="name">Above ${formatPercent(imbalance.threshold, this.locale)}</span>
+          <span class="name">
+            ${t.above({ threshold: formatPercent(imbalance.threshold, this.locale) })}
+          </span>
           <span class="value">${formatPercent(imbalance.fraction_above, this.locale)}</span>
-          <span class="row"><span>of the measured time</span></span>
+          <span class="row"><span>${t.ofMeasuredTime}</span></span>
         </div>
       </div>
-      <ia-chart .option=${imbalanceOption(imbalance, this.i18n.m)}></ia-chart>
+      <ia-chart .option=${imbalanceOption(imbalance, m)}></ia-chart>
       <p class="note">
-        Measured over ${formatDuration(imbalance.analysed_seconds, this.locale)}
-        (${formatCoverage(imbalance.coverage, this.locale)} of the period).${imbalance.below_floor_seconds >
-        0
-          ? html` A further ${formatDuration(imbalance.below_floor_seconds, this.locale)} sat below
-              ${formatPower(imbalance.floor_w, this.locale)} of total load and is excluded: at
-              standby power a few watts of difference is a large percentage and means nothing.`
+        ${t.measuredOver({
+          duration: formatDuration(imbalance.analysed_seconds, this.locale),
+          share: formatCoverage(imbalance.coverage, this.locale),
+        })}${imbalance.below_floor_seconds > 0
+          ? html` ${t.belowFloorExcluded({
+              duration: formatDuration(imbalance.below_floor_seconds, this.locale),
+              floor: formatPower(imbalance.floor_w, this.locale),
+            })}`
           : nothing}
       </p>
     `;
   }
 
   private renderEpisodes() {
+    const m = this.i18n.m;
     const { episodes, per_phase } = this.phases;
     if (!episodes.length) {
-      return html`<p class="empty">No sustained imbalance in this period.</p>`;
+      return html`<p class="empty">${m.sections.phases.noSustained}</p>`;
     }
     return html`<table>
       <thead>
         <tr>
-          <th>Start</th>
-          <th>Duration</th>
-          <th>Worst</th>
+          <th>${m.common.start}</th>
+          <th>${m.common.duration}</th>
+          <th>${m.sections.phases.worst}</th>
           ${per_phase.map((phase) => html`<th>${phase.label}</th>`)}
         </tr>
       </thead>
@@ -105,29 +115,29 @@ export class IaPhasesSection extends LitElement {
   protected render() {
     const { imbalance, rating_per_phase, rating_per_phase_derived, rating_per_phase_divisor } =
       this.phases;
+    const t = this.i18n.m.sections.phases;
     return html`
       <section>
-        <h2>Phases</h2>
+        <h2>${t.title}</h2>
         ${this.renderCards()}
         ${rating_per_phase_derived
           ? html`<p class="note">
-              No per-phase rating is configured, so the total is split across
-              ${rating_per_phase_divisor} phases — ${formatPower(rating_per_phase, this.locale)}
-              each. Set the real figure in the integration's options if the hardware differs.
+              ${t.derivedRating({
+                n: rating_per_phase_divisor,
+                rating: formatPower(rating_per_phase, this.locale),
+              })}
             </p>`
           : nothing}
         ${imbalance.aligned_coverage < 0.95
           ? html`<p class="warn">
-              All phases had data at the same moment for only
-              ${formatCoverage(imbalance.aligned_coverage, this.locale)} of the period. The spread
-              cannot be measured while any one phase is unknown.
+              ${t.alignedLow({ share: formatCoverage(imbalance.aligned_coverage, this.locale) })}
             </p>`
           : nothing}
 
-        <h3>Imbalance</h3>
+        <h3>${t.imbalance}</h3>
         ${this.renderImbalance()}
 
-        <h3>Sustained imbalance episodes</h3>
+        <h3>${t.sustainedEpisodes}</h3>
         ${this.renderEpisodes()}
       </section>
     `;

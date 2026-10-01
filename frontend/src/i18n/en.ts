@@ -11,6 +11,17 @@ import { plural } from "./plural";
 export const en = {
   common: {
     and: "and",
+    // The words every tab shares: its error notice, its status line, the
+    // first columns of its episode tables.
+    couldNotLoadData: (p: { error: string }) => `Could not load data: ${p.error}`,
+    tryAgain: "Try again",
+    computing: "Computing…",
+    refreshing: "Refreshing…",
+    periodShortened: "Period shortened to the maximum allowed",
+    start: "Start",
+    duration: "Duration",
+    peak: "Peak",
+    coversOfPeriod: (p: { share: string }) => `Covers ${p.share} of the period`,
   },
   units: {
     w: "W",
@@ -24,7 +35,6 @@ export const en = {
   panel: {
     language: "Language",
     couldNotLoad: (p: { error: string }) => `Could not load configuration: ${p.error}`,
-    tryAgain: "Try again",
     loading: "Loading…",
     noInverter:
       "No inverter is configured yet. Add the Inverter Analytics integration in settings.",
@@ -165,6 +175,142 @@ export const en = {
             one: `${p.n} outage began`,
             other: `${p.n} outages began`,
           }),
+  },
+  load: {
+    // A total and its parts that disagree. Two sentences rather than one with
+    // the subject slotted in: in Ukrainian the subject's gender changes the words around it.
+    loadConsistency: (p: { total: string; partsTotal: string }) =>
+      `Total load averages ${p.total} while the phases add up to ${p.partsTotal}. ` +
+      "Is one of them mapped to the wrong sensor?",
+    pvConsistency: (p: { total: string; partsTotal: string }) =>
+      `Total PV power averages ${p.total} while the strings add up to ${p.partsTotal}. ` +
+      "Is one of them mapped to the wrong sensor?",
+    histogramClipped:
+      "Some values fell outside the histogram range and are shown in its edge buckets",
+    mean: "Mean",
+    median: "Median",
+    sustained15m: "Sustained 15 min",
+    above80OfRated: ">80% of rated",
+    ofTime: "of time",
+    shareOfRated: (p: { share: string }) => `${p.share} of rated`,
+    noOverloads: "No overloads in this period.",
+    timeAtPowerLevel: "Time spent at each power level",
+    asPercentOfRated: "as % of rated",
+    inWatts: "in watts",
+    durationCurve: "Load duration curve",
+    ratedBands: "Distribution across rated-power bands",
+    overloadEpisodes: "Overload episodes",
+  },
+  battery: {
+    meanCharge: "Mean charge",
+    overWholePeriod: "over the whole period",
+    lowestCharge: "Lowest charge",
+    exactDataOnly: "exact data only",
+    needsExactData: "needs exact data",
+    below: (p: { level: string }) => `Below ${p.level}`,
+    dips: "Dips",
+    lastingOverMinute: "lasting over a minute",
+    meanLowPoint: "Mean low point",
+    acrossThoseDips: "across those dips",
+    dipsNotMeasurable:
+      "This period is covered only by hourly averages, which record the mean charge across each " +
+      "hour. A fall to 8% for twenty minutes shows up there as a comfortable number, so dips " +
+      'cannot be counted at all — an empty table would read as "none happened". Pick a shorter ' +
+      "period to see them.",
+    noEpisodes: (p: { level: string }) =>
+      `The charge never stayed below ${p.level} for more than a minute in this period.`,
+    lowest: "Lowest",
+    recoveredTo: "Recovered to",
+    dipsCountedFrom: (p: { date: string }) =>
+      `Dips counted from ${p.date}, where exact data begins`,
+    timeAtSoc: "Time spent at each state of charge",
+    chargeBands: "Distribution across charge bands",
+    lowChargeEpisodes: "Low-charge episodes",
+    // The heading itself is sections.charge.title, shared with the section.
+    mapPowerSensor:
+      "Map a battery power sensor in the integration's options to see how much moves in and " +
+      "out, and how much of the time the battery is working.",
+  },
+  sections: {
+    charge: {
+      title: "Charging and discharging",
+      signInverted:
+        "The charge rises while this battery reports discharging. The power sensor's " +
+        'direction is probably reversed — tick "Invert battery power" in the integration\'s ' +
+        "options. Until then charging and discharging are swapped everywhere on this page.",
+      meanChargePower: "Mean charge power",
+      meanDischargePower: "Mean discharge power",
+      ofTheTime: "Of the time",
+      resting: "Resting",
+      below: "Below",
+      discharged: "Discharged",
+      charged: "Charged",
+      roundTripEfficiency: "Round-trip efficiency",
+      outOfWhatWentIn: "Out of what went in",
+      fullCyclesPerDay: "Full cycles per day",
+      needsCapacity: "Needs the battery capacity",
+      setCapacity:
+        "Set the battery capacity in the integration's options and this becomes the energy " +
+        "discharged each day divided by one full charge. It is not guessed from the state of " +
+        "charge, which would count a shallow cycle the same as a deep one.",
+      integrated:
+        "Energy is integrated from the power readings rather than read off a meter, so a " +
+        "period with gaps understates it — compare it against the coverage above. Map the " +
+        "battery's charge and discharge counters in the options to read the inverter's own " +
+        "accounting instead, and to get round-trip efficiency.",
+      noEfficiency: "No round-trip efficiency for this period.",
+      // Below and above are two sentences, not a word slot: the comparative
+      // agrees with its noun in Ukrainian.
+      driftBelow: (p: { n: number }) =>
+        `The charge ended ${p.n} ${plural("en", p.n, { one: "point", other: "points" })} ` +
+        "below where it started, so the gap between charged and discharged is mostly energy " +
+        "still in the battery rather than energy lost on the way through. A longer period, or " +
+        "one that begins and ends at a similar charge, will give a figure.",
+      driftAbove: (p: { n: number }) =>
+        `The charge ended ${p.n} ${plural("en", p.n, { one: "point", other: "points" })} ` +
+        "above where it started, so the gap between charged and discharged is mostly energy " +
+        "still in the battery rather than energy lost on the way through. A longer period, or " +
+        "one that begins and ends at a similar charge, will give a figure.",
+      tooLittle: "There was too little charging and discharging to divide one by the other.",
+    },
+    phases: {
+      title: "Phases",
+      shareOfLoad: "Share of load",
+      peakVs: (p: { rating: string }) => `Peak vs ${p.rating}`,
+      neverAboveFloor: (p: { floor: string }) =>
+        `Total load never rose above ${p.floor}, so there was nothing to measure the spread ` +
+        "against in this period.",
+      meanImbalance: "Mean imbalance",
+      p95Imbalance: "P95 imbalance",
+      above: (p: { threshold: string }) => `Above ${p.threshold}`,
+      ofMeasuredTime: "of the measured time",
+      measuredOver: (p: { duration: string; share: string }) =>
+        `Measured over ${p.duration} (${p.share} of the period).`,
+      belowFloorExcluded: (p: { duration: string; floor: string }) =>
+        `A further ${p.duration} sat below ${p.floor} of total load and is excluded: at ` +
+        "standby power a few watts of difference is a large percentage and means nothing.",
+      noSustained: "No sustained imbalance in this period.",
+      worst: "Worst",
+      derivedRating: (p: { n: number; rating: string }) =>
+        "No per-phase rating is configured, so the total is split across " +
+        `${p.n} ${plural("en", p.n, { one: "phase", other: "phases" })} — ${p.rating} each. ` +
+        "Set the real figure in the integration's options if the hardware differs.",
+      alignedLow: (p: { share: string }) =>
+        `All phases had data at the same moment for only ${p.share} of the period. The spread ` +
+        "cannot be measured while any one phase is unknown.",
+      imbalance: "Imbalance",
+      sustainedEpisodes: "Sustained imbalance episodes",
+    },
+    strings: {
+      title: "PV strings",
+      shareOfPv: "Share of PV",
+      alignedLow: (p: { share: string }) =>
+        `All strings had data at the same moment for only ${p.share} of the period, so the ` +
+        "shares are of that time rather than the whole window.",
+      compare:
+        "A string consistently below its neighbour points at shading, a different orientation " +
+        "or a fault. Compare mean rather than peak: peaks coincide, averages do not.",
+    },
   },
 };
 

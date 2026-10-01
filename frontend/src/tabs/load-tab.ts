@@ -24,7 +24,9 @@ export class IaLoadTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "30d";
 
   @state() private payload?: LoadPayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
   @state() private mode: "watts" | "percent" = "watts";
 
@@ -74,7 +76,7 @@ export class IaLoadTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -89,27 +91,39 @@ export class IaLoadTab extends LitElement {
    * have a total that covers more than the parts, so this is evidence the user
    * should look at, not a fault we have proved.
    */
-  private renderConsistency(check: Consistency | undefined, whole: string, parts: string) {
+  private renderConsistency(
+    check: Consistency | undefined,
+    sentence: (p: { total: string; partsTotal: string }) => string,
+  ) {
     if (!check?.beyond_margin) return nothing;
     const locale = this.i18n.locale;
     return html`<span class="warn">
-      ${whole} averages ${formatPower(check.total_mean, locale)} while ${parts} add up to
-      ${formatPower(check.parts_mean, locale)}. Is one of them mapped to the wrong sensor?
+      ${sentence({
+        total: formatPower(check.total_mean, locale),
+        partsTotal: formatPower(check.parts_mean, locale),
+      })}
     </span>`;
   }
 
   private renderKpi(payload: LoadPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const share = (value: number | null) =>
-      value === null ? "" : formatPercent(value / payload.rated_power, locale) + " of rated";
+      value === null
+        ? ""
+        : m.load.shareOfRated({ share: formatPercent(value / payload.rated_power, locale) });
 
     const cells: [string, string, string][] = [
-      ["Mean", formatPower(payload.kpi.mean, locale), share(payload.kpi.mean)],
-      ["Median", formatPower(payload.kpi.median, locale), ""],
+      [m.load.mean, formatPower(payload.kpi.mean, locale), share(payload.kpi.mean)],
+      [m.load.median, formatPower(payload.kpi.median, locale), ""],
       ["P95", formatPower(payload.kpi.p95, locale), ""],
-      ["Peak", formatPower(payload.kpi.max, locale), share(payload.kpi.max)],
-      ["Sustained 15 min", formatPower(payload.kpi.max_sustained_15m, locale), ""],
-      [">80% of rated", formatPercent(payload.kpi.fraction_above_80pct, locale), "of time"],
+      [m.common.peak, formatPower(payload.kpi.max, locale), share(payload.kpi.max)],
+      [m.load.sustained15m, formatPower(payload.kpi.max_sustained_15m, locale), ""],
+      [
+        m.load.above80OfRated,
+        formatPercent(payload.kpi.fraction_above_80pct, locale),
+        m.load.ofTime,
+      ],
     ];
 
     return html`<div class="kpi">
@@ -124,13 +138,14 @@ export class IaLoadTab extends LitElement {
   }
 
   private renderOverloads(payload: LoadPayload) {
+    const m = this.i18n.m;
     if (!payload.overloads.length) {
-      return html`<p class="empty">No overloads in this period.</p>`;
+      return html`<p class="empty">${m.load.noOverloads}</p>`;
     }
     const locale = this.i18n.locale;
     return html`<table>
       <thead>
-        <tr><th>Start</th><th>Duration</th><th>Peak</th></tr>
+        <tr><th>${m.common.start}</th><th>${m.common.duration}</th><th>${m.common.peak}</th></tr>
       </thead>
       <tbody>
         ${payload.overloads.map(
@@ -145,14 +160,15 @@ export class IaLoadTab extends LitElement {
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
 
     const payload = this.payload;
@@ -165,42 +181,40 @@ export class IaLoadTab extends LitElement {
           ? html`<span class="warn">${coverageWarning(payload.coverage, locale)}</span>`
           : nothing}
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
         ${payload.histogram.clipped_low_seconds + payload.histogram.clipped_high_seconds > 0
-          ? html`<span class="warn">
-              Some values fell outside the histogram range and are shown in its edge buckets
-            </span>`
+          ? html`<span class="warn">${m.load.histogramClipped}</span>`
           : nothing}
-        ${this.renderConsistency(payload.consistency.load, "Total load", "the phases")}
-        ${this.renderConsistency(payload.consistency.pv, "Total PV power", "the strings")}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${this.renderConsistency(payload.consistency.load, m.load.loadConsistency)}
+        ${this.renderConsistency(payload.consistency.pv, m.load.pvConsistency)}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       ${this.renderKpi(payload)}
 
       <section>
         <header>
-          <h2>Time spent at each power level</h2>
+          <h2>${m.load.timeAtPowerLevel}</h2>
           <button @click=${() => {
             this.mode = this.mode === "watts" ? "percent" : "watts";
-          }}>${this.mode === "watts" ? "as % of rated" : "in watts"}</button>
+          }}>${this.mode === "watts" ? m.load.asPercentOfRated : m.load.inWatts}</button>
         </header>
-        <ia-chart .option=${histogramOption(payload, this.mode, this.i18n.m)}></ia-chart>
+        <ia-chart .option=${histogramOption(payload, this.mode, m)}></ia-chart>
       </section>
 
       <section>
-        <h2>Load duration curve</h2>
-        <ia-chart .option=${durationCurveOption(payload, this.i18n.m)}></ia-chart>
+        <h2>${m.load.durationCurve}</h2>
+        <ia-chart .option=${durationCurveOption(payload, m)}></ia-chart>
       </section>
 
       <section>
-        <h2>Distribution across rated-power bands</h2>
-        <ia-chart .option=${bandsOption(payload, this.i18n.m)} height="220px"></ia-chart>
+        <h2>${m.load.ratedBands}</h2>
+        <ia-chart .option=${bandsOption(payload, m)} height="220px"></ia-chart>
       </section>
 
       <section>
-        <h2>Overload episodes</h2>
+        <h2>${m.load.overloadEpisodes}</h2>
         ${this.renderOverloads(payload)}
       </section>
 

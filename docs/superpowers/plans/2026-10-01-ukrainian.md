@@ -64,6 +64,13 @@
 | the battery filled / never filled | батарея зарядилася повністю / жодного разу не зарядилася повністю |
 | integration | інтеграція |
 | settings | налаштування |
+| of rated (power) | від номінальної |
+| dip (state of charge) | провал |
+| episode (overload, low charge, imbalance) | епізод |
+| resting (battery idle) | простій |
+| load duration curve | крива тривалості навантаження |
+| charging and discharging | заряд і розряд |
+| P95 | P95 |
 
 ---
 

@@ -22,7 +22,9 @@ export class IaBatteryTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "30d";
 
   @state() private payload?: BatteryPayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
 
   private i18n = new I18nController(this);
@@ -67,7 +69,7 @@ export class IaBatteryTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -76,31 +78,36 @@ export class IaBatteryTab extends LitElement {
   }
 
   private renderKpi(payload: BatteryPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const measurable = payload.dips_measurable;
     const dash = "—";
 
     const cells: [string, string, string][] = [
-      ["Mean charge", formatPercent(pct(payload.kpi.mean_soc), locale), "over the whole period"],
       [
-        "Lowest charge",
+        m.battery.meanCharge,
+        formatPercent(pct(payload.kpi.mean_soc), locale),
+        m.battery.overWholePeriod,
+      ],
+      [
+        m.battery.lowestCharge,
         measurable ? formatPercent(pct(payload.kpi.min_soc), locale) : dash,
-        measurable ? "exact data only" : "needs exact data",
+        measurable ? m.battery.exactDataOnly : m.battery.needsExactData,
       ],
       [
-        `Below ${formatPercent(pct(payload.low_pct), locale)}`,
+        m.battery.below({ level: formatPercent(pct(payload.low_pct), locale) }),
         measurable ? formatDuration(payload.kpi.seconds_below_low, locale) : dash,
-        measurable ? "exact data only" : "needs exact data",
+        measurable ? m.battery.exactDataOnly : m.battery.needsExactData,
       ],
       [
-        "Dips",
+        m.battery.dips,
         measurable ? String(payload.kpi.dip_count) : dash,
-        measurable ? "lasting over a minute" : "needs exact data",
+        measurable ? m.battery.lastingOverMinute : m.battery.needsExactData,
       ],
       [
-        "Mean low point",
+        m.battery.meanLowPoint,
         measurable ? formatPercent(pct(payload.kpi.mean_low_point), locale) : dash,
-        measurable ? "across those dips" : "needs exact data",
+        measurable ? m.battery.acrossThoseDips : m.battery.needsExactData,
       ],
     ];
 
@@ -116,26 +123,26 @@ export class IaBatteryTab extends LitElement {
   }
 
   private renderEpisodes(payload: BatteryPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
 
     if (!payload.dips_measurable) {
-      return html`<p class="empty">
-        This period is covered only by hourly averages, which record the mean charge across each
-        hour. A fall to 8% for twenty minutes shows up there as a comfortable number, so dips
-        cannot be counted at all — an empty table would read as "none happened". Pick a shorter
-        period to see them.
-      </p>`;
+      return html`<p class="empty">${m.battery.dipsNotMeasurable}</p>`;
     }
     if (!payload.episodes.length) {
       return html`<p class="empty">
-        The charge never stayed below ${formatPercent(pct(payload.low_pct), locale)} for more than
-        a minute in this period.
+        ${m.battery.noEpisodes({ level: formatPercent(pct(payload.low_pct), locale) })}
       </p>`;
     }
 
     return html`<table>
       <thead>
-        <tr><th>Start</th><th>Duration</th><th>Lowest</th><th>Recovered to</th></tr>
+        <tr>
+          <th>${m.common.start}</th>
+          <th>${m.common.duration}</th>
+          <th>${m.battery.lowest}</th>
+          <th>${m.battery.recoveredTo}</th>
+        </tr>
       </thead>
       <tbody>
         ${payload.episodes.map(
@@ -151,14 +158,15 @@ export class IaBatteryTab extends LitElement {
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
 
     const payload = this.payload;
@@ -170,31 +178,32 @@ export class IaBatteryTab extends LitElement {
         <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
         ${warning ? html`<span class="warn">${warning}</span>` : nothing}
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
         ${payload.raw_from && payload.dips_restricted && payload.dips_measurable
           ? html`<span class="warn">
-              Dips counted from ${new Date(payload.raw_from).toLocaleDateString(locale)}, where
-              exact data begins
+              ${m.battery.dipsCountedFrom({
+                date: new Date(payload.raw_from).toLocaleDateString(locale),
+              })}
             </span>`
           : nothing}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       ${this.renderKpi(payload)}
 
       <section>
-        <h2>Time spent at each state of charge</h2>
-        <ia-chart .option=${socHistogramOption(payload, this.i18n.m)}></ia-chart>
+        <h2>${m.battery.timeAtSoc}</h2>
+        <ia-chart .option=${socHistogramOption(payload, m)}></ia-chart>
       </section>
 
       <section>
-        <h2>Distribution across charge bands</h2>
-        <ia-chart .option=${socBandsOption(payload.bands, this.i18n.m)} height="220px"></ia-chart>
+        <h2>${m.battery.chargeBands}</h2>
+        <ia-chart .option=${socBandsOption(payload.bands, m)} height="220px"></ia-chart>
       </section>
 
       <section>
-        <h2>Low-charge episodes</h2>
+        <h2>${m.battery.lowChargeEpisodes}</h2>
         ${this.renderEpisodes(payload)}
       </section>
 
@@ -205,11 +214,8 @@ export class IaBatteryTab extends LitElement {
             .locale=${locale}
           ></ia-charge-section>`
         : html`<section>
-            <h2>Charging and discharging</h2>
-            <p class="empty">
-              Map a battery power sensor in the integration's options to see how much moves in and
-              out, and how much of the time the battery is working.
-            </p>
+            <h2>${m.sections.charge.title}</h2>
+            <p class="empty">${m.battery.mapPowerSensor}</p>
           </section>`}
     `;
   }
