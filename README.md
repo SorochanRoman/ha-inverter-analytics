@@ -112,6 +112,15 @@ beyond pointing the integration at the ones you already have.
   read from the requested window, and reads both when the window straddles
   the boundary.
 
+### Language
+
+The panel speaks English and Ukrainian. The `EN | UK` switch in its header
+picks one, and the choice is kept in the browser; until it is used, the panel
+follows the language of your Home Assistant profile. A Ukrainian panel also
+writes its numbers and units the Ukrainian way. The setup and options forms
+are rendered by Home Assistant itself, so they follow the profile language
+only, whatever the switch says.
+
 ## What it will not pretend to know
 
 The interface refuses to show confident numbers it cannot substantiate,

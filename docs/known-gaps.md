@@ -191,6 +191,15 @@ the defect was only visible on screen.
   English. HA's explicit `date_format` and `time_format` preferences are
   ignored — only `language` is read.
 
+- **The Ukrainian panel and `uk.json`, all of it.** Nothing in the Ukrainian
+  work has been seen in a running Home Assistant; it rests on unit tests that
+  every key is present and translated, and on the build. The live run has to
+  switch the panel to UK and read every tab's headings, notes, cards, charts
+  and the feature notice in Ukrainian, with numbers written with a comma and
+  in кВт; reload and find the choice kept; switch back and find the English
+  exactly as before; then open **Reconfigure** in a Ukrainian profile and find
+  the labels and descriptions in Ukrainian.
+
 ## 4. Seams to widen before the next tabs
 
 - **Cross-role phase counts are unvalidated.** `load_power_phase` and
@@ -203,6 +212,31 @@ the defect was only visible on screen.
   first place the "total wins" rule has nothing to apply to.
 
 ## 5. Deliberately deferred
+
+**The panel and the forms choose their language separately.** The panel
+follows its own `EN | UK` switch (or, until it is used, the Home Assistant
+profile language); the setup and options forms follow the profile language
+only, because Home Assistant renders them. With the panel in Ukrainian and
+Home Assistant in English, the panel names a field in Ukrainian that the form
+shows in English. Not worked around: the forms cannot be told to follow the
+switch.
+
+**English fragments inside the Ukrainian forms.** Several placeholders in the
+forms and in Repairs are filled by the backend with finished English text —
+`{found}`, `{no_statistics}`, `{sensors}`, `{features}` — so a Ukrainian form
+still reads "3 sensors" in the middle of a Ukrainian sentence. `uk.json` can
+translate the sentence around a placeholder but not what the backend puts in
+it. Doing better means the backend sending values that can be translated —
+counts and keys rather than phrases — and the translation files composing
+them; nothing else needs that yet, so it waits.
+
+**The English Sizing rules say less exactly what the code does.** The battery
+rule says the charge "fell to" the low mark, where the code counts a day when
+it fell *below* it (`< low`); the inverter rule says "above 80%" of rated,
+where the code counts 80% itself (`>= 80%`). The Ukrainian sentences follow
+the code exactly, so on these two points the languages differ. The English
+wording is a follow-up; it was left alone here because the Ukrainian work was
+not to change a word of the English.
 
 **Year-on-year comparison.** Windows are capped at 400 days, so the same month
 in two different years cannot both be in view. Lifting the cap is a separate
