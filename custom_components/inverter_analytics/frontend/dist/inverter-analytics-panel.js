@@ -676,6 +676,7 @@ const bb = {
     // The notice on a tab whose sensors are not mapped. One role or several
     // changes more than a pronoun, so each is a whole paragraph.
     missingOne: (r) => `${r.feature} needs ${r.roles}, and it is not mapped to this inverter. Nothing here is broken and there is no data missing — this page has simply not been told which of your sensors that is.`,
+    // missingMany gets its roles already set off one by one by common.quoted.
     missingMany: (r) => `${r.feature} needs ${r.roles}, and none of them are mapped to this inverter. Nothing here is broken and there is no data missing — this page has simply not been told which of your sensors those are.`,
     reconfigureBefore: "Open the integration, choose ",
     reconfigure: "Reconfigure",
@@ -1159,8 +1160,8 @@ const bb = {
     peak: "Пік",
     load: "Навантаження",
     pv: "СЕС",
-    in: "Надходження",
-    out: "Витрата",
+    in: "Надійшло",
+    out: "Вийшло",
     flows: {
       pv_energy_total: "Сонце",
       grid_import_total: "З мережі",
@@ -1257,7 +1258,7 @@ const bb = {
     noEnergyStatistics: "За цей період немає статистики енергії",
     intoSystem: "у систему",
     outOfIt: "із системи",
-    inAgainstOut: "Надійшло проти вийшло",
+    inAgainstOut: "Надійшло й вийшло",
     needsAllSix: (r) => `Баланс можна звести лише тоді, коли вказано всі шість лічильників. Бракує: ${r.missing}. Доти різниця між двома стовпчиками вимірювала б те, що не вказано, а не те, що втрачено.`,
     inOut: (r) => `Надійшло ${r.in}, вийшло ${r.out} —`,
     unaccountedFor: (r) => `не враховано (${r.share}).`,
@@ -26449,7 +26450,9 @@ let Ee = class extends Gt {
     if (t && !t.available) {
       const e = {
         feature: r.features[t.key] ?? t.label,
-        roles: hh(r, t.missing)
+        // Several roles are each set off by common.quoted (missingMany);
+        // missingOne quotes its single role itself where a language does.
+        roles: hh(r, t.missing, t.missing.length > 1)
       };
       return L`<div class="notice">
         <p>

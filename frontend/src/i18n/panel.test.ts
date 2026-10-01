@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { listRoles } from "../roles";
 import { en } from "./en";
 import { uk } from "./uk";
 
@@ -22,10 +23,19 @@ describe("the missing-roles notice", () => {
         "вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не " +
         "сказали, який із ваших сенсорів це.",
     );
-    expect(uk.panel.missingMany({ feature: "Баланс", roles: "A і B" })).toBe(
-      "Для розділу «Баланс» потрібні поля A і B, але для цього інвертора жодне з них не " +
+    expect(uk.panel.missingMany({ feature: "Баланс", roles: "«A» і «B»" })).toBe(
+      "Для розділу «Баланс» потрібні поля «A» і «B», але для цього інвертора жодне з них не " +
         "вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не " +
         "сказали, які з ваших сенсорів це.",
     );
+  });
+
+  it("quotes every role of a list in Ukrainian and none in English", () => {
+    const roles = ["pv_power", "grid_power"];
+    expect(en.panel.missingMany({ feature: "Load", roles: listRoles(en, roles, true) })).toMatch(
+      /^Load needs PV power and Grid power, and none/,
+    );
+    expect(uk.panel.missingMany({ feature: "Навантаження", roles: listRoles(uk, roles, true) }))
+      .toContain(`потрібні поля «${uk.roles.pv_power}» і «${uk.roles.grid_power}», але`);
   });
 });

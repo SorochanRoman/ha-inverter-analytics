@@ -57,6 +57,7 @@ export const en = {
       `${p.feature} needs ${p.roles}, and it is not mapped to this inverter. ` +
       "Nothing here is broken and there is no data missing — this page has simply not been " +
       "told which of your sensors that is.",
+    // missingMany gets its roles already set off one by one by common.quoted.
     missingMany: (p: { feature: string; roles: string }) =>
       `${p.feature} needs ${p.roles}, and none of them are mapped to this inverter. ` +
       "Nothing here is broken and there is no data missing — this page has simply not been " +

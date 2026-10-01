@@ -244,7 +244,9 @@ export class InverterAnalyticsPanel extends LitElement {
     if (feature && !feature.available) {
       const words = {
         feature: m.features[feature.key as keyof Messages["features"]] ?? feature.label,
-        roles: listRoles(m, feature.missing),
+        // Several roles are each set off by common.quoted (missingMany);
+        // missingOne quotes its single role itself where a language does.
+        roles: listRoles(m, feature.missing, feature.missing.length > 1),
       };
       return html`<div class="notice">
         <p>
