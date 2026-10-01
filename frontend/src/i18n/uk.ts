@@ -490,6 +490,7 @@ export const uk: Messages = {
     },
     phases: {
       title: "Фази",
+      positional: (p) => `Фаза ${p.n}`,
       shareOfLoad: "Частка навантаження",
       peakVs: (p) => `Пік щодо ${p.rating}`,
       neverAboveFloor: (p) =>
@@ -519,6 +520,7 @@ export const uk: Messages = {
     },
     strings: {
       title: "Стрінги СЕС",
+      positional: (p) => `Стрінг ${p.n}`,
       shareOfPv: "Частка СЕС",
       alignedLow: (p) =>
         `Усі стрінги мали дані одночасно лише для ${p.share} періоду, тож частки рахуються від ` +

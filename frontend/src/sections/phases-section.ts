@@ -4,6 +4,7 @@ import { imbalanceOption } from "../charts/options";
 import "../charts/echart";
 import { formatCoverage, formatDuration, formatPercent, formatPower } from "../format";
 import { I18nController } from "../i18n/controller";
+import { partLabel } from "../roles";
 import type { Phases, SeriesInfo } from "../types";
 import { sectionStyles } from "./shared-styles";
 
@@ -23,7 +24,7 @@ export class IaPhasesSection extends LitElement {
       ${this.phases.per_phase.map((phase) => {
         const coverage = this.series[phase.key]?.coverage;
         return html`<div class="card">
-          <span class="name">${phase.label}</span>
+          <span class="name">${partLabel(m, phase)}</span>
           <span class="value">${formatPower(phase.mean, this.locale)}</span>
           <span class="row"><span>${m.common.peak}</span><span>${formatPower(phase.peak, this.locale)}</span></span>
           <span class="row"><span>P95</span><span>${formatPower(phase.p95, this.locale)}</span></span>
@@ -96,7 +97,7 @@ export class IaPhasesSection extends LitElement {
           <th>${m.common.start}</th>
           <th>${m.common.duration}</th>
           <th>${m.sections.phases.worst}</th>
-          ${per_phase.map((phase) => html`<th>${phase.label}</th>`)}
+          ${per_phase.map((phase) => html`<th>${partLabel(m, phase)}</th>`)}
         </tr>
       </thead>
       <tbody>

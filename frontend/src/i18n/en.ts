@@ -499,6 +499,7 @@ export const en = {
     },
     phases: {
       title: "Phases",
+      positional: (p: { n: number }) => `Phase ${p.n}`,
       shareOfLoad: "Share of load",
       peakVs: (p: { rating: string }) => `Peak vs ${p.rating}`,
       neverAboveFloor: (p: { floor: string }) =>
@@ -527,6 +528,7 @@ export const en = {
     },
     strings: {
       title: "PV strings",
+      positional: (p: { n: number }) => `String ${p.n}`,
       shareOfPv: "Share of PV",
       alignedLow: (p: { share: string }) =>
         `All strings had data at the same moment for only ${p.share} of the period, so the ` +

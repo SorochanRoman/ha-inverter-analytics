@@ -30,5 +30,25 @@ export function listRoles(m: Messages, roles: readonly string[]): string {
   return `${labels.slice(0, -1).join(", ")} ${m.common.and} ${labels[labels.length - 1]}`;
 }
 
+/**
+ * A part key the backend builds when it could not read an index from the
+ * entity ids: load_p2, grid_p2, pv_p3 (see part_identities in roles.py). A
+ * part whose index was read gets load_l2 / pv_s3 instead, so the key alone
+ * says whether the label is the positional fallback ("Phase 2", "String 3").
+ */
+const POSITIONAL_PART = /^(load|grid|pv)_p(\d+)$/;
+
+/**
+ * The name a phase or PV string is shown under. A label the backend read
+ * from the entity id ("L2", "PV3") is kept as it is; the positional fallback
+ * is English prose, so it is named again from the dictionary.
+ */
+export function partLabel(m: Messages, part: { key: string; label: string }): string {
+  const match = POSITIONAL_PART.exec(part.key);
+  if (!match) return part.label;
+  const n = Number(match[2]);
+  return match[1] === "pv" ? m.sections.strings.positional({ n }) : m.sections.phases.positional({ n });
+}
+
 /** Where the user goes to map them. */
 export const INTEGRATION_URL = "/config/integrations/integration/inverter_analytics";

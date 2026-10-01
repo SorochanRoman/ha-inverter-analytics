@@ -1,4 +1,5 @@
 import type { Messages } from "../i18n/en";
+import { partLabel } from "../roles";
 import { SERIES, chartBaseOption } from "../theme";
 import type {
   BalanceDay,
@@ -149,7 +150,7 @@ export function partsOption(
     // the plot has to be pushed down to make room for it.
     legend: { data: [m.charts.mean, m.charts.peak], top: 0, textStyle: base.textStyle },
     grid: { ...(base.grid as Record<string, unknown>), top: 48 },
-    xAxis: { ...axis, type: "category", data: parts.map((part) => part.label) },
+    xAxis: { ...axis, type: "category", data: parts.map((part) => partLabel(m, part)) },
     yAxis: { ...axis, type: "value", name: m.units.w },
     series: [
       {

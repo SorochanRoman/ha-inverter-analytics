@@ -4,6 +4,7 @@ import { partsOption } from "../charts/options";
 import "../charts/echart";
 import { formatCoverage, formatPercent, formatPower } from "../format";
 import { I18nController } from "../i18n/controller";
+import { partLabel } from "../roles";
 import { SERIES } from "../theme";
 import type { SeriesInfo, Strings } from "../types";
 import { sectionStyles } from "./shared-styles";
@@ -27,7 +28,7 @@ export class IaStringsSection extends LitElement {
           ${parts.map((part) => {
             const coverage = this.series[part.key]?.coverage;
             return html`<div class="card">
-              <span class="name">${part.label}</span>
+              <span class="name">${partLabel(m, part)}</span>
               <span class="value">${formatPower(part.mean, this.locale)}</span>
               <span class="row"><span>${m.common.peak}</span><span>${formatPower(part.peak, this.locale)}</span></span>
               <span class="row"><span>${t.shareOfPv}</span><span>${formatPercent(part.share, this.locale)}</span></span>

@@ -241,6 +241,8 @@ def part_identities(role_key: str, entity_ids: Sequence[str]) -> tuple[PartIdent
                 )
             )
         else:
+            # The panel recognises the _p<N> key and names the part in its own
+            # language (partLabel in frontend/src/roles.ts); keep the two in step.
             identities.append(
                 PartIdentity(
                     f"{family.prefix}_p{position + 1}",

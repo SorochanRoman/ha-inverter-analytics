@@ -167,6 +167,15 @@ describe("partsOption", () => {
     expect(option.series[1].data).toEqual([3400, 2600]);
   });
 
+  it("names positional parts on the axis in the panel language", () => {
+    const positional: PartSummary[] = [
+      { ...parts[0], key: "pv_p1", label: "String 1", index: null },
+      { ...parts[1], key: "pv_p2", label: "String 2", index: null },
+    ];
+    expect((partsOption(positional, SERIES.pv, en) as any).xAxis.data).toEqual(["String 1", "String 2"]);
+    expect((partsOption(positional, SERIES.pv, uk) as any).xAxis.data).toEqual(["Стрінг 1", "Стрінг 2"]);
+  });
+
   it("keeps a part with no data as a hole rather than a zero", () => {
     const option = partsOption([{ ...parts[0], mean: null, peak: null }], SERIES.pv, en) as any;
     expect(option.series[0].data).toEqual([null]);

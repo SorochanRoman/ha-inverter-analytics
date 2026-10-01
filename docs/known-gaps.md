@@ -225,9 +225,11 @@ switch.
 **English fragments inside the Ukrainian forms.** Several placeholders in the
 forms and in Repairs are filled by the backend with finished English text —
 `{found}`, `{no_statistics}`, `{sensors}`, `{features}` — so a Ukrainian form
-still reads "3 sensors" in the middle of a Ukrainian sentence. `uk.json` can
-translate the sentence around a placeholder but not what the backend puts in
-it. Doing better means the backend sending values that can be translated —
+still reads "3 sensors" in the middle of a Ukrainian sentence. The same goes
+for the text of the inverter options on the first setup step, which the
+backend builds whole ("Deye — 42 sensors", "— no load sensor found" in
+`_cluster_label`, `config_flow.py`). `uk.json` can translate the sentence
+around a placeholder but not what the backend puts in it. Doing better means the backend sending values that can be translated —
 counts and keys rather than phrases — and the translation files composing
 them; nothing else needs that yet, so it waits.
 
