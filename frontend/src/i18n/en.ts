@@ -28,7 +28,7 @@ export const en = {
     // The notice on a tab whose sensors are not mapped. One role or several
     // changes more than a pronoun, so each is a whole paragraph.
     missingOne: (p: { feature: string; roles: string }) =>
-      `${p.feature} needs ${p.roles}, and it is mapped to this inverter. ` +
+      `${p.feature} needs ${p.roles}, and it is not mapped to this inverter. ` +
       "Nothing here is broken and there is no data missing — this page has simply not been " +
       "told which of your sensors that is.",
     missingMany: (p: { feature: string; roles: string }) =>
