@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { partsOption } from "../charts/options";
 import "../charts/echart";
 import { formatCoverage, formatPercent, formatPower } from "../format";
+import { I18nController } from "../i18n/controller";
 import { SERIES } from "../theme";
 import type { SeriesInfo, Strings } from "../types";
 import { sectionStyles } from "./shared-styles";
@@ -12,6 +13,10 @@ export class IaStringsSection extends LitElement {
   @property({ attribute: false }) public strings!: Strings;
   @property({ attribute: false }) public series: Record<string, SeriesInfo> = {};
   @property({ type: String }) public locale = "en";
+
+  // Protected only until this section reads its own words from it:
+  // noUnusedLocals rejects a private field nothing reads yet.
+  protected i18n = new I18nController(this);
 
   protected render() {
     const { parts, aligned_coverage } = this.strings;

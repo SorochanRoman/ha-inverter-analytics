@@ -1,13 +1,11 @@
+import type { Messages } from "./i18n/en";
+
 export const RANGE_KEYS = ["24h", "7d", "30d", "month", "year"] as const;
 export type RangeKey = (typeof RANGE_KEYS)[number];
 
-export const RANGE_LABELS: Record<RangeKey, string> = {
-  "24h": "24 h",
-  "7d": "7 days",
-  "30d": "30 days",
-  month: "This month",
-  year: "Year",
-};
+export function rangeLabel(m: Messages, key: RangeKey): string {
+  return m.ranges[key];
+}
 
 const DAY_MS = 24 * 3600 * 1000;
 const MINUTE_MS = 60 * 1000;

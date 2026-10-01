@@ -1,3 +1,4 @@
+import type { Messages } from "./i18n/en";
 import type { Precision } from "./types";
 
 const DASH = "—";
@@ -60,7 +61,17 @@ export function formatDuration(seconds: number): string {
 }
 
 /** An error from Home Assistant arrives as an object {code, message}, not a string. */
-export function describeError(error: unknown): string {
+/**
+ * An error as a sentence. A backend code with a fixed message is named in
+ * the panel's language; anything else keeps the message it came with.
+ */
+export function describeError(error: unknown, m: Messages): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && Object.prototype.hasOwnProperty.call(m.errors, code)) {
+      return m.errors[code as keyof Messages["errors"]];
+    }
+  }
   if (typeof error === "object" && error !== null && "message" in error) {
     const message = (error as { message?: unknown }).message;
     if (typeof message === "string" && message) return message;

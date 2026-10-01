@@ -8,6 +8,7 @@ import {
   formatPercent,
   formatPower,
 } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import { listRoles } from "../roles";
 import { sectionStyles } from "../sections/shared-styles";
@@ -47,6 +48,8 @@ export class IaSizingTab extends LitElement {
   @state() private error?: string;
   @state() private loading = false;
 
+  private i18n = new I18nController(this);
+
   private requestId = 0;
 
   protected willUpdate(changed: Map<string, unknown>): void {
@@ -67,7 +70,7 @@ export class IaSizingTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -181,14 +184,14 @@ export class IaSizingTab extends LitElement {
    * each makes the verdict below it meaningless, so they outrank it.
    */
   private renderSetupNote(card: SizingCardKey, payload: SizingPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const meta = payload.cards[card];
     if (meta.missing.length) {
       // rated_power is a number in the options, not an entity: "not mapped"
       // would send the reader looking for a sensor to pick.
       const onlyRated = meta.missing.length === 1 && meta.missing[0] === "rated_power";
       return html`<p class="note">
-        Needs ${listRoles(meta.missing)},
+        Needs ${listRoles(this.i18n.m, meta.missing)},
         ${onlyRated ? "which is not set for this inverter" : "not mapped to this inverter"}.
       </p>`;
     }
@@ -219,14 +222,14 @@ export class IaSizingTab extends LitElement {
    */
   private renderCoverageNote(block: VerdictBlock, payload: SizingPayload) {
     if (block.coverage === 0 || block.coverage >= payload.incomplete_below) return nothing;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     return html`<p class="note">
       Read from ${formatCoverage(block.coverage, locale)} of the period.
     </p>`;
   }
 
   private renderCard(card: SizingCardKey, title: string, payload: SizingPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const block = payload.period[card];
     const setup = this.renderSetupNote(card, payload);
     let body;
@@ -264,7 +267,7 @@ export class IaSizingTab extends LitElement {
   }
 
   private renderMonths(payload: SizingPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const cell = (card: SizingCardKey, month: SizingMonth) => {
       const block = month[card];
       // Unmapped, or a sensor that keeps no statistics: the card above says
@@ -332,7 +335,7 @@ export class IaSizingTab extends LitElement {
       return html`<div class="notice">Computing…</div>`;
     }
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     return html`
       <div class="status">
         <span class="badge">Hourly statistics</span>

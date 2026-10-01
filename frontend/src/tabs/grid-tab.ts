@@ -12,6 +12,7 @@ import {
   formatPower,
   precisionLabel,
 } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import { sectionStyles } from "../sections/shared-styles";
 import type {
@@ -57,6 +58,8 @@ export class IaGridTab extends LitElement {
   @state() private error?: string;
   @state() private loading = false;
 
+  private i18n = new I18nController(this);
+
   private requestId = 0;
   private themeObserver?: MutationObserver;
 
@@ -94,7 +97,7 @@ export class IaGridTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -103,7 +106,7 @@ export class IaGridTab extends LitElement {
   }
 
   private renderKpi(payload: GridPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const kpi = payload.kpi;
     const measured = payload.measured_seconds > 0;
     const cells: [string, string, string][] = [
@@ -154,7 +157,7 @@ export class IaGridTab extends LitElement {
         measurement.
       </p>`;
     }
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const soc = (value: number | null | undefined) =>
       value === null || value === undefined ? DASH : formatPercent(value / 100, locale);
     return html`<table>
@@ -191,7 +194,7 @@ export class IaGridTab extends LitElement {
   }
 
   private renderAutonomy(autonomy: Autonomy, lowPct: number) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     if (autonomy.reason !== null) {
       // Keyed by the union rather than by string, so a reason the backend
       // learns to send is a compile error here and not "undefined" on screen.
@@ -248,7 +251,7 @@ export class IaGridTab extends LitElement {
     }
 
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const warning = coverageWarning(payload.coverage, locale);
     const daysWithoutData = payload.days.length === 0;
     // Days the sensor had no data for are absent from the chart rather than

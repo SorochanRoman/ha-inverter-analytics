@@ -13,6 +13,7 @@ import {
   formatPower,
   precisionLabel,
 } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import type { Consistency, HomeAssistant, LoadPayload } from "../types";
 
@@ -26,6 +27,8 @@ export class IaLoadTab extends LitElement {
   @state() private error?: string;
   @state() private loading = false;
   @state() private mode: "watts" | "percent" = "watts";
+
+  private i18n = new I18nController(this);
 
   private requestId = 0;
 
@@ -71,7 +74,7 @@ export class IaLoadTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -88,7 +91,7 @@ export class IaLoadTab extends LitElement {
    */
   private renderConsistency(check: Consistency | undefined, whole: string, parts: string) {
     if (!check?.beyond_margin) return nothing;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     return html`<span class="warn">
       ${whole} averages ${formatPower(check.total_mean, locale)} while ${parts} add up to
       ${formatPower(check.parts_mean, locale)}. Is one of them mapped to the wrong sensor?
@@ -96,7 +99,7 @@ export class IaLoadTab extends LitElement {
   }
 
   private renderKpi(payload: LoadPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const share = (value: number | null) =>
       value === null ? "" : formatPercent(value / payload.rated_power, locale) + " of rated";
 
@@ -124,7 +127,7 @@ export class IaLoadTab extends LitElement {
     if (!payload.overloads.length) {
       return html`<p class="empty">No overloads in this period.</p>`;
     }
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     return html`<table>
       <thead>
         <tr><th>Start</th><th>Duration</th><th>Peak</th></tr>
@@ -153,7 +156,7 @@ export class IaLoadTab extends LitElement {
     }
 
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
 
     return html`
       <div class="status">

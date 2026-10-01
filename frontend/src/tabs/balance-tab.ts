@@ -4,6 +4,7 @@ import { fetchBalance } from "../api";
 import { FLOW_LABELS, dailyFlowsOption, flowBarsOption } from "../charts/options";
 import "../charts/echart";
 import { describeError, formatEnergy, formatPercent } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import type { BalancePayload, HomeAssistant } from "../types";
 
@@ -20,6 +21,8 @@ export class IaBalanceTab extends LitElement {
   @state() private payload?: BalancePayload;
   @state() private error?: string;
   @state() private loading = false;
+
+  private i18n = new I18nController(this);
 
   private requestId = 0;
   private themeObserver?: MutationObserver;
@@ -57,7 +60,7 @@ export class IaBalanceTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -66,7 +69,7 @@ export class IaBalanceTab extends LitElement {
   }
 
   private renderTotals(payload: BalancePayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     return html`<div class="kpi">
       ${ALL.filter((role) => role in payload.totals).map(
         (role) => html`<div class="cell">
@@ -81,7 +84,7 @@ export class IaBalanceTab extends LitElement {
   }
 
   private renderBalance(payload: BalancePayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
 
     if (payload.unaccounted === null) {
       return html`<p class="empty">
@@ -108,7 +111,7 @@ export class IaBalanceTab extends LitElement {
   }
 
   private renderRatios(payload: BalancePayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const totals = payload.totals;
     const has = (role: string) => role in totals;
 
@@ -163,7 +166,7 @@ export class IaBalanceTab extends LitElement {
     }
 
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
 
     return html`
       <div class="status">

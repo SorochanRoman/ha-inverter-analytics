@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { RANGE_KEYS, resolveRange } from "./range";
+import { en } from "./i18n/en";
+import { uk } from "./i18n/uk";
+import { RANGE_KEYS, rangeLabel, resolveRange } from "./range";
 
 const NOW = new Date("2026-08-29T12:00:00Z");
 
@@ -55,5 +57,13 @@ describe("resolveRange end", () => {
     const { start, end } = resolveRange("month", NOW);
     expect(end.toISOString()).toBe(NOW.toISOString());
     expect(start.getTime()).toBeLessThan(end.getTime());
+  });
+});
+
+describe("rangeLabel", () => {
+  it("names the periods in both languages", () => {
+    expect(rangeLabel(en, "7d")).toBe("7 days");
+    expect(rangeLabel(uk, "7d")).toBe("7 днів");
+    expect(rangeLabel(uk, "month")).toBe("Цей місяць");
   });
 });

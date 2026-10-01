@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { coverageWarning, describeError, formatCoverage, formatDuration, formatPercent, formatPower, precisionLabel } from "./format";
+import { en } from "./i18n/en";
+import { uk } from "./i18n/uk";
 
 describe("formatPower", () => {
   it("shows watts below a kilowatt", () => {
@@ -52,21 +54,31 @@ describe("formatDuration", () => {
 
 describe("describeError", () => {
   it("extracts the message from an HA-shaped error object", () => {
-    expect(describeError({ code: "invalid_window", message: "Window end must be later than its start" })).toBe(
+    expect(describeError({ code: "invalid_window", message: "Window end must be later than its start" }, en)).toBe(
       "Window end must be later than its start",
     );
   });
 
   it("extracts the message from a plain Error", () => {
-    expect(describeError(new Error("boom"))).toContain("boom");
+    expect(describeError(new Error("boom"), en)).toContain("boom");
   });
 
   it("passes a bare string through", () => {
-    expect(describeError("something went wrong")).toBe("something went wrong");
+    expect(describeError("something went wrong", en)).toBe("something went wrong");
   });
 
   it("falls back to String() for an object without a message", () => {
-    expect(describeError({ code: "not_found" })).toBe(String({ code: "not_found" }));
+    expect(describeError({ code: "weird" }, en)).toBe(String({ code: "weird" }));
+  });
+
+  it("names a known backend error in the panel's language", () => {
+    expect(describeError({ code: "not_found", message: "Inverter not found or disabled" }, uk)).toBe(
+      uk.errors.not_found,
+    );
+  });
+
+  it("falls back to the backend's message for an unknown code", () => {
+    expect(describeError({ code: "weird", message: "Something odd" }, uk)).toBe("Something odd");
   });
 });
 

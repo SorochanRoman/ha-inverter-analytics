@@ -11,6 +11,7 @@ import {
   formatPercent,
   precisionLabel,
 } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import type { BatteryPayload, HomeAssistant } from "../types";
 
@@ -23,6 +24,8 @@ export class IaBatteryTab extends LitElement {
   @state() private payload?: BatteryPayload;
   @state() private error?: string;
   @state() private loading = false;
+
+  private i18n = new I18nController(this);
 
   private requestId = 0;
   private themeObserver?: MutationObserver;
@@ -64,7 +67,7 @@ export class IaBatteryTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -73,7 +76,7 @@ export class IaBatteryTab extends LitElement {
   }
 
   private renderKpi(payload: BatteryPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const measurable = payload.dips_measurable;
     const dash = "—";
 
@@ -113,7 +116,7 @@ export class IaBatteryTab extends LitElement {
   }
 
   private renderEpisodes(payload: BatteryPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
 
     if (!payload.dips_measurable) {
       return html`<p class="empty">
@@ -159,7 +162,7 @@ export class IaBatteryTab extends LitElement {
     }
 
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const warning = coverageWarning(payload.coverage, locale);
 
     return html`

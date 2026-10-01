@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { formatEnergy, formatPercent, formatPower } from "../format";
+import { I18nController } from "../i18n/controller";
 import type { ChargeFlow } from "../types";
 import { sectionStyles } from "./shared-styles";
 
@@ -9,6 +10,10 @@ export class IaChargeSection extends LitElement {
   @property({ attribute: false }) public flow!: ChargeFlow;
   @property({ type: Boolean }) public hasCapacity = false;
   @property({ type: String }) public locale = "en";
+
+  // Protected only until this section reads its own words from it:
+  // noUnusedLocals rejects a private field nothing reads yet.
+  protected i18n = new I18nController(this);
 
   protected render() {
     const flow = this.flow;

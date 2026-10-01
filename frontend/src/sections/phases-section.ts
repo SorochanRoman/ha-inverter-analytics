@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { imbalanceOption } from "../charts/options";
 import "../charts/echart";
 import { formatCoverage, formatDuration, formatPercent, formatPower } from "../format";
+import { I18nController } from "../i18n/controller";
 import type { Phases, SeriesInfo } from "../types";
 import { sectionStyles } from "./shared-styles";
 
@@ -11,6 +12,10 @@ export class IaPhasesSection extends LitElement {
   @property({ attribute: false }) public phases!: Phases;
   @property({ attribute: false }) public series: Record<string, SeriesInfo> = {};
   @property({ type: String }) public locale = "en";
+
+  // Protected only until this section reads its own words from it:
+  // noUnusedLocals rejects a private field nothing reads yet.
+  protected i18n = new I18nController(this);
 
   private renderCards() {
     const { rating_per_phase } = this.phases;

@@ -10,6 +10,7 @@ import {
   formatPower,
   precisionLabel,
 } from "../format";
+import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import type { HomeAssistant, SeasonalityPayload } from "../types";
 
@@ -22,6 +23,8 @@ export class IaSeasonalityTab extends LitElement {
   @state() private payload?: SeasonalityPayload;
   @state() private error?: string;
   @state() private loading = false;
+
+  private i18n = new I18nController(this);
 
   private requestId = 0;
   private themeObserver?: MutationObserver;
@@ -59,7 +62,7 @@ export class IaSeasonalityTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -68,7 +71,7 @@ export class IaSeasonalityTab extends LitElement {
   }
 
   private renderMonthTable(payload: SeasonalityPayload) {
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const keys = payload.months.map((month) => month.key);
     return html`<table>
       <thead>
@@ -106,7 +109,7 @@ export class IaSeasonalityTab extends LitElement {
     }
 
     const payload = this.payload;
-    const locale = this.hass.locale.language;
+    const locale = this.i18n.locale;
     const warning = coverageWarning(payload.coverage, locale);
     // Split deliberately: a month with a thin bar and a month with no bar at
     // all are different problems, and one sentence counting them together said

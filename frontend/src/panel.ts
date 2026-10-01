@@ -4,7 +4,10 @@ import { fetchConfig } from "./api";
 import { describeError } from "./format";
 import { singleFlight } from "./single-flight";
 import { buildLocation, parseLocation } from "./location";
-import { RANGE_KEYS, RANGE_LABELS, type RangeKey } from "./range";
+import { I18nController } from "./i18n/controller";
+import type { Messages } from "./i18n/en";
+import { LANGS, noteHaLanguage, setLang } from "./i18n/lang";
+import { RANGE_KEYS, rangeLabel, type RangeKey } from "./range";
 import { INTEGRATION_URL, listRoles } from "./roles";
 import type { ConfigResult, EntryInfo, FeatureInfo, HomeAssistant } from "./types";
 import "./tabs/balance-tab";
@@ -16,14 +19,7 @@ import "./tabs/sizing-tab";
 
 const BASE_PATH = "/inverter-analytics";
 
-const TABS = [
-  { id: "load", label: "Load" },
-  { id: "battery", label: "Battery" },
-  { id: "seasonal", label: "Seasonality" },
-  { id: "balance", label: "Balance" },
-  { id: "grid", label: "Grid" },
-  { id: "sizing", label: "Sizing" },
-] as const;
+const TABS = ["load", "battery", "seasonal", "balance", "grid", "sizing"] as const;
 
 @customElement("inverter-analytics-panel")
 export class InverterAnalyticsPanel extends LitElement {
@@ -36,6 +32,8 @@ export class InverterAnalyticsPanel extends LitElement {
   @state() private entryId?: string;
   @state() private tab: string = "load";
   @state() private range: RangeKey = "30d";
+
+  private i18n = new I18nController(this);
 
   public connectedCallback(): void {
     super.connectedCallback();
@@ -52,6 +50,10 @@ export class InverterAnalyticsPanel extends LitElement {
   }
 
   protected willUpdate(changed: Map<string, unknown>): void {
+    // Until the reader picks a language, the panel follows Home Assistant's.
+    if (changed.has("hass")) {
+      noteHaLanguage(this.hass?.locale?.language);
+    }
     // Home Assistant may assign hass only after the element has connected —
     // in that case connectedCallback would have called fetchConfig(undefined).
     // Wait for the first hass value and try again if the config hasn't
@@ -66,7 +68,7 @@ export class InverterAnalyticsPanel extends LitElement {
     const next = parseLocation(
       window.location.pathname,
       window.location.search,
-      TABS.map((item) => item.id),
+      TABS,
       { tab: this.tab, range: this.range, entryId: this.entryId },
     );
     this.tab = next.tab;
@@ -108,7 +110,7 @@ export class InverterAnalyticsPanel extends LitElement {
       }
       this.writeLocation();
     } catch (err) {
-      this.error = describeError(err);
+      this.error = describeError(err, this.i18n.m);
     }
   }
 
@@ -141,20 +143,21 @@ export class InverterAnalyticsPanel extends LitElement {
   }
 
   protected render() {
+    const m = this.i18n.m;
     if (this.error) {
       return html`<div class="notice">
-        Could not load configuration: ${this.error}
+        ${m.panel.couldNotLoad({ error: this.error })}
         <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
-          Try again
+          ${m.panel.tryAgain}
         </button>
       </div>`;
     }
     if (!this.config) {
-      return html`<div class="notice">Loading…</div>`;
+      return html`<div class="notice">${m.panel.loading}</div>`;
     }
     if (!this.config.entries.length) {
       return html`<div class="notice">
-        No inverter is configured yet. Add the Inverter Analytics integration in settings.
+        ${m.panel.noInverter}
       </div>`;
     }
 
@@ -182,27 +185,35 @@ export class InverterAnalyticsPanel extends LitElement {
               )}
             </select>`
           : nothing}
+        <div class="langs" role="group" aria-label=${m.panel.language}>
+          ${LANGS.map(
+            (lang) => html`<button
+              class=${lang === this.i18n.lang ? "active" : ""}
+              @click=${() => setLang(lang)}
+            >${lang.toUpperCase()}</button>`,
+          )}
+        </div>
         <div class="ranges">
           ${RANGE_KEYS.map(
             (key) => html`<button
               class=${key === this.range ? "active" : ""}
               @click=${() => this.selectRange(key)}
-            >${RANGE_LABELS[key]}</button>`,
+            >${rangeLabel(m, key)}</button>`,
           )}
         </div>
       </div>
 
       <nav class="tabs">
-        ${TABS.map((item) => {
+        ${TABS.map((id) => {
           // Dimmed rather than hidden. A tab that disappears takes with it
           // any hint that the feature exists, and the reason it is empty —
           // an unmapped sensor — is one the user can act on the moment they
           // are told which sensor it is.
-          const unavailable = this.feature(item.id)?.available === false;
+          const unavailable = this.feature(id)?.available === false;
           return html`<button
-            class="${item.id === this.tab ? "active" : ""} ${unavailable ? "muted" : ""}"
-            @click=${() => this.selectTab(item.id)}
-          >${item.label}</button>`;
+            class="${id === this.tab ? "active" : ""} ${unavailable ? "muted" : ""}"
+            @click=${() => this.selectTab(id)}
+          >${m.panel.tabs[id]}</button>`;
         })}
       </nav>
 
@@ -222,20 +233,21 @@ export class InverterAnalyticsPanel extends LitElement {
    * "Could not load data", which reads as a fault rather than as a setting.
    */
   private renderTab() {
+    const m = this.i18n.m;
     const feature = this.feature(this.tab);
     if (feature && !feature.available) {
+      const words = {
+        feature: m.features[feature.key as keyof Messages["features"]] ?? feature.label,
+        roles: listRoles(m, feature.missing),
+      };
       return html`<div class="notice">
         <p>
-          ${feature.label} needs ${listRoles(feature.missing)}, and
-          ${feature.missing.length === 1 ? "it is" : "none of them are"} mapped to this inverter.
-          Nothing here is broken and there is no data missing — this page has simply not been
-          told which of your sensors ${feature.missing.length === 1 ? "that is" : "those are"}.
+          ${feature.missing.length === 1 ? m.panel.missingOne(words) : m.panel.missingMany(words)}
         </p>
         <p>
-          Open the integration, choose <strong>Reconfigure</strong>, and it will offer what it
-          can find in your installation.
+          ${m.panel.reconfigureBefore}<strong>${m.panel.reconfigure}</strong>${m.panel.reconfigureAfter}
         </p>
-        <a href=${INTEGRATION_URL}>Go to Inverter Analytics settings</a>
+        <a href=${INTEGRATION_URL}>${m.panel.goToSettings}</a>
       </div>`;
     }
 
@@ -296,7 +308,8 @@ export class InverterAnalyticsPanel extends LitElement {
     }
     .header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     h1 { font-size: 20px; margin: 0; font-weight: 500; }
-    .ranges { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+    .langs { display: flex; gap: 4px; margin-left: auto; }
+    .ranges { display: flex; gap: 4px; flex-wrap: wrap; }
     button {
       background: var(--card-background-color);
       color: var(--primary-text-color);

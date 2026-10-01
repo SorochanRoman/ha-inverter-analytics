@@ -56,6 +56,10 @@
 | W / kW / kWh | Вт / кВт / кВт·год |
 | s / min / h (durations) | с / хв / год |
 | 24 h / 7 days / 30 days / This month / Year | 24 год / 7 днів / 30 днів / Цей місяць / Рік |
+| sensor | сенсор |
+| capacity (battery) | ємність |
+| integration | інтеграція |
+| settings | налаштування |
 
 ---
 
