@@ -81,6 +81,7 @@
 | autonomy (battery through an outage) | автономність |
 | brief interruptions (grid) | короткі перебої |
 | unrecorded (gap inside an outage) | без записів |
+| sustained (load over 15 min, imbalance) | тривалий (Тривала 15 хв) |
 | discharge rate / pts/h (charge points per hour) | швидкість розряду / в.п./год |
 | verdict (sizing) | вердикт |
 | low mark / full mark (charge thresholds) | низька позначка / позначка повного заряду |
@@ -94,7 +95,7 @@
 | wizard (config flow) | майстер |
 | current transformer / clamp | трансформатор струму / кліщі |
 | invert (sign switch) | інвертувати |
-| Configure (options, in en.json) | «Параметри» |
+| Configure (HA button that opens the options, in en.json) | «Налаштувати» |
 
 ---
 
