@@ -25,6 +25,8 @@ export const en = {
     duration: "Duration",
     peak: "Peak",
     coversOfPeriod: (p: { share: string }) => `Covers ${p.share} of the period`,
+    meanLoad: "Mean load",
+    selfSufficiency: "Self-sufficiency",
   },
   units: {
     w: "W",
@@ -256,7 +258,6 @@ export const en = {
       "Home Assistant keeps long-term statistics only from the moment a sensor starts producing them.",
     monthByMonth: "Month by month",
     month: "Month",
-    meanLoad: "Mean load",
     busiestHour: "Busiest hour",
     meanPv: "Mean PV",
     ofTheMonth: "Of the month",
@@ -298,7 +299,6 @@ export const en = {
     ratiosNeedCounters:
       "Self-sufficiency needs the house and grid-import counters; self-consumption needs " +
       "solar and grid export.",
-    selfSufficiency: "Self-sufficiency",
     selfConsumption: "Self-consumption",
     dayByDay: "Day by day",
     noDays: "No days with energy statistics in this period.",
@@ -326,7 +326,6 @@ export const en = {
     chargeAtStart: "Charge at start",
     lowest: "Lowest",
     atEnd: "At end",
-    meanLoad: "Mean load",
     unrecorded: (p: { duration: string }) => `(${p.duration} unrecorded)`,
     noAutonomy: "No autonomy estimate.",
     // Keyed by AutonomyReason; the one with a figure is a function.
@@ -403,7 +402,6 @@ export const en = {
     lowestCharge: "Lowest charge",
     productionShare: "Production as a share of consumption",
     producedConsumed: "Produced / consumed",
-    selfSufficiency: "Self-sufficiency",
     daysBatteryFilled: "Days the battery filled",
     // The rule each verdict was read by, in the reader's own numbers, saying
     // exactly what sizing.py tests: "reaching" is >=, "fell below" is <. With no

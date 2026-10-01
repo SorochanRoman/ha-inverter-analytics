@@ -195,7 +195,7 @@ export class IaGridTab extends LitElement {
                 <th>${m.grid.lowest}</th>
                 <th>${m.grid.atEnd}</th>`
             : nothing}
-          ${payload.has_load ? html`<th>${m.grid.meanLoad}</th>` : nothing}
+          ${payload.has_load ? html`<th>${m.common.meanLoad}</th>` : nothing}
         </tr>
       </thead>
       <tbody>
@@ -267,7 +267,7 @@ export class IaGridTab extends LitElement {
             >${rate === null ? DASH : m.grid.pointsPerHour({ rate: oneDecimal(rate, m) })}</span
           >
           <span class="row">
-            <span>${m.grid.meanLoad}</span>
+            <span>${m.common.meanLoad}</span>
             <span>${formatPower(autonomy.load_mean_w, locale)}</span>
           </span>
         </div>

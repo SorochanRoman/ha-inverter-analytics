@@ -50,6 +50,11 @@ describe("formatDuration", () => {
   it("renders seconds below a minute", () => {
     expect(formatDuration(45, "en")).toBe("45 s");
   });
+
+  it("prints the Ukrainian units", () => {
+    expect(formatDuration(45, "uk")).toBe("45 с");
+    expect(formatDuration(420, "uk")).toBe("7 хв");
+  });
 });
 
 describe("describeError", () => {

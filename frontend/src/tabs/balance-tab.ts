@@ -128,7 +128,7 @@ export class IaBalanceTab extends LitElement {
     return html`<div class="kpi">
       ${payload.self_sufficiency !== null
         ? html`<div class="cell">
-            <span class="label">${m.balance.selfSufficiency}</span>
+            <span class="label">${m.common.selfSufficiency}</span>
             <span class="value">${formatPercent(payload.self_sufficiency, locale)}</span>
             <span class="hint">
               ${has("load_energy_total") && has("grid_import_total")

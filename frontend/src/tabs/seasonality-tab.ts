@@ -80,7 +80,7 @@ export class IaSeasonalityTab extends LitElement {
       <thead>
         <tr>
           <th>${m.seasonality.month}</th>
-          <th>${m.seasonality.meanLoad}</th>
+          <th>${m.common.meanLoad}</th>
           <th>${m.seasonality.busiestHour}</th>
           ${payload.has_pv ? html`<th>${m.seasonality.meanPv}</th>` : nothing}
           <th>${m.seasonality.ofTheMonth}</th>

@@ -25,18 +25,23 @@ function leaves(node: unknown, path = ""): Leaf[] {
   return [{ path, value: node }];
 }
 
-// Parameters typed as numbers in en.ts (counts a language inflects by).
+// The numeric params are the fields typed `: number` in en.ts — the counts a
+// language inflects by. Every other param is an already-formatted string.
 const NUMERIC_PARAMS = new Set(["n", "total"]);
 
+// Counts that land on every plural branch either language has: 1 and 21 are
+// Ukrainian "one", 2 is "few", 0, 5 and 11 are "many" (11 despite ending in 1).
+const PLURAL_COUNTS = [0, 1, 2, 5, 11, 21];
+
 /** Calls a dictionary function with every parameter it might read. */
-function render(value: unknown): string {
+function render(value: unknown, count = 3): string {
   if (typeof value !== "function") return String(value);
   const sample = new Proxy(
     {},
     {
       get: (_, key) =>
         typeof key === "string" && NUMERIC_PARAMS.has(key)
-          ? 3
+          ? count
           : key === "roles"
             ? "A"
             : `«${String(key)}»`,
@@ -68,5 +73,24 @@ describe("the English dictionary", () => {
       expect(text).not.toContain("undefined");
       expect(text).not.toContain("NaN");
     });
+  }
+});
+
+describe("every plural branch", () => {
+  for (const [lang, dict] of [
+    ["en", en],
+    ["uk", uk],
+  ] as const) {
+    for (const { path, value } of leaves(dict)) {
+      if (typeof value !== "function") continue;
+      it(`${lang} ${path} renders at every count`, () => {
+        for (const count of PLURAL_COUNTS) {
+          const text = render(value, count);
+          expect(text.trim()).not.toBe("");
+          expect(text).not.toContain("undefined");
+          expect(text).not.toContain("NaN");
+        }
+      });
+    }
   }
 });

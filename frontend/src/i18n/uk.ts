@@ -15,6 +15,8 @@ export const uk: Messages = {
     duration: "Тривалість",
     peak: "Пік",
     coversOfPeriod: (p) => `Дані покривають ${p.share} періоду`,
+    meanLoad: "Середнє навантаження",
+    selfSufficiency: "Самозабезпечення",
   },
   units: {
     w: "Вт",
@@ -235,7 +237,6 @@ export const uk: Messages = {
       "Home Assistant зберігає довгострокову статистику лише з моменту, коли сенсор починає її створювати.",
     monthByMonth: "Місяць за місяцем",
     month: "Місяць",
-    meanLoad: "Середнє навантаження",
     busiestHour: "Найнавантаженіша година",
     meanPv: "Середня генерація СЕС",
     ofTheMonth: "Покриття даними",
@@ -275,7 +276,6 @@ export const uk: Messages = {
     ratiosNeedCounters:
       "Для самозабезпечення потрібні лічильники будинку й імпорту з мережі; для " +
       "самоспоживання — сонячної генерації й експорту в мережу.",
-    selfSufficiency: "Самозабезпечення",
     selfConsumption: "Самоспоживання",
     dayByDay: "День за днем",
     noDays: "За цей період немає днів зі статистикою енергії.",
@@ -302,7 +302,6 @@ export const uk: Messages = {
     chargeAtStart: "Заряд на початку",
     lowest: "Найнижчий",
     atEnd: "Наприкінці",
-    meanLoad: "Середнє навантаження",
     unrecorded: (p) => `(${p.duration} без записів)`,
     noAutonomy: "Оцінки автономності немає.",
     autonomyReasons: {
@@ -384,7 +383,6 @@ export const uk: Messages = {
     lowestCharge: "Найнижчий заряд",
     productionShare: "Генерація як частка споживання",
     producedConsumed: "Згенеровано / спожито",
-    selfSufficiency: "Самозабезпечення",
     daysBatteryFilled: "Днів із повним зарядом батареї",
     // Each rule says what sizing.py computes: "more than" is strict, "at
     // least" and "from" include the mark, "below the low mark" is strict.

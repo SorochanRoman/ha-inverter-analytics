@@ -139,7 +139,7 @@ export class IaSizingTab extends LitElement {
         `${formatEnergy(e.pv_kwh ?? null, locale)} / ${formatEnergy(e.load_kwh ?? null, locale)}`,
       )}
       ${row(
-        m.sizing.selfSufficiency,
+        m.common.selfSufficiency,
         e.self_sufficiency === null || e.self_sufficiency === undefined
           ? DASH
           : formatPercent(e.self_sufficiency, locale),

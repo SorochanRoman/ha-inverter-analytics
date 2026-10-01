@@ -74,8 +74,11 @@ describe("messagesForLocale", () => {
 describe("the store", () => {
   it("reads the stored choice once and writes a new one", () => {
     const storage = fakeStorage({ "inverter-analytics.lang": "uk" });
-    vi.stubGlobal("localStorage", storage);
+    const getItem = vi.fn(storage.getItem);
+    vi.stubGlobal("localStorage", { ...storage, getItem });
     expect(currentLang()).toBe("uk");
+    expect(currentLang()).toBe("uk");
+    expect(getItem).toHaveBeenCalledTimes(1);
     setLang("en");
     expect(currentLang()).toBe("en");
     expect(storage.data["inverter-analytics.lang"]).toBe("en");
