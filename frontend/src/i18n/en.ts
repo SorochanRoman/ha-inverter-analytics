@@ -127,10 +127,11 @@ export const en = {
   // charts/options.ts: axis names, legend entries and series names. A legend
   // finds its series by name, so both sides read the same entry here.
   charts: {
-    // The locale month names on the charts and the month table are written
-    // in. The language's own, not Home Assistant's: an English panel has
-    // always said "Mar", whatever the profile's locale.
-    monthNamesLocale: "en",
+    // The locale the charts write month names and numbers in, also used by
+    // the month table. It is the panel language's own locale, not Home
+    // Assistant's: an English panel has always said "Mar" and "2.5",
+    // whatever the profile's locale.
+    locale: "en",
     percentOfTime: "% of time",
     percentImbalance: "% imbalance",
     percentCharge: "% charge",

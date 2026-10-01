@@ -86,7 +86,7 @@ export class IaSeasonalityTab extends LitElement {
       <tbody>
         ${payload.months.map(
           (month, index) => html`<tr class=${month.complete ? "" : "partial"}>
-            <td>${monthLabel(month.key, keys[index - 1], this.i18n.m.charts.monthNamesLocale)}</td>
+            <td>${monthLabel(month.key, keys[index - 1], this.i18n.m.charts.locale)}</td>
             <td>${formatPower(month.load_mean, locale)}</td>
             <td>${formatPower(month.load_peak_hourly, locale)}</td>
             ${payload.has_pv ? html`<td>${formatPower(month.pv_mean, locale)}</td>` : nothing}

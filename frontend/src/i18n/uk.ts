@@ -108,7 +108,7 @@ export const uk: Messages = {
     hintNoData: "немає даних",
   },
   charts: {
-    monthNamesLocale: "uk",
+    locale: "uk",
     percentOfTime: "% часу",
     percentImbalance: "% перекосу фаз",
     percentCharge: "% заряду",

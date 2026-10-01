@@ -17,6 +17,16 @@ import type {
 const round = (value: number, digits: number): number =>
   Number(value.toFixed(digits));
 
+/**
+ * A rounded number as text in the panel's locale: 2.5 in English, 2,5 in
+ * Ukrainian. Without grouping, so English stays what String() printed.
+ */
+const decimal = (value: number, digits: number, m: Messages): string =>
+  new Intl.NumberFormat(m.charts.locale, {
+    maximumFractionDigits: digits,
+    useGrouping: false,
+  }).format(round(value, digits));
+
 export function histogramOption(
   payload: LoadPayload,
   mode: "watts" | "percent",
@@ -27,7 +37,7 @@ export function histogramOption(
   const labels = buckets.map((bucket) =>
     mode === "watts"
       ? String(round(bucket.start, 0))
-      : String(round((bucket.start / payload.rated_power) * 100, 1)),
+      : decimal((bucket.start / payload.rated_power) * 100, 1, m),
   );
 
   return {
@@ -225,7 +235,7 @@ export function monthlyOption(
   m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
-  const labels = months.map((month, index) => monthLabel(month.key, months[index - 1]?.key, m.charts.monthNamesLocale));
+  const labels = months.map((month, index) => monthLabel(month.key, months[index - 1]?.key, m.charts.locale));
 
   const series: Record<string, unknown>[] = [
     {
@@ -309,7 +319,7 @@ export function monthHourHeatmapOption(
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const keys = months.map((month) => month.key);
-  const labels = keys.map((key, index) => monthLabel(key, keys[index - 1], m.charts.monthNamesLocale));
+  const labels = keys.map((key, index) => monthLabel(key, keys[index - 1], m.charts.locale));
   const index = new Map(keys.map((key, position) => [key, position]));
 
   const data = cells
@@ -432,7 +442,7 @@ export function outageDaysOption(days: GridDay[], m: Messages): Record<string, u
       formatter: (params: { name: string; value: number; dataIndex: number }[]) => {
         const point = params[0];
         const count = days[point.dataIndex].count;
-        const hours = m.charts.hoursWithoutGrid({ hours: String(point.value) });
+        const hours = m.charts.hoursWithoutGrid({ hours: decimal(point.value, 2, m) });
         return `${point.name}<br/>${hours}<br/>${m.charts.outagesBegan({ n: count })}`;
       },
     },

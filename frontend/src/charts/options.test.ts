@@ -476,12 +476,24 @@ describe("chart words in Ukrainian", () => {
       { day: "2026-01-01", off_seconds: 7200, measured_seconds: 86400, count: 2 },
       { day: "2026-01-02", off_seconds: 0, measured_seconds: 86400, count: 5 },
       { day: "2026-01-03", off_seconds: 0, measured_seconds: 86400, count: 0 },
+      { day: "2026-01-04", off_seconds: 5400, measured_seconds: 86400, count: 1 },
     ];
     const tooltip = outageDaysOption(days, uk).tooltip as {
       formatter: (params: { name: string; value: number; dataIndex: number }[]) => string;
     };
     expect(tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }])).toContain("2 відключення");
     expect(tooltip.formatter([{ name: "01-02", value: 0, dataIndex: 1 }])).toContain("5 відключень");
-    expect(tooltip.formatter([{ name: "01-03", value: 0, dataIndex: 2 }])).not.toContain("outage");
+    expect(tooltip.formatter([{ name: "01-03", value: 0, dataIndex: 2 }])).toContain(
+      "жодне відключення не почалося",
+    );
+    expect(tooltip.formatter([{ name: "01-04", value: 1.5, dataIndex: 3 }])).toContain("1,5 год");
+    expect(tooltip.formatter([{ name: "01-04", value: 1.5, dataIndex: 3 }])).toContain(
+      "1 відключення почалося",
+    );
+  });
+
+  it("writes decimals with a comma in Ukrainian", () => {
+    const option = histogramOption(payload, "percent", uk) as any;
+    expect(option.xAxis.data).toEqual(["0", "2,5"]);
   });
 });
