@@ -206,7 +206,7 @@ export class IaSizingTab extends LitElement {
       const onlyRated = meta.missing.length === 1 && meta.missing[0] === "rated_power";
       return html`<p class="note">
         ${onlyRated
-          ? m.sizing.needsNotSet({ roles: listRoles(m, meta.missing) })
+          ? m.sizing.needsNotSet({ roles: listRoles(m, meta.missing, true) })
           : m.sizing.needsNotMapped({
               roles: listRoles(m, meta.missing, true),
               n: meta.missing.length,

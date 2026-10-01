@@ -53,11 +53,12 @@ export const en = {
     },
     // The notice on a tab whose sensors are not mapped. One role or several
     // changes more than a pronoun, so each is a whole paragraph.
+    // Role names reach every sentence already set off by common.quoted, one
+    // by one: the caller quotes, no dictionary function adds its own quotes.
     missingOne: (p: { feature: string; roles: string }) =>
       `${p.feature} needs ${p.roles}, and it is not mapped to this inverter. ` +
       "Nothing here is broken and there is no data missing — this page has simply not been " +
       "told which of your sensors that is.",
-    // missingMany gets its roles already set off one by one by common.quoted.
     missingMany: (p: { feature: string; roles: string }) =>
       `${p.feature} needs ${p.roles}, and none of them are mapped to this inverter. ` +
       "Nothing here is broken and there is no data missing — this page has simply not been " +
@@ -431,8 +432,8 @@ export const en = {
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.
-    // needsNotMapped gets its roles already set off by common.quoted, one by
-    // one, so a language that quotes names quotes every name in a list.
+    // Both get their roles already set off by common.quoted, one by one, so
+    // a language that quotes names quotes every name in a list.
     needsNotSet: (p: { roles: string }) => `Needs ${p.roles}, which is not set for this inverter.`,
     needsNotMapped: (p: { roles: string; n: number }) =>
       `Needs ${p.roles}, not mapped to this inverter.`,

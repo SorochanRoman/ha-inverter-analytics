@@ -18,7 +18,7 @@ describe("the missing-roles notice", () => {
   });
 
   it("agrees with one field or several in Ukrainian", () => {
-    expect(uk.panel.missingOne({ feature: "Батарея", roles: "Рівень заряду" })).toBe(
+    expect(uk.panel.missingOne({ feature: "Батарея", roles: "«Рівень заряду»" })).toBe(
       "Для розділу «Батарея» потрібне поле «Рівень заряду», але для цього інвертора його не " +
         "вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не " +
         "сказали, який із ваших сенсорів це.",
@@ -28,6 +28,15 @@ describe("the missing-roles notice", () => {
         "вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не " +
         "сказали, які з ваших сенсорів це.",
     );
+  });
+
+  it("quotes a single role through listRoles in Ukrainian and not in English", () => {
+    const roles = ["battery_soc"];
+    expect(en.panel.missingOne({ feature: "Battery", roles: listRoles(en, roles, true) })).toMatch(
+      /^Battery needs Battery state of charge, and it/,
+    );
+    expect(uk.panel.missingOne({ feature: "Батарея", roles: listRoles(uk, roles, true) }))
+      .toContain(`потрібне поле «${uk.roles.battery_soc}», але`);
   });
 
   it("quotes every role of a list in Ukrainian and none in English", () => {

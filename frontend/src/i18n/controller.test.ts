@@ -65,6 +65,7 @@ describe("I18nController", () => {
     setLang("en");
     expect(controller.lang).toBe("en");
     expect(controller.m).toBe(en);
+    expect(controller.locale).toBe("en");
     setLang("uk");
     expect(controller.lang).toBe("uk");
     expect(controller.m).toBe(uk);

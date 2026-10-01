@@ -675,8 +675,9 @@ const bb = {
     },
     // The notice on a tab whose sensors are not mapped. One role or several
     // changes more than a pronoun, so each is a whole paragraph.
+    // Role names reach every sentence already set off by common.quoted, one
+    // by one: the caller quotes, no dictionary function adds its own quotes.
     missingOne: (r) => `${r.feature} needs ${r.roles}, and it is not mapped to this inverter. Nothing here is broken and there is no data missing — this page has simply not been told which of your sensors that is.`,
-    // missingMany gets its roles already set off one by one by common.quoted.
     missingMany: (r) => `${r.feature} needs ${r.roles}, and none of them are mapped to this inverter. Nothing here is broken and there is no data missing — this page has simply not been told which of your sensors those are.`,
     reconfigureBefore: "Open the integration, choose ",
     reconfigure: "Reconfigure",
@@ -970,8 +971,8 @@ const bb = {
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.
-    // needsNotMapped gets its roles already set off by common.quoted, one by
-    // one, so a language that quotes names quotes every name in a list.
+    // Both get their roles already set off by common.quoted, one by one, so
+    // a language that quotes names quotes every name in a list.
     needsNotSet: (r) => `Needs ${r.roles}, which is not set for this inverter.`,
     needsNotMapped: (r) => `Needs ${r.roles}, not mapped to this inverter.`,
     thresholdsInverted: (r) => `The full mark (${r.full}) is at or below the low mark (${r.low}), so no day can be judged. Raise Full battery charge or lower Low battery charge in the integration's options.`,
@@ -1079,7 +1080,7 @@ const bb = {
       grid: "Мережа",
       sizing: "Достатність"
     },
-    missingOne: (r) => `Для розділу «${r.feature}» потрібне поле «${r.roles}», але для цього інвертора його не вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не сказали, який із ваших сенсорів це.`,
+    missingOne: (r) => `Для розділу «${r.feature}» потрібне поле ${r.roles}, але для цього інвертора його не вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не сказали, який із ваших сенсорів це.`,
     missingMany: (r) => `Для розділу «${r.feature}» потрібні поля ${r.roles}, але для цього інвертора жодне з них не вказано. Тут нічого не зламано й жодних даних не бракує — цій сторінці просто не сказали, які з ваших сенсорів це.`,
     reconfigureBefore: "Відкрийте інтеграцію, виберіть ",
     reconfigure: "Переналаштувати",
@@ -1352,7 +1353,7 @@ const bb = {
     batteryRule: (r) => `Рахується за днями з даними: замало, якщо щонайменше в ${r.share} із них батарея зарядилася до ${r.full} і все одно опустилася нижче ${r.low}; на межі — якщо таке траплялося хоча б раз; без вердикту — для періоду, у якому вона жодного разу не зарядилася повністю. День, коли батарея опустилася нижче цієї позначки, так і не зарядившись повністю, зараховується як недолік сонця, а не батареї.`,
     solarRuleWithFill: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання і батарея заряджалася повністю щонайменше в ${r.fill} днів; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
     solarRule: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
-    needsNotSet: (r) => `Потрібне значення «${r.roles}», але для цього інвертора його не задано.`,
+    needsNotSet: (r) => `Потрібне значення ${r.roles}, але для цього інвертора його не задано.`,
     needsNotMapped: (r) => r.n === 1 ? `Потрібне поле ${r.roles}, але для цього інвертора його не вказано.` : `Потрібні поля ${r.roles}, але для цього інвертора їх не вказано.`,
     // The option names as the integration's form shows them in Ukrainian.
     thresholdsInverted: (r) => `Позначка повного заряду (${r.full}) не вища за позначку низького (${r.low}), тож жоден день неможливо оцінити. Підвищте «Повний заряд батареї» або знизьте «Низький заряд батареї» в параметрах інтеграції.`,
@@ -26056,7 +26057,7 @@ let wr = class extends Gt {
     if (n.missing.length) {
       const a = n.missing.length === 1 && n.missing[0] === "rated_power";
       return L`<p class="note">
-        ${a ? e.sizing.needsNotSet({ roles: hh(e, n.missing) }) : e.sizing.needsNotMapped({
+        ${a ? e.sizing.needsNotSet({ roles: hh(e, n.missing, !0) }) : e.sizing.needsNotMapped({
         roles: hh(e, n.missing, !0),
         n: n.missing.length
       })}
@@ -26450,9 +26451,8 @@ let Ee = class extends Gt {
     if (t && !t.available) {
       const e = {
         feature: r.features[t.key] ?? t.label,
-        // Several roles are each set off by common.quoted (missingMany);
-        // missingOne quotes its single role itself where a language does.
-        roles: hh(r, t.missing, t.missing.length > 1)
+        // Every role is set off by common.quoted; the dictionary never quotes.
+        roles: hh(r, t.missing, !0)
       };
       return L`<div class="notice">
         <p>
