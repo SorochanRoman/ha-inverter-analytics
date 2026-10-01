@@ -21,11 +21,7 @@ import type {
 } from "../types";
 import { reasonHint, reasonSentence, verdictLabel } from "../verdict";
 
-const CARDS: { key: SizingCardKey; title: string }[] = [
-  { key: "inverter", title: "Inverter, against the load" },
-  { key: "battery", title: "Battery, against the nights" },
-  { key: "solar", title: "Sun, against the consumption" },
-];
+const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
 const DASH = "—";
 
@@ -45,7 +41,9 @@ export class IaSizingTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "30d";
 
   @state() private payload?: SizingPayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
 
   private i18n = new I18nController(this);
@@ -70,7 +68,7 @@ export class IaSizingTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -80,12 +78,18 @@ export class IaSizingTab extends LitElement {
 
   /** The one figure a rule turned on, for a month cell. */
   private cellFigure(card: SizingCardKey, block: VerdictBlock, locale: string): string {
+    const m = this.i18n.m;
     const e = block.evidence;
-    if (card === "inverter") return `${e.hours_at_rated ?? 0} h at rated`;
-    if (card === "battery") return `${e.days_full_and_low ?? 0} of ${e.days_with_data ?? 0} days`;
+    if (card === "inverter") return m.sizing.hoursAtRated({ hours: `${e.hours_at_rated ?? 0}` });
+    if (card === "battery") {
+      return m.sizing.daysOf({
+        days: `${e.days_full_and_low ?? 0}`,
+        total: e.days_with_data ?? 0,
+      });
+    }
     return e.production_share === null || e.production_share === undefined
       ? DASH
-      : `${formatPercent(e.production_share, locale)} of load`;
+      : m.sizing.ofLoad({ share: formatPercent(e.production_share, locale) });
   }
 
   private renderEvidence(
@@ -94,32 +98,29 @@ export class IaSizingTab extends LitElement {
     rules: SizingPayload["rules"],
     locale: string,
   ) {
+    const m = this.i18n.m;
     const e = block.evidence;
+    const countOf = (count?: number | null, total?: number | null) =>
+      m.sizing.countOf({ count: `${count ?? DASH}`, total: `${total ?? DASH}` });
     const row = (name: string, value: string) =>
       html`<span class="row"><span>${name}</span><span>${value}</span></span>`;
     if (card === "inverter") {
       return html`
+        ${row(m.sizing.hoursReachedRated, countOf(e.hours_at_rated, e.measured_hours))}
         ${row(
-          "Hours the load reached rated power",
-          `${e.hours_at_rated ?? DASH} of ${e.measured_hours ?? DASH}`,
-        )}
-        ${row(
-          `Hours above ${formatPercent(rules.high_load_share, locale)} of rated`,
+          m.sizing.hoursAboveOfRated({ share: formatPercent(rules.high_load_share, locale) }),
           `${e.hours_above_high ?? DASH}`,
         )}
-        ${row("Highest hourly peak", formatPower(e.peak_w ?? null, locale))}
+        ${row(m.sizing.highestPeak, formatPower(e.peak_w ?? null, locale))}
       `;
     }
     if (card === "battery") {
       return html`
+        ${row(m.sizing.daysFilledAndLow, countOf(e.days_full_and_low, e.days_with_data))}
+        ${row(m.sizing.daysLowWithoutFilling, `${e.days_low_without_full ?? DASH}`)}
+        ${row(m.sizing.daysFilled, `${e.days_full ?? DASH}`)}
         ${row(
-          "Days it filled, and still hit the low mark",
-          `${e.days_full_and_low ?? DASH} of ${e.days_with_data ?? DASH}`,
-        )}
-        ${row("Days it hit the low mark without filling", `${e.days_low_without_full ?? DASH}`)}
-        ${row("Days it filled", `${e.days_full ?? DASH}`)}
-        ${row(
-          "Lowest charge",
+          m.sizing.lowestCharge,
           e.lowest_pct === null || e.lowest_pct === undefined
             ? DASH
             : formatPercent(e.lowest_pct / 100, locale),
@@ -128,23 +129,23 @@ export class IaSizingTab extends LitElement {
     }
     return html`
       ${row(
-        "Production as a share of consumption",
+        m.sizing.productionShare,
         e.production_share === null || e.production_share === undefined
           ? DASH
           : formatPercent(e.production_share, locale),
       )}
       ${row(
-        "Produced / consumed",
+        m.sizing.producedConsumed,
         `${formatEnergy(e.pv_kwh ?? null, locale)} / ${formatEnergy(e.load_kwh ?? null, locale)}`,
       )}
       ${row(
-        "Self-sufficiency",
+        m.sizing.selfSufficiency,
         e.self_sufficiency === null || e.self_sufficiency === undefined
           ? DASH
           : formatPercent(e.self_sufficiency, locale),
       )}
       ${row(
-        "Days the battery filled",
+        m.sizing.daysBatteryFilled,
         e.fill_share === null || e.fill_share === undefined
           ? DASH
           : formatPercent(e.fill_share, locale),
@@ -161,18 +162,28 @@ export class IaSizingTab extends LitElement {
    * condition the verdict never tested.
    */
   private ruleSentence(card: SizingCardKey, payload: SizingPayload, locale: string): string {
+    const m = this.i18n.m;
     const rules = payload.rules;
     const pct = (value: number) => formatPercent(value, locale);
     if (card === "inverter") {
-      return `Short when the load reached rated power in more than ${pct(rules.inverter_short_share)} of hours; borderline on any such hour, or above ${pct(rules.high_load_share)} of rated in more than ${pct(rules.inverter_borderline_share)} of hours.`;
+      return m.sizing.inverterRule({
+        shortShare: pct(rules.inverter_short_share),
+        highShare: pct(rules.high_load_share),
+        borderlineShare: pct(rules.inverter_borderline_share),
+      });
     }
     if (card === "battery") {
-      return `Counted over days with data: short when the battery filled to ${pct(rules.full_pct / 100)} and still fell to ${pct(rules.low_pct / 100)} on at least ${pct(rules.battery_short_share)} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`;
+      return m.sizing.batteryRule({
+        full: pct(rules.full_pct / 100),
+        low: pct(rules.low_pct / 100),
+        share: pct(rules.battery_short_share),
+      });
     }
-    const fill = payload.cards.battery.missing.length
-      ? ""
-      : ` and the battery filled on at least ${pct(rules.solar_fill_share)} of days`;
-    return `Enough when production is at least ${pct(rules.solar_enough_share)} of consumption${fill}; borderline from ${pct(rules.solar_borderline_share)} of consumption; short below.`;
+    const enough = pct(rules.solar_enough_share);
+    const borderline = pct(rules.solar_borderline_share);
+    return payload.cards.battery.missing.length
+      ? m.sizing.solarRule({ enough, borderline })
+      : m.sizing.solarRuleWithFill({ enough, fill: pct(rules.solar_fill_share), borderline });
   }
 
   /**
@@ -184,28 +195,33 @@ export class IaSizingTab extends LitElement {
    * each makes the verdict below it meaningless, so they outrank it.
    */
   private renderSetupNote(card: SizingCardKey, payload: SizingPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const meta = payload.cards[card];
     if (meta.missing.length) {
       // rated_power is a number in the options, not an entity: "not mapped"
       // would send the reader looking for a sensor to pick.
       const onlyRated = meta.missing.length === 1 && meta.missing[0] === "rated_power";
+      const roles = listRoles(m, meta.missing);
       return html`<p class="note">
-        Needs ${listRoles(this.i18n.m, meta.missing)},
-        ${onlyRated ? "which is not set for this inverter" : "not mapped to this inverter"}.
+        ${onlyRated
+          ? m.sizing.needsNotSet({ roles })
+          : m.sizing.needsNotMapped({ roles, n: meta.missing.length })}
       </p>`;
     }
     if (meta.thresholds_inverted) {
       return html`<p class="note">
-        The full mark (${formatPercent(payload.rules.full_pct / 100, locale)}) is at or below the
-        low mark (${formatPercent(payload.rules.low_pct / 100, locale)}), so no day can be judged.
-        Raise Full battery charge or lower Low battery charge in the integration's options.
+        ${m.sizing.thresholdsInverted({
+          full: formatPercent(payload.rules.full_pct / 100, locale),
+          low: formatPercent(payload.rules.low_pct / 100, locale),
+        })}
       </p>`;
     }
     if (meta.no_statistics.length) {
+      const n = meta.no_statistics.length;
       return html`<p class="note">
-        ${meta.no_statistics.join(", ")} keeps no long-term statistics — it has no
-        <code>state_class</code> — so this card cannot be read from it.
+        ${m.sizing.noStatisticsBefore({ sensors: meta.no_statistics.join(", "), n })}
+        <code>state_class</code> ${m.sizing.noStatisticsAfter({ n })}
       </p>`;
     }
     return null;
@@ -224,11 +240,12 @@ export class IaSizingTab extends LitElement {
     if (block.coverage === 0 || block.coverage >= payload.incomplete_below) return nothing;
     const locale = this.i18n.locale;
     return html`<p class="note">
-      Read from ${formatCoverage(block.coverage, locale)} of the period.
+      ${this.i18n.m.sizing.readFrom({ share: formatCoverage(block.coverage, locale) })}
     </p>`;
   }
 
-  private renderCard(card: SizingCardKey, title: string, payload: SizingPayload) {
+  private renderCard(card: SizingCardKey, payload: SizingPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const block = payload.period[card];
     const setup = this.renderSetupNote(card, payload);
@@ -239,10 +256,10 @@ export class IaSizingTab extends LitElement {
       // Everything the payload could name has been ruled out above, so this
       // is a sensor that was mapped and has since been deleted. It still gets
       // a sentence: an empty card reads as a bug.
-      body = html`<p class="note">${reasonSentence(this.i18n.m, card, "no_data")}</p>`;
+      body = html`<p class="note">${reasonSentence(m, card, "no_data")}</p>`;
     } else if (block.verdict === null) {
       body = html`
-        <p class="note">${reasonSentence(this.i18n.m, card, block.reason ?? "no_data")}</p>
+        <p class="note">${reasonSentence(m, card, block.reason ?? "no_data")}</p>
         ${this.renderCoverageNote(block, payload)}
       `;
     } else {
@@ -251,22 +268,25 @@ export class IaSizingTab extends LitElement {
         ${this.renderCoverageNote(block, payload)}
         ${block.note === "covers_but_battery_not_filling"
           ? html`<p class="note">
-              Production covers the load, but the battery filled on only
-              ${formatPercent(block.evidence.fill_share ?? 0, locale)} of days — export by day and
-              import by night.
+              ${m.sizing.batteryNotFilling({
+                share: formatPercent(block.evidence.fill_share ?? 0, locale),
+              })}
             </p>`
           : nothing}
         <p class="note">${this.ruleSentence(card, payload, locale)}</p>
       `;
     }
     return html`<div class="card">
-      <span class="name">${title}</span>
-      <span class="value ${block?.verdict ?? "none"}">${verdictLabel(this.i18n.m, block?.verdict ?? null)}</span>
+      <span class="name">${m.sizing.cards[card]}</span>
+      <span class="value ${block?.verdict ?? "none"}"
+        >${verdictLabel(m, block?.verdict ?? null)}</span
+      >
       ${body}
     </div>`;
   }
 
   private renderMonths(payload: SizingPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const cell = (card: SizingCardKey, month: SizingMonth) => {
       const block = month[card];
@@ -280,28 +300,30 @@ export class IaSizingTab extends LitElement {
       // judged from twelve days is presented under a full month.
       const thin = month.complete && block.coverage < payload.incomplete_below;
       return html`<td class=${block.verdict ?? "none"}>
-        ${verdictLabel(this.i18n.m, block.verdict)}
+        ${verdictLabel(m, block.verdict)}
         ${block.verdict === null
           ? // Why there is no verdict: a month the battery never filled is the
             // rule working, a month with no statistics is missing data, and
             // "No verdict" alone reads the same for both.
-            html`<span class="hint">${reasonHint(this.i18n.m, card, block.reason ?? "no_data")}</span>`
+            html`<span class="hint">${reasonHint(m, card, block.reason ?? "no_data")}</span>`
           : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
         ${thin
-          ? html`<span class="hint">from ${formatCoverage(block.coverage, locale)}</span>`
+          ? html`<span class="hint"
+              >${m.sizing.cellCoverage({ share: formatCoverage(block.coverage, locale) })}</span
+            >`
           : nothing}
       </td>`;
     };
     if (!payload.months.length) {
-      return html`<p class="empty">No month falls inside this period.</p>`;
+      return html`<p class="empty">${m.sizing.noMonths}</p>`;
     }
     return html`<table>
       <thead>
         <tr>
-          <th>Month</th>
-          <th>Inverter</th>
-          <th>Battery</th>
-          <th>Sun</th>
+          <th>${m.seasonality.month}</th>
+          <th>${m.sizing.parts.inverter}</th>
+          <th>${m.sizing.parts.battery}</th>
+          <th>${m.sizing.parts.solar}</th>
         </tr>
       </thead>
       <tbody>
@@ -310,11 +332,13 @@ export class IaSizingTab extends LitElement {
             <td>
               ${monthName(month.key, locale)}
               ${month.coverage === 0
-                ? html`<span class="hint">no data</span>`
+                ? html`<span class="hint">${m.verdict.hintNoData}</span>`
                 : month.complete
                   ? nothing
                   : html`<span class="hint"
-                      >from ${formatCoverage(month.coverage, locale)} of the month</span
+                      >${m.sizing.ofTheMonth({
+                        share: formatCoverage(month.coverage, locale),
+                      })}</span
                     >`}
             </td>
             ${cell("inverter", month)} ${cell("battery", month)} ${cell("solar", month)}
@@ -325,57 +349,61 @@ export class IaSizingTab extends LitElement {
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
     const payload = this.payload;
     const locale = this.i18n.locale;
+    const ruleLine = (card: SizingCardKey) =>
+      m.sizing.ruleLine({
+        part: m.sizing.parts[card],
+        rule: this.ruleSentence(card, payload, locale),
+      });
     return html`
       <div class="status">
-        <span class="badge">Hourly statistics</span>
-        <span class="badge">Months in ${payload.timezone}</span>
+        <span class="badge">${m.balance.hourlyStatistics}</span>
+        <span class="badge">${m.seasonality.monthsIn({ timezone: payload.timezone })}</span>
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
         ${!payload.covers_whole_window && payload.covered_end
           ? html`<span class="warn"
-              >Statistics cover up to ${new Date(payload.covered_end).toLocaleString(locale)}</span
+              >${m.sizing.statisticsCoverUpTo({
+                time: new Date(payload.covered_end).toLocaleString(locale),
+              })}</span
             >`
           : nothing}
-        ${!payload.covered_end ? html`<span class="warn">No statistics in this period</span>` : nothing}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${!payload.covered_end
+          ? html`<span class="warn">${m.sizing.noStatistics}</span>`
+          : nothing}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       <section>
-        <div class="cards">${CARDS.map((card) => this.renderCard(card.key, card.title, payload))}</div>
+        <div class="cards">${CARDS.map((card) => this.renderCard(card, payload))}</div>
       </section>
 
       <section>
-        <h2>Month by month</h2>
+        <h2>${m.seasonality.monthByMonth}</h2>
         ${this.renderMonths(payload)}
         <p class="note">
-          A month drawn in grey was seen for less than
-          ${formatPercent(payload.incomplete_below, locale)} of its length; its verdict stands on
-          that part alone. The first and last months of a period are almost always partial.
+          ${m.sizing.greyMonths({ share: formatPercent(payload.incomplete_below, locale) })}
         </p>
       </section>
 
       <section>
-        <h2>How the verdicts are read</h2>
-        <p class="note">Inverter — ${this.ruleSentence("inverter", payload, locale)}</p>
-        <p class="note">Battery — ${this.ruleSentence("battery", payload, locale)}</p>
-        <p class="note">Sun — ${this.ruleSentence("solar", payload, locale)}</p>
-        <p class="note">
-          Every month is judged from hourly statistics — the peak and the floor of each hour, not
-          the mean — so a verdict for last winter is read the same way as one for last week. Nothing
-          here is a combined score: which part is short is the whole point.
-        </p>
+        <h2>${m.sizing.howVerdictsRead}</h2>
+        <p class="note">${ruleLine("inverter")}</p>
+        <p class="note">${ruleLine("battery")}</p>
+        <p class="note">${ruleLine("solar")}</p>
+        <p class="note">${m.sizing.hourlyNotMean}</p>
       </section>
     `;
   }

@@ -305,6 +305,156 @@ export const en = {
       "is where counter resets are already accounted for. The current hour is compiled only " +
       "once it ends, so a period running up to now stops at the last completed hour.",
   },
+  grid: {
+    outages: "Outages",
+    withoutGrid: "Without grid",
+    unrecordedAssumedOff: (p: { duration: string }) => `+ ${p.duration} unrecorded, assumed off`,
+    shareOfTime: "Share of time",
+    ofMeasuredTime: "of measured time",
+    longest: "Longest",
+    fromTime: (p: { time: string }) => `from ${p.time}`,
+    meanDuration: "Mean duration",
+    briefInterruptions: "Brief interruptions",
+    underAMinute: "under a minute",
+    // An outage cut by the window's start or still going is longer than seen.
+    atLeast: (p: { duration: string }) => `at least ${p.duration}`,
+    noOutages: (p: { duration: string }) =>
+      `No outages in this period — none in ${p.duration} of measurement.`,
+    chargeAtStart: "Charge at start",
+    lowest: "Lowest",
+    atEnd: "At end",
+    meanLoad: "Mean load",
+    unrecorded: (p: { duration: string }) => `(${p.duration} unrecorded)`,
+    noAutonomy: "No autonomy estimate.",
+    // Keyed by AutonomyReason; the one with a figure is a function.
+    autonomyReasons: {
+      no_soc: "It needs the battery's state of charge, which is not mapped to this inverter.",
+      no_outages: "There were no outages in this period to read a discharge rate from.",
+      no_soc_in_outages:
+        "The battery's charge was not recorded during any of this period's outages, so there " +
+        "is no discharge to read a rate from.",
+      no_net_discharge:
+        "The charge did not fall during this period's outages — the sun covered them — so " +
+        "there is no discharge rate to read.",
+    },
+    tooLittleEvidence: (p: { hours: string }) =>
+      `The outages with a charge reading at both ends add up to ${p.hours}, and an estimate ` +
+      "needs at least an hour.",
+    fromFullTo: (p: { level: string }) => `From full to ${p.level}`,
+    fromNow: "From where it is now",
+    chargeNow: "Charge now",
+    dischargeRate: "Discharge rate",
+    pointsPerHour: (p: { rate: string }) => `${p.rate} pts/h`,
+    evidenceNote: (p: { hours: string }) =>
+      `At the rate seen during this period's outages — ${p.hours} of them. Whether a summer ` +
+      "afternoon's outage says anything about a winter evening's is for the reader to judge; " +
+      "the mean load beside it is there to help.",
+    // Why counting starts late: two whole sentences rather than a clause slot.
+    countedFromInferred: (p: { date: string }) =>
+      `Outages counted from ${p.date} — earlier history is only hourly averages, which ` +
+      "cannot say when inside an hour the grid was gone",
+    countedFromNoHistory: (p: { date: string }) =>
+      `Outages counted from ${p.date} — the recorder keeps no earlier history of this sensor`,
+    inferredBanner:
+      "Inferred from power flows, not measured. A night the battery carries the house with " +
+      "nothing crossing the grid connection looks exactly like an outage, and a daytime " +
+      "outage the sun covers is not seen at all. Map a sensor that reports grid presence to " +
+      "measure instead.",
+    hoursByDay: "Hours without grid, by day",
+    noDaysWithData: "No days with data in this period.",
+    missingDays: (p: { n: number }) =>
+      plural("en", p.n, {
+        one: `${p.n} day in this period had no data and is not drawn.`,
+        other: `${p.n} days in this period had no data and are not drawn.`,
+      }),
+    shareByHour: "Share of time without grid, by hour of day",
+    hoursNeverRecorded:
+      "Hours the sensor never recorded are left empty rather than drawn at zero.",
+    autonomy: "Autonomy",
+  },
+  sizing: {
+    cards: {
+      inverter: "Inverter, against the load",
+      battery: "Battery, against the nights",
+      solar: "Sun, against the consumption",
+    },
+    // The month-table columns, and the part named before each rule.
+    parts: {
+      inverter: "Inverter",
+      battery: "Battery",
+      solar: "Sun",
+    },
+    // The one figure in a month cell.
+    hoursAtRated: (p: { hours: string }) => `${p.hours} h at rated`,
+    // The total is a number so a language can inflect "days" by it.
+    daysOf: (p: { days: string; total: number }) => `${p.days} of ${p.total} days`,
+    ofLoad: (p: { share: string }) => `${p.share} of load`,
+    // The evidence rows of each card.
+    countOf: (p: { count: string; total: string }) => `${p.count} of ${p.total}`,
+    hoursReachedRated: "Hours the load reached rated power",
+    hoursAboveOfRated: (p: { share: string }) => `Hours above ${p.share} of rated`,
+    highestPeak: "Highest hourly peak",
+    daysFilledAndLow: "Days it filled, and still hit the low mark",
+    daysLowWithoutFilling: "Days it hit the low mark without filling",
+    daysFilled: "Days it filled",
+    lowestCharge: "Lowest charge",
+    productionShare: "Production as a share of consumption",
+    producedConsumed: "Produced / consumed",
+    selfSufficiency: "Self-sufficiency",
+    daysBatteryFilled: "Days the battery filled",
+    // The rule each verdict was read by, in the reader's own numbers. With no
+    // charge sensor mapped the solar rule has no fill clause, and is a
+    // sentence of its own rather than one with a hole in it.
+    inverterRule: (p: { shortShare: string; highShare: string; borderlineShare: string }) =>
+      `Short when the load reached rated power in more than ${p.shortShare} of hours; ` +
+      `borderline on any such hour, or above ${p.highShare} of rated in more than ` +
+      `${p.borderlineShare} of hours.`,
+    batteryRule: (p: { full: string; low: string; share: string }) =>
+      `Counted over days with data: short when the battery filled to ${p.full} and still ` +
+      `fell to ${p.low} on at least ${p.share} of them; borderline when it happened at all; ` +
+      "no verdict for a span in which it never filled. A day it ran low without filling " +
+      "counts against the sun, not the battery.",
+    solarRuleWithFill: (p: { enough: string; fill: string; borderline: string }) =>
+      `Enough when production is at least ${p.enough} of consumption and the battery filled ` +
+      `on at least ${p.fill} of days; borderline from ${p.borderline} of consumption; short ` +
+      "below.",
+    solarRule: (p: { enough: string; borderline: string }) =>
+      `Enough when production is at least ${p.enough} of consumption; borderline from ` +
+      `${p.borderline} of consumption; short below.`,
+    // What a card is short of before a verdict can be read. Rated power is a
+    // number in the options, not an entity, so it is "not set", not "not
+    // mapped"; the count lets a language agree with one role or several.
+    needsNotSet: (p: { roles: string }) => `Needs ${p.roles}, which is not set for this inverter.`,
+    needsNotMapped: (p: { roles: string; n: number }) =>
+      `Needs ${p.roles}, not mapped to this inverter.`,
+    thresholdsInverted: (p: { full: string; low: string }) =>
+      `The full mark (${p.full}) is at or below the low mark (${p.low}), so no day can be ` +
+      "judged. Raise Full battery charge or lower Low battery charge in the integration's " +
+      "options.",
+    // Split around the <code>state_class</code> the template holds.
+    noStatisticsBefore: (p: { sensors: string; n: number }) =>
+      `${p.sensors} keeps no long-term statistics — it has no`,
+    noStatisticsAfter: (p: { n: number }) => "— so this card cannot be read from it.",
+    readFrom: (p: { share: string }) => `Read from ${p.share} of the period.`,
+    batteryNotFilling: (p: { share: string }) =>
+      `Production covers the load, but the battery filled on only ${p.share} of days — ` +
+      "export by day and import by night.",
+    cellCoverage: (p: { share: string }) => `from ${p.share}`,
+    noMonths: "No month falls inside this period.",
+    ofTheMonth: (p: { share: string }) => `from ${p.share} of the month`,
+    statisticsCoverUpTo: (p: { time: string }) => `Statistics cover up to ${p.time}`,
+    noStatistics: "No statistics in this period",
+    greyMonths: (p: { share: string }) =>
+      `A month drawn in grey was seen for less than ${p.share} of its length; its verdict ` +
+      "stands on that part alone. The first and last months of a period are almost always " +
+      "partial.",
+    howVerdictsRead: "How the verdicts are read",
+    ruleLine: (p: { part: string; rule: string }) => `${p.part} — ${p.rule}`,
+    hourlyNotMean:
+      "Every month is judged from hourly statistics — the peak and the floor of each hour, " +
+      "not the mean — so a verdict for last winter is read the same way as one for last " +
+      "week. Nothing here is a combined score: which part is short is the whole point.",
+  },
   sections: {
     charge: {
       title: "Charging and discharging",

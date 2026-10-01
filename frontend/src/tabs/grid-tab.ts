@@ -13,6 +13,7 @@ import {
   precisionLabel,
 } from "../format";
 import { I18nController } from "../i18n/controller";
+import type { Messages } from "../i18n/en";
 import { resolveRange, type RangeKey } from "../range";
 import { sectionStyles } from "../sections/shared-styles";
 import type {
@@ -28,6 +29,18 @@ const DASH = "—";
 function formatHours(hours: number | null, locale: string): string {
   if (hours === null) return DASH;
   return formatDuration(hours * 3600, locale);
+}
+
+/**
+ * A rate to one decimal, as toFixed(1) always gave it in English — "2.5",
+ * never grouped — but with the panel language's decimal mark.
+ */
+function oneDecimal(value: number, m: Messages): string {
+  return new Intl.NumberFormat(m.charts.locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    useGrouping: false,
+  }).format(value);
 }
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -55,7 +68,9 @@ export class IaGridTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "30d";
 
   @state() private payload?: GridPayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
 
   private i18n = new I18nController(this);
@@ -97,7 +112,7 @@ export class IaGridTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -106,33 +121,42 @@ export class IaGridTab extends LitElement {
   }
 
   private renderKpi(payload: GridPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const kpi = payload.kpi;
     const measured = payload.measured_seconds > 0;
     const cells: [string, string, string][] = [
-      ["Outages", measured ? `${kpi.count}` : DASH, ""],
+      [m.grid.outages, measured ? `${kpi.count}` : DASH, ""],
       [
-        "Without grid",
+        m.grid.withoutGrid,
         measured ? formatDuration(kpi.off_seconds, locale) : DASH,
         // Only measured absence is in the figure, while "Longest" and "Mean"
         // include the gaps bridged inside an outage; unsaid, the two contradict
         // each other on a single outage that a restart cut in half.
         kpi.bridged_seconds > 0
-          ? `+ ${formatDuration(kpi.bridged_seconds, locale)} unrecorded, assumed off`
+          ? m.grid.unrecordedAssumedOff({
+              duration: formatDuration(kpi.bridged_seconds, locale),
+            })
           : "",
       ],
       // Not formatPercent: a real 0.007% share beside "Outages: 3" rounds to a
       // flat "0%", which reads as no outages at all.
-      ["Share of time", formatCoverage(kpi.off_share, locale), "of measured time"],
+      [m.grid.shareOfTime, formatCoverage(kpi.off_share, locale), m.grid.ofMeasuredTime],
       [
-        "Longest",
+        m.grid.longest,
         kpi.longest_seconds === null ? DASH : formatDuration(kpi.longest_seconds, locale),
-        kpi.longest_start ? `from ${new Date(kpi.longest_start).toLocaleString(locale)}` : "",
+        kpi.longest_start
+          ? m.grid.fromTime({ time: new Date(kpi.longest_start).toLocaleString(locale) })
+          : "",
       ],
-      ["Mean duration", kpi.mean_seconds === null ? DASH : formatDuration(kpi.mean_seconds, locale), ""],
+      [
+        m.grid.meanDuration,
+        kpi.mean_seconds === null ? DASH : formatDuration(kpi.mean_seconds, locale),
+        "",
+      ],
     ];
     if (kpi.brief_interruptions !== null) {
-      cells.push(["Brief interruptions", `${kpi.brief_interruptions}`, "under a minute"]);
+      cells.push([m.grid.briefInterruptions, `${kpi.brief_interruptions}`, m.grid.underAMinute]);
     }
     return html`<div class="kpi">
       ${cells.map(
@@ -147,28 +171,31 @@ export class IaGridTab extends LitElement {
 
   private renderDuration(episode: OutageEpisode): string {
     const cut = episode.started_before_window || episode.ongoing;
-    return `${cut ? "at least " : ""}${formatDuration(episode.seconds, this.i18n.locale)}`;
+    const duration = formatDuration(episode.seconds, this.i18n.locale);
+    return cut ? this.i18n.m.grid.atLeast({ duration }) : duration;
   }
 
   private renderEpisodes(payload: GridPayload) {
+    const m = this.i18n.m;
+    const locale = this.i18n.locale;
     if (!payload.episodes.length) {
       return html`<p class="empty">
-        No outages in this period — none in ${formatDuration(payload.measured_seconds, this.i18n.locale)} of
-        measurement.
+        ${m.grid.noOutages({ duration: formatDuration(payload.measured_seconds, locale) })}
       </p>`;
     }
-    const locale = this.i18n.locale;
     const soc = (value: number | null | undefined) =>
       value === null || value === undefined ? DASH : formatPercent(value / 100, locale);
     return html`<table>
       <thead>
         <tr>
-          <th>Start</th>
-          <th>Duration</th>
+          <th>${m.common.start}</th>
+          <th>${m.common.duration}</th>
           ${payload.has_soc
-            ? html`<th>Charge at start</th><th>Lowest</th><th>At end</th>`
+            ? html`<th>${m.grid.chargeAtStart}</th>
+                <th>${m.grid.lowest}</th>
+                <th>${m.grid.atEnd}</th>`
             : nothing}
-          ${payload.has_load ? html`<th>Mean load</th>` : nothing}
+          ${payload.has_load ? html`<th>${m.grid.meanLoad}</th>` : nothing}
         </tr>
       </thead>
       <tbody>
@@ -178,7 +205,11 @@ export class IaGridTab extends LitElement {
             <td>
               ${this.renderDuration(item)}
               ${item.bridged_seconds > 0
-                ? html`<span class="hint">(${formatDuration(item.bridged_seconds, locale)} unrecorded)</span>`
+                ? html`<span class="hint"
+                    >${m.grid.unrecorded({
+                      duration: formatDuration(item.bridged_seconds, locale),
+                    })}</span
+                  >`
                 : nothing}
             </td>
             ${payload.has_soc
@@ -186,7 +217,9 @@ export class IaGridTab extends LitElement {
                   <td class=${item.below_low ? "low" : ""}>${soc(item.soc_min)}</td>
                   <td>${soc(item.soc_end)}</td>`
               : nothing}
-            ${payload.has_load ? html`<td>${formatPower(item.load_mean_w ?? null, locale)}</td>` : nothing}
+            ${payload.has_load
+              ? html`<td>${formatPower(item.load_mean_w ?? null, locale)}</td>`
+              : nothing}
           </tr>`,
         )}
       </tbody>
@@ -194,60 +227,67 @@ export class IaGridTab extends LitElement {
   }
 
   private renderAutonomy(autonomy: Autonomy, lowPct: number) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     if (autonomy.reason !== null) {
       // Keyed by the union rather than by string, so a reason the backend
       // learns to send is a compile error here and not "undefined" on screen.
       const reasons: Record<AutonomyReason, string> = {
-        no_soc: "It needs the battery's state of charge, which is not mapped to this inverter.",
-        no_outages: "There were no outages in this period to read a discharge rate from.",
-        no_soc_in_outages:
-          "The battery's charge was not recorded during any of this period's outages, so there is no discharge to read a rate from.",
-        too_little_evidence: `The outages with a charge reading at both ends add up to ${formatHours(autonomy.evidence_hours, locale)}, and an estimate needs at least an hour.`,
-        no_net_discharge:
-          "The charge did not fall during this period's outages — the sun covered them — so there is no discharge rate to read.",
+        ...m.grid.autonomyReasons,
+        too_little_evidence: m.grid.tooLittleEvidence({
+          hours: formatHours(autonomy.evidence_hours, locale),
+        }),
       };
-      return html`<p class="note">No autonomy estimate. ${reasons[autonomy.reason]}</p>`;
+      return html`<p class="note">${m.grid.noAutonomy} ${reasons[autonomy.reason]}</p>`;
     }
+    const rate = autonomy.rate_pct_per_hour;
     return html`
       <div class="cards">
         <div class="card">
-          <span class="name">From full to ${formatPercent(lowPct / 100, locale)}</span>
+          <span class="name"
+            >${m.grid.fromFullTo({ level: formatPercent(lowPct / 100, locale) })}</span
+          >
           <span class="value">${formatHours(autonomy.hours_from_full, locale)}</span>
         </div>
         <div class="card">
-          <span class="name">From where it is now</span>
+          <span class="name">${m.grid.fromNow}</span>
           <span class="value">${formatHours(autonomy.hours_from_now, locale)}</span>
           <span class="row">
-            <span>Charge now</span>
-            <span>${autonomy.soc_now === null ? DASH : formatPercent(autonomy.soc_now / 100, locale)}</span>
+            <span>${m.grid.chargeNow}</span>
+            <span
+              >${autonomy.soc_now === null
+                ? DASH
+                : formatPercent(autonomy.soc_now / 100, locale)}</span
+            >
           </span>
         </div>
         <div class="card">
-          <span class="name">Discharge rate</span>
-          <span class="value">${autonomy.rate_pct_per_hour === null ? DASH : `${autonomy.rate_pct_per_hour.toFixed(1)} pts/h`}</span>
+          <span class="name">${m.grid.dischargeRate}</span>
+          <span class="value"
+            >${rate === null ? DASH : m.grid.pointsPerHour({ rate: oneDecimal(rate, m) })}</span
+          >
           <span class="row">
-            <span>Mean load</span><span>${formatPower(autonomy.load_mean_w, locale)}</span>
+            <span>${m.grid.meanLoad}</span>
+            <span>${formatPower(autonomy.load_mean_w, locale)}</span>
           </span>
         </div>
       </div>
       <p class="note">
-        At the rate seen during this period's outages — ${formatHours(autonomy.evidence_hours, locale)} of
-        them. Whether a summer afternoon's outage says anything about a winter evening's is for
-        the reader to judge; the mean load beside it is there to help.
+        ${m.grid.evidenceNote({ hours: formatHours(autonomy.evidence_hours, locale) })}
       </p>
     `;
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
 
     const payload = this.payload;
@@ -259,62 +299,59 @@ export class IaGridTab extends LitElement {
     const missingDays =
       localDaysSpanned(payload.counted_from ?? payload.window.start, payload.window.end) -
       payload.days.length;
+    const countedFrom = payload.counted_from
+      ? new Date(payload.counted_from).toLocaleDateString(locale)
+      : null;
 
     return html`
       <div class="status">
         <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
-        ${payload.counted_from
+        ${countedFrom
           ? html`<span class="warn">
-              Outages counted from ${new Date(payload.counted_from).toLocaleDateString(locale)} —
               ${payload.source === "inferred"
-                ? "earlier history is only hourly averages, which cannot say when inside an hour the grid was gone"
-                : "the recorder keeps no earlier history of this sensor"}
+                ? m.grid.countedFromInferred({ date: countedFrom })
+                : m.grid.countedFromNoHistory({ date: countedFrom })}
             </span>`
           : nothing}
         ${warning ? html`<span class="warn">${warning}</span>` : nothing}
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       ${payload.source === "inferred"
-        ? html`<p class="banner">
-            Inferred from power flows, not measured. A night the battery carries the house with
-            nothing crossing the grid connection looks exactly like an outage, and a daytime outage
-            the sun covers is not seen at all. Map a sensor that reports grid presence to measure
-            instead.
-          </p>`
+        ? html`<p class="banner">${m.grid.inferredBanner}</p>`
         : nothing}
 
       ${this.renderKpi(payload)}
 
       <section>
-        <h2>Hours without grid, by day</h2>
+        <h2>${m.grid.hoursByDay}</h2>
         ${daysWithoutData
-          ? html`<p class="empty">No days with data in this period.</p>`
-          : html`<ia-chart .option=${outageDaysOption(payload.days, this.i18n.m)} height="220px"></ia-chart>
+          ? html`<p class="empty">${m.grid.noDaysWithData}</p>`
+          : html`<ia-chart
+                .option=${outageDaysOption(payload.days, m)}
+                height="220px"
+              ></ia-chart>
               ${missingDays > 0
-                ? html`<p class="note">
-                    ${missingDays} ${missingDays === 1 ? "day" : "days"} in this period had no data
-                    and ${missingDays === 1 ? "is" : "are"} not drawn.
-                  </p>`
+                ? html`<p class="note">${m.grid.missingDays({ n: missingDays })}</p>`
                 : nothing}`}
       </section>
 
       <section>
-        <h2>Share of time without grid, by hour of day</h2>
-        <ia-chart .option=${outageHoursOption(payload.hours, this.i18n.m)} height="220px"></ia-chart>
-        <p class="note">Hours the sensor never recorded are left empty rather than drawn at zero.</p>
+        <h2>${m.grid.shareByHour}</h2>
+        <ia-chart .option=${outageHoursOption(payload.hours, m)} height="220px"></ia-chart>
+        <p class="note">${m.grid.hoursNeverRecorded}</p>
       </section>
 
       <section>
-        <h2>Outages</h2>
+        <h2>${m.grid.outages}</h2>
         ${this.renderEpisodes(payload)}
       </section>
 
       <section>
-        <h2>Autonomy</h2>
+        <h2>${m.grid.autonomy}</h2>
         ${this.renderAutonomy(payload.autonomy, payload.low_pct)}
       </section>
     `;

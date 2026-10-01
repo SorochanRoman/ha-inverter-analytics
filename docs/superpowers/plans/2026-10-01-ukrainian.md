@@ -78,6 +78,14 @@
 | self-sufficiency / self-consumption | самозабезпечення / самоспоживання |
 | unaccounted (energy) | неврахована |
 | bar (chart) | стовпчик |
+| autonomy (battery through an outage) | автономність |
+| brief interruptions (grid) | короткі перебої |
+| unrecorded (gap inside an outage) | без записів |
+| discharge rate / pts/h (charge points per hour) | швидкість розряду / в.п./год |
+| verdict (sizing) | вердикт |
+| low mark / full mark (charge thresholds) | низька позначка / позначка повного заряду |
+| Low battery charge / Full battery charge (option fields) | Низький заряд батареї / Повний заряд батареї |
+| "X, against the Y" (sizing card titles) | «X проти Y» |
 
 ---
 
