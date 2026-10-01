@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { coverageWarning, describeError, formatCoverage, formatDuration, formatEnergy, formatPercent, formatPower, precisionLabel } from "./format";
+import {
+  coverageWarning,
+  describeError,
+  formatCoverage,
+  formatDuration,
+  formatEnergy,
+  formatOneDecimal,
+  formatPercent,
+  formatPower,
+  precisionLabel,
+} from "./format";
 import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
 
@@ -59,9 +69,8 @@ describe("formatDuration", () => {
 
 describe("describeError", () => {
   it("extracts the message from an HA-shaped error object", () => {
-    expect(describeError({ code: "invalid_window", message: "Window end must be later than its start" }, en)).toBe(
-      "Window end must be later than its start",
-    );
+    const error = { code: "invalid_window", message: "Window end must be later than its start" };
+    expect(describeError(error, en)).toBe("Window end must be later than its start");
   });
 
   it("extracts the message from a plain Error", () => {
@@ -77,9 +86,8 @@ describe("describeError", () => {
   });
 
   it("names a known backend error in the panel's language", () => {
-    expect(describeError({ code: "not_found", message: "Inverter not found or disabled" }, uk)).toBe(
-      uk.errors.not_found,
-    );
+    const error = { code: "not_found", message: "Inverter not found or disabled" };
+    expect(describeError(error, uk)).toBe(uk.errors.not_found);
   });
 
   it("falls back to the backend's message for an unknown code", () => {
@@ -168,5 +176,22 @@ describe("in Ukrainian", () => {
 
   it("names the precision in Ukrainian", () => {
     expect(precisionLabel("lts", null, "uk")).toBe(uk.format.hourlyAverages);
+  });
+});
+
+describe("formatOneDecimal", () => {
+  it("rounds exactly as toFixed(1) did in English, halves included", () => {
+    // 0.15, 1.45 and 8.35 sit just below the half in binary, so toFixed gives
+    // the lower digit where Intl.NumberFormat would round up.
+    expect(formatOneDecimal(0.15, "en")).toBe("0.1");
+    expect(formatOneDecimal(1.45, "en")).toBe("1.4");
+    expect(formatOneDecimal(8.35, "en")).toBe("8.3");
+    expect(formatOneDecimal(2.5, "en")).toBe("2.5");
+    expect(formatOneDecimal(12345.67, "en")).toBe("12345.7");
+  });
+
+  it("uses the Ukrainian decimal mark", () => {
+    expect(formatOneDecimal(1.45, "uk")).toBe("1,4");
+    expect(formatOneDecimal(12345.67, "uk")).toBe("12345,7");
   });
 });

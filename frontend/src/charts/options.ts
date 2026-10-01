@@ -226,7 +226,9 @@ export function socBandsOption(bands: Band[], m: Messages): Record<string, unkno
  */
 export function monthLabel(key: string, previous: string | undefined, locale: string): string {
   const [year, month] = key.split("-").map(Number);
-  const name = new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString(locale, { month: "short" });
+  const name = new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString(locale, {
+    month: "short",
+  });
   return previous && previous.slice(0, 4) === String(year) ? name : `${name} ${year}`;
 }
 
@@ -236,7 +238,9 @@ export function monthlyOption(
   m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
-  const labels = months.map((month, index) => monthLabel(month.key, months[index - 1]?.key, m.charts.locale));
+  const labels = months.map((month, index) =>
+    monthLabel(month.key, months[index - 1]?.key, m.charts.locale),
+  );
 
   const series: Record<string, unknown>[] = [
     {
@@ -262,7 +266,9 @@ export function monthlyOption(
 
   return {
     ...base,
-    legend: hasPv ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle } : undefined,
+    legend: hasPv
+      ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle }
+      : undefined,
     grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
     xAxis: { ...axis, type: "category", data: labels },
     yAxis: { ...axis, type: "value", name: m.units.w },
@@ -299,7 +305,9 @@ export function hourOfDayOption(
   }
   return {
     ...base,
-    legend: hasPv ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle } : undefined,
+    legend: hasPv
+      ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle }
+      : undefined,
     grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
     xAxis: {
       ...axis,

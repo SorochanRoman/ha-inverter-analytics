@@ -28,7 +28,8 @@ export class IaChargeSection extends LitElement {
             <span class="name">${t.meanChargePower}</span>
             <span class="value">${formatPower(flow.mean_charge_w, this.locale)}</span>
             <span class="row">
-              <span>${t.ofTheTime}</span><span>${formatPercent(flow.share_charging, this.locale)}</span>
+              <span>${t.ofTheTime}</span
+              ><span>${formatPercent(flow.share_charging, this.locale)}</span>
             </span>
           </div>
           <div class="card">

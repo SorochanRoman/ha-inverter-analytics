@@ -22,7 +22,9 @@ describe("verdict copy", () => {
     // A block can arrive with no reason at all — a mapped entity that no
     // longer exists — and the card must still print a sentence.
     expect(reasonSentence(en, "battery", "no_data")).toMatch(/no statistics/);
-    expect(reasonSentence(en, "solar", "something_new")).toBe(reasonSentence(en, "solar", "no_data"));
+    expect(reasonSentence(en, "solar", "something_new")).toBe(
+      reasonSentence(en, "solar", "no_data"),
+    );
   });
 
   it("tells a never-filled month apart from an unmeasured one in a cell", () => {

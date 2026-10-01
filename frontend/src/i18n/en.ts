@@ -132,7 +132,8 @@ export const en = {
       inverter: "There are no statistics for the load in this span.",
       battery: "There are no statistics for the battery's charge in this span.",
       solar:
-        "There are no statistics for the counters in this span, or too little consumption to take a share of.",
+        "There are no statistics for the counters in this span, or too little consumption " +
+        "to take a share of.",
     },
     neverFull:
       "The battery never filled in this span, so the nights say nothing about its size.",
@@ -244,7 +245,9 @@ export const en = {
     thinMonths: (p: { n: number; share: string }) =>
       plural("en", p.n, {
         one: `One month is covered by less than ${p.share} of its days and is drawn in grey.`,
-        other: `${p.n} months are covered by less than ${p.share} of their days and are drawn in grey.`,
+        other:
+          `${p.n} months are covered by less than ${p.share} of their days and are drawn ` +
+          "in grey.",
       }),
     partialNotLower:
       "A month the recorder only saw part of is not a lower month; the figures stand, the " +
@@ -255,7 +258,8 @@ export const en = {
         other: `${p.n} months have no recorded data at all and carry no bar.`,
       }),
     statisticsFromStart:
-      "Home Assistant keeps long-term statistics only from the moment a sensor starts producing them.",
+      "Home Assistant keeps long-term statistics only from the moment a sensor starts " +
+      "producing them.",
     monthByMonth: "Month by month",
     month: "Month",
     busiestHour: "Busiest hour",

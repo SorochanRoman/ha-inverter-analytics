@@ -172,8 +172,14 @@ describe("partsOption", () => {
       { ...parts[0], key: "pv_p1", label: "String 1", index: null },
       { ...parts[1], key: "pv_p2", label: "String 2", index: null },
     ];
-    expect((partsOption(positional, SERIES.pv, en) as any).xAxis.data).toEqual(["String 1", "String 2"]);
-    expect((partsOption(positional, SERIES.pv, uk) as any).xAxis.data).toEqual(["Стрінг 1", "Стрінг 2"]);
+    expect((partsOption(positional, SERIES.pv, en) as any).xAxis.data).toEqual([
+      "String 1",
+      "String 2",
+    ]);
+    expect((partsOption(positional, SERIES.pv, uk) as any).xAxis.data).toEqual([
+      "Стрінг 1",
+      "Стрінг 2",
+    ]);
   });
 
   it("keeps a part with no data as a hole rather than a zero", () => {
@@ -478,7 +484,10 @@ describe("chart words in Ukrainian", () => {
       ["load_energy_total"],
       uk,
     ) as any;
-    expect(option.legend.data).toEqual([uk.charts.flows.pv_energy_total, uk.charts.flows.load_energy_total]);
+    expect(option.legend.data).toEqual([
+      uk.charts.flows.pv_energy_total,
+      uk.charts.flows.load_energy_total,
+    ]);
     expect(option.xAxis.name).toBe(uk.units.kwh);
 
     const days: GridDay[] = [
@@ -490,8 +499,12 @@ describe("chart words in Ukrainian", () => {
     const tooltip = outageDaysOption(days, uk).tooltip as {
       formatter: (params: { name: string; value: number; dataIndex: number }[]) => string;
     };
-    expect(tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }])).toContain("2 відключення");
-    expect(tooltip.formatter([{ name: "01-02", value: 0, dataIndex: 1 }])).toContain("5 відключень");
+    expect(tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }])).toContain(
+      "2 відключення",
+    );
+    expect(tooltip.formatter([{ name: "01-02", value: 0, dataIndex: 1 }])).toContain(
+      "5 відключень",
+    );
     expect(tooltip.formatter([{ name: "01-03", value: 0, dataIndex: 2 }])).toContain(
       "жодне відключення не почалося",
     );

@@ -193,6 +193,7 @@ export class InverterAnalyticsPanel extends LitElement {
           ${LANGS.map(
             (lang) => html`<button
               class=${lang === this.i18n.lang ? "active" : ""}
+              aria-pressed=${lang === this.i18n.lang ? "true" : "false"}
               @click=${() => setLang(lang)}
             >${lang.toUpperCase()}</button>`,
           )}
@@ -201,6 +202,7 @@ export class InverterAnalyticsPanel extends LitElement {
           ${RANGE_KEYS.map(
             (key) => html`<button
               class=${key === this.range ? "active" : ""}
+              aria-pressed=${key === this.range ? "true" : "false"}
               @click=${() => this.selectRange(key)}
             >${rangeLabel(m, key)}</button>`,
           )}
@@ -249,7 +251,8 @@ export class InverterAnalyticsPanel extends LitElement {
           ${feature.missing.length === 1 ? m.panel.missingOne(words) : m.panel.missingMany(words)}
         </p>
         <p>
-          ${m.panel.reconfigureBefore}<strong>${m.panel.reconfigure}</strong>${m.panel.reconfigureAfter}
+          ${m.panel.reconfigureBefore}<strong>${m.panel.reconfigure}</strong
+          >${m.panel.reconfigureAfter}
         </p>
         <a href=${INTEGRATION_URL}>${m.panel.goToSettings}</a>
       </div>`;

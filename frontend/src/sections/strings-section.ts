@@ -30,8 +30,14 @@ export class IaStringsSection extends LitElement {
             return html`<div class="card">
               <span class="name">${partLabel(m, part)}</span>
               <span class="value">${formatPower(part.mean, this.locale)}</span>
-              <span class="row"><span>${m.common.peak}</span><span>${formatPower(part.peak, this.locale)}</span></span>
-              <span class="row"><span>${t.shareOfPv}</span><span>${formatPercent(part.share, this.locale)}</span></span>
+              <span class="row"
+                ><span>${m.common.peak}</span
+                ><span>${formatPower(part.peak, this.locale)}</span></span
+              >
+              <span class="row"
+                ><span>${t.shareOfPv}</span
+                ><span>${formatPercent(part.share, this.locale)}</span></span
+              >
               ${coverage !== undefined && coverage < 0.95
                 ? html`<span class="warn">
                     ${m.common.coversOfPeriod({ share: formatCoverage(coverage, this.locale) })}

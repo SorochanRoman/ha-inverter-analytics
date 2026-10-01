@@ -26,9 +26,17 @@ export class IaPhasesSection extends LitElement {
         return html`<div class="card">
           <span class="name">${partLabel(m, phase)}</span>
           <span class="value">${formatPower(phase.mean, this.locale)}</span>
-          <span class="row"><span>${m.common.peak}</span><span>${formatPower(phase.peak, this.locale)}</span></span>
-          <span class="row"><span>P95</span><span>${formatPower(phase.p95, this.locale)}</span></span>
-          <span class="row"><span>${t.shareOfLoad}</span><span>${formatPercent(phase.share, this.locale)}</span></span>
+          <span class="row"
+            ><span>${m.common.peak}</span
+            ><span>${formatPower(phase.peak, this.locale)}</span></span
+          >
+          <span class="row"
+            ><span>P95</span><span>${formatPower(phase.p95, this.locale)}</span></span
+          >
+          <span class="row"
+            ><span>${t.shareOfLoad}</span
+            ><span>${formatPercent(phase.share, this.locale)}</span></span
+          >
           <span class="row">
             <span>${t.peakVs({ rating: formatPower(rating_per_phase, this.locale) })}</span>
             <span>${formatPercent(phase.headroom, this.locale)}</span>

@@ -13,7 +13,8 @@ export function formatPower(value: number | null, locale: string): string {
     );
     return `${kilowatts} ${m.units.kw}`;
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} ${m.units.w}`;
+  const watts = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
+  return `${watts} ${m.units.w}`;
 }
 
 export function formatPercent(value: number | null, locale: string): string {
@@ -43,6 +44,20 @@ export function formatEnergy(kwh: number | null, locale: string): string {
   if (kwh === null || Number.isNaN(kwh)) return DASH;
   const { units } = messagesForLocale(locale);
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kwh)} ${units.kwh}`;
+}
+
+/**
+ * A number to one decimal, rounded exactly as toFixed(1) rounds — never
+ * grouped, and in English byte for byte what toFixed(1) gave — with the
+ * locale's decimal mark. Intl.NumberFormat would round the binary halves
+ * (0.15, 1.45, 8.35) up where toFixed rounds them down.
+ */
+export function formatOneDecimal(value: number, locale: string): string {
+  const fixed = value.toFixed(1);
+  const mark =
+    new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === "decimal")
+      ?.value ?? ".";
+  return mark === "." ? fixed : fixed.replace(".", mark);
 }
 
 export function formatDuration(seconds: number, locale: string): string {

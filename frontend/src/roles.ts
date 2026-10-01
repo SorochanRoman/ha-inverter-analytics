@@ -10,8 +10,8 @@ import type { Messages } from "./i18n/en";
  * name rather than for something they have to translate first.
  *
  * Distinct from m.charts.flows (flowLabel in charts/options), which names
- * the same counters as movements of energy — "From grid" is right on an axis and useless in an
- * instruction to go and map a sensor.
+ * the same counters as movements of energy — "From grid" is right on an
+ * axis and useless in an instruction to go and map a sensor.
  *
  * The names live in m.roles. The English ones equal translations/en.json;
  * the Ukrainian ones must equal translations/uk.json word for word.
@@ -53,7 +53,9 @@ export function partLabel(m: Messages, part: { key: string; label: string }): st
   const match = POSITIONAL_PART.exec(part.key);
   if (!match) return part.label;
   const n = Number(match[2]);
-  return match[1] === "pv" ? m.sections.strings.positional({ n }) : m.sections.phases.positional({ n });
+  return match[1] === "pv"
+    ? m.sections.strings.positional({ n })
+    : m.sections.phases.positional({ n });
 }
 
 /** Where the user goes to map them. */

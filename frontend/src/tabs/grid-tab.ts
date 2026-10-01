@@ -8,12 +8,12 @@ import {
   describeError,
   formatCoverage,
   formatDuration,
+  formatOneDecimal,
   formatPercent,
   formatPower,
   precisionLabel,
 } from "../format";
 import { I18nController } from "../i18n/controller";
-import type { Messages } from "../i18n/en";
 import { resolveRange, type RangeKey } from "../range";
 import { sectionStyles } from "../sections/shared-styles";
 import type {
@@ -29,18 +29,6 @@ const DASH = "—";
 function formatHours(hours: number | null, locale: string): string {
   if (hours === null) return DASH;
   return formatDuration(hours * 3600, locale);
-}
-
-/**
- * A rate to one decimal, as toFixed(1) always gave it in English — "2.5",
- * never grouped — but with the panel language's decimal mark.
- */
-function oneDecimal(value: number, m: Messages): string {
-  return new Intl.NumberFormat(m.charts.locale, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-    useGrouping: false,
-  }).format(value);
 }
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -264,7 +252,9 @@ export class IaGridTab extends LitElement {
         <div class="card">
           <span class="name">${m.grid.dischargeRate}</span>
           <span class="value"
-            >${rate === null ? DASH : m.grid.pointsPerHour({ rate: oneDecimal(rate, m) })}</span
+            >${rate === null
+              ? DASH
+              : m.grid.pointsPerHour({ rate: formatOneDecimal(rate, m.charts.locale) })}</span
           >
           <span class="row">
             <span>${m.common.meanLoad}</span>
