@@ -58,6 +58,7 @@
 | 24 h / 7 days / 30 days / This month / Year | 24 год / 7 днів / 30 днів / Цей місяць / Рік |
 | House (balance flow) | Будинок |
 | In / Out (balance bars) | Надходження / Витрата |
+| In against out (balance heading, beside "In … out …") | Надійшло проти вийшло |
 | sensor | сенсор |
 | capacity (battery) | ємність |
 | Exact data / Hourly averages / Mixed (precision) | Точні дані / Погодинні середні / Змішані |
@@ -81,6 +82,8 @@
 | autonomy (battery through an outage) | автономність |
 | brief interruptions (grid) | короткі перебої |
 | unrecorded (gap inside an outage) | без записів |
+| assumed off (unrecorded gap counted as an outage) | вважаємо відключенням |
+| is reported (time past a threshold, option help) | враховується у звіті |
 | sustained (load over 15 min, imbalance) | тривалий (Тривала 15 хв) |
 | discharge rate / pts/h (charge points per hour) | швидкість розряду / в.п./год |
 | verdict (sizing) | вердикт |

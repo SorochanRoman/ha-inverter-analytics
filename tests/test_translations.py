@@ -150,8 +150,18 @@ def test_the_ukrainian_file_keeps_every_placeholder():
         assert sorted(PLACEHOLDER.findall(uk[key])) == sorted(PLACEHOLDER.findall(text)), key
 
 
+PRODUCT_NAME = "Inverter Analytics"
+
+
 def test_the_ukrainian_file_is_translated():
     en = _leaves(json.loads(TRANSLATIONS.read_text()))
     uk = _leaves(json.loads(UK.read_text()))
-    untranslated = [key for key, text in en.items() if uk[key] == text and len(text) > 3]
+    # The product name is not translated, so a title that is exactly the
+    # product name reads the same in both files. Only that exact value is
+    # exempt: a sentence that merely contains the name must still differ.
+    untranslated = [
+        key
+        for key, text in en.items()
+        if uk[key] == text and len(text) > 3 and text != PRODUCT_NAME
+    ]
     assert not untranslated

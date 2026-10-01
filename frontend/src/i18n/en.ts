@@ -11,6 +11,9 @@ import { plural } from "./plural";
 export const en = {
   common: {
     and: "and",
+    // One name inside a list, set off the way the language sets off a name it
+    // quotes: English leaves a role name bare, Ukrainian puts it in «».
+    quoted: (p: { text: string }) => p.text,
     // The words every tab shares: its error notice, its status line, the
     // first columns of its episode tables.
     couldNotLoadData: (p: { error: string }) => `Could not load data: ${p.error}`,
@@ -425,6 +428,8 @@ export const en = {
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.
+    // needsNotMapped gets its roles already set off by common.quoted, one by
+    // one, so a language that quotes names quotes every name in a list.
     needsNotSet: (p: { roles: string }) => `Needs ${p.roles}, which is not set for this inverter.`,
     needsNotMapped: (p: { roles: string; n: number }) =>
       `Needs ${p.roles}, not mapped to this inverter.`,

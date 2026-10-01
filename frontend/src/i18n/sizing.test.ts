@@ -62,11 +62,11 @@ describe("the sizing sentences that count", () => {
     expect(en.sizing.needsNotMapped({ roles: "Load power", n: 1 })).toBe(
       "Needs Load power, not mapped to this inverter.",
     );
-    expect(uk.sizing.needsNotMapped({ roles: "Потужність навантаження", n: 1 })).toMatch(
+    expect(uk.sizing.needsNotMapped({ roles: "«Потужність навантаження»", n: 1 })).toMatch(
       /^Потрібне поле «Потужність навантаження», але .* його не вказано\.$/,
     );
-    expect(uk.sizing.needsNotMapped({ roles: "A і B", n: 2 })).toMatch(
-      /^Потрібні поля A і B, але .* їх не вказано\.$/,
+    expect(uk.sizing.needsNotMapped({ roles: "«A» і «B»", n: 2 })).toMatch(
+      /^Потрібні поля «A» і «B», але .* їх не вказано\.$/,
     );
   });
 

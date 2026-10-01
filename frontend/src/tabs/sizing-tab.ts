@@ -204,11 +204,13 @@ export class IaSizingTab extends LitElement {
       // rated_power is a number in the options, not an entity: "not mapped"
       // would send the reader looking for a sensor to pick.
       const onlyRated = meta.missing.length === 1 && meta.missing[0] === "rated_power";
-      const roles = listRoles(m, meta.missing);
       return html`<p class="note">
         ${onlyRated
-          ? m.sizing.needsNotSet({ roles })
-          : m.sizing.needsNotMapped({ roles, n: meta.missing.length })}
+          ? m.sizing.needsNotSet({ roles: listRoles(m, meta.missing) })
+          : m.sizing.needsNotMapped({
+              roles: listRoles(m, meta.missing, true),
+              n: meta.missing.length,
+            })}
       </p>`;
     }
     if (meta.thresholds_inverted) {

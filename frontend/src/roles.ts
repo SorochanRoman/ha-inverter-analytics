@@ -23,9 +23,15 @@ export function roleLabel(m: Messages, role: string): string {
   return (m.roles as Record<string, string>)[role] ?? role;
 }
 
-/** "A", "A and B", "A, B and C" — a list a sentence can end on. */
-export function listRoles(m: Messages, roles: readonly string[]): string {
-  const labels = roles.map((role) => roleLabel(m, role));
+/**
+ * "A", "A and B", "A, B and C" — a list a sentence can end on. With quote,
+ * each name is set off by m.common.quoted before the list is joined.
+ */
+export function listRoles(m: Messages, roles: readonly string[], quote = false): string {
+  const labels = roles.map((role) => {
+    const label = roleLabel(m, role);
+    return quote ? m.common.quoted({ text: label }) : label;
+  });
   if (labels.length <= 1) return labels.join("");
   return `${labels.slice(0, -1).join(", ")} ${m.common.and} ${labels[labels.length - 1]}`;
 }

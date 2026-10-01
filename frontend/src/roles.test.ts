@@ -30,6 +30,14 @@ describe("listRoles", () => {
       `${uk.roles.battery_soc} і ${uk.roles.grid_connected}`,
     );
   });
+
+  it("quotes every name when asked, in the language's own way", () => {
+    expect(listRoles(en, ["pv_power", "grid_power"], true)).toBe("PV power and Grid power");
+    expect(listRoles(uk, ["battery_soc"], true)).toBe(`«${uk.roles.battery_soc}»`);
+    expect(listRoles(uk, ["battery_soc", "grid_connected"], true)).toBe(
+      `«${uk.roles.battery_soc}» і «${uk.roles.grid_connected}»`,
+    );
+  });
 });
 
 describe("partLabel", () => {
