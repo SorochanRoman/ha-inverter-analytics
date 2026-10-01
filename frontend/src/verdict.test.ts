@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
-import { reasonHint, reasonSentence, verdictLabel } from "./verdict";
+import type { SizingCard, SizingPayload, VerdictBlock } from "./types";
+import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "./verdict";
 
 describe("verdict copy", () => {
   it("names each verdict", () => {
@@ -35,5 +36,56 @@ describe("verdict copy", () => {
     expect(verdictLabel(uk, "borderline")).toBe("На межі");
     expect(verdictLabel(uk, "short")).toBe("Замало");
     expect(verdictLabel(uk, null)).toBe("Без вердикту");
+  });
+});
+
+describe("whether the solar rule tested the battery filling", () => {
+  const solarBlock = (fill: number | null): VerdictBlock => ({
+    verdict: "enough",
+    reason: null,
+    evidence: {
+      pv_kwh: 100,
+      load_kwh: 90,
+      production_share: 1.1,
+      self_sufficiency: 0.8,
+      fill_share: fill,
+    },
+    coverage: 1,
+  });
+  const payload = (
+    solar: VerdictBlock | null,
+    battery: SizingCard = { missing: [], no_statistics: [] },
+  ): SizingPayload =>
+    ({
+      period: { inverter: null, battery: null, solar },
+      cards: {
+        inverter: { missing: [], no_statistics: [] },
+        battery,
+        solar: { missing: [], no_statistics: [] },
+      },
+    }) as unknown as SizingPayload;
+
+  it("says no when the charge sensor is not mapped", () => {
+    const unmapped = { missing: ["battery_soc"], no_statistics: [] };
+    expect(solarFillTested(payload(solarBlock(null), unmapped))).toBe(false);
+    expect(solarFillTested(payload(null, unmapped))).toBe(false);
+  });
+
+  it("says no when the battery thresholds are inverted", () => {
+    const inverted = { missing: [], no_statistics: [], thresholds_inverted: true };
+    expect(solarFillTested(payload(solarBlock(null), inverted))).toBe(false);
+    expect(solarFillTested(payload(null, inverted))).toBe(false);
+  });
+
+  it("says no when the span has no fill share, even with the battery mapped", () => {
+    expect(solarFillTested(payload(solarBlock(null)))).toBe(false);
+  });
+
+  it("says yes when the fill share was measured", () => {
+    expect(solarFillTested(payload(solarBlock(0.5)))).toBe(true);
+  });
+
+  it("falls back to the battery mapping when there is no period verdict", () => {
+    expect(solarFillTested(payload(null))).toBe(true);
   });
 });

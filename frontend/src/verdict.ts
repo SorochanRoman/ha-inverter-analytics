@@ -7,7 +7,7 @@
  * arranges what they return.
  */
 import type { Messages } from "./i18n/en";
-import type { SizingCardKey, Verdict } from "./types";
+import type { SizingCardKey, SizingPayload, Verdict } from "./types";
 
 export function verdictLabel(m: Messages, verdict: Verdict | null): string {
   switch (verdict) {
@@ -45,4 +45,20 @@ export function reasonHint(m: Messages, card: SizingCardKey, reason: string): st
   return card === "battery" && reason === "never_full"
     ? m.verdict.hintNeverFilled
     : m.verdict.hintNoData;
+}
+
+/**
+ * Whether the solar verdict tested the battery filling, so the rule can say so.
+ *
+ * The backend skips the fill test whenever the span has no fill share: no
+ * charge sensor, thresholds inverted so the charge is never read, or a charge
+ * sensor with no rows in the span. A withheld block still carries its
+ * evidence, so the period block answers when there is one; without it the
+ * battery card's configuration is the best guess.
+ */
+export function solarFillTested(payload: SizingPayload): boolean {
+  const solar = payload.period.solar;
+  if (solar) return typeof solar.evidence.fill_share === "number";
+  const battery = payload.cards.battery;
+  return !battery.missing.length && !battery.thresholds_inverted;
 }
