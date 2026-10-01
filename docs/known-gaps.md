@@ -185,12 +185,13 @@ the defect was only visible on screen.
 - **The sidebar item appearing without a browser reload.**
 - **Switching themes through the HA profile UI.** Verified by substituting the
   CSS variables, which reproduces the mechanism but not the interface.
-- **Date formatting follows the Home Assistant language**, so an English
-  interface on a Ukrainian HA shows Ukrainian dates. This is deliberate:
-  numbers and dates belong to the reader's locale even when the strings are
-  English. HA's explicit `date_format` and `time_format` preferences are
-  ignored — only `language` is read.
-
+- **Dates and numbers follow the panel language.** A Ukrainian panel formats
+  with "uk". An English panel keeps the Home Assistant locale, so an en-GB or
+  German profile sees no change — unless that locale is Ukrainian, in which
+  case it formats with "en": the format helpers pick their units from the
+  locale, and an English panel must not print кВт. HA's explicit
+  `date_format` and `time_format` preferences are still ignored — only
+  `language` is read.
 - **The Ukrainian panel and `uk.json`, all of it.** Nothing in the Ukrainian
   work has been seen in a running Home Assistant; it rests on unit tests that
   every key is present and translated, and on the build. The live run has to
