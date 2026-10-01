@@ -89,7 +89,7 @@ export class IaBatteryTab extends LitElement {
       ],
       [
         `Below ${formatPercent(pct(payload.low_pct), locale)}`,
-        measurable ? formatDuration(payload.kpi.seconds_below_low) : dash,
+        measurable ? formatDuration(payload.kpi.seconds_below_low, locale) : dash,
         measurable ? "exact data only" : "needs exact data",
       ],
       [
@@ -141,7 +141,7 @@ export class IaBatteryTab extends LitElement {
         ${payload.episodes.map(
           (dip) => html`<tr>
             <td>${new Date(dip.start).toLocaleString(locale)}</td>
-            <td>${formatDuration(dip.seconds)}</td>
+            <td>${formatDuration(dip.seconds, locale)}</td>
             <td>${formatPercent(pct(dip.lowest), locale)}</td>
             <td>${formatPercent(pct(dip.recovered_to), locale)}</td>
           </tr>`,

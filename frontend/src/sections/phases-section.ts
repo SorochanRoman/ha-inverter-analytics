@@ -66,10 +66,10 @@ export class IaPhasesSection extends LitElement {
       </div>
       <ia-chart .option=${imbalanceOption(imbalance)}></ia-chart>
       <p class="note">
-        Measured over ${formatDuration(imbalance.analysed_seconds)}
+        Measured over ${formatDuration(imbalance.analysed_seconds, this.locale)}
         (${formatCoverage(imbalance.coverage, this.locale)} of the period).${imbalance.below_floor_seconds >
         0
-          ? html` A further ${formatDuration(imbalance.below_floor_seconds)} sat below
+          ? html` A further ${formatDuration(imbalance.below_floor_seconds, this.locale)} sat below
               ${formatPower(imbalance.floor_w, this.locale)} of total load and is excluded: at
               standby power a few watts of difference is a large percentage and means nothing.`
           : nothing}
@@ -95,7 +95,7 @@ export class IaPhasesSection extends LitElement {
         ${episodes.map(
           (episode) => html`<tr>
             <td>${new Date(episode.start).toLocaleString(this.locale)}</td>
-            <td>${formatDuration(episode.seconds)}</td>
+            <td>${formatDuration(episode.seconds, this.locale)}</td>
             <td>${formatPercent(episode.peak_imbalance, this.locale)}</td>
             ${episode.phases.map((value) => html`<td>${formatPower(value, this.locale)}</td>`)}
           </tr>`,

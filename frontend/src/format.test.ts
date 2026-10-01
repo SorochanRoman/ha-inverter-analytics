@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverageWarning, describeError, formatCoverage, formatDuration, formatPercent, formatPower, precisionLabel } from "./format";
+import { coverageWarning, describeError, formatCoverage, formatDuration, formatEnergy, formatPercent, formatPower, precisionLabel } from "./format";
 import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
 
@@ -29,26 +29,26 @@ describe("formatPercent", () => {
 
 describe("formatDuration", () => {
   it("renders minutes below an hour", () => {
-    expect(formatDuration(420)).toBe("7 min");
+    expect(formatDuration(420, "en")).toBe("7 min");
   });
 
   it("keeps the seconds of a short span rather than rounding them away", () => {
     // An episode of 100 s shown as "2 min" overstates it by a fifth, and
     // episodes start at exactly 60 s — the worst place for that rounding.
-    expect(formatDuration(100)).toBe("1 min 40 s");
-    expect(formatDuration(61)).toBe("1 min 1 s");
+    expect(formatDuration(100, "en")).toBe("1 min 40 s");
+    expect(formatDuration(61, "en")).toBe("1 min 1 s");
   });
 
   it("drops the seconds once the span is long enough not to need them", () => {
-    expect(formatDuration(41 * 60 + 12)).toBe("41 min");
+    expect(formatDuration(41 * 60 + 12, "en")).toBe("41 min");
   });
 
   it("renders hours and minutes above an hour", () => {
-    expect(formatDuration(3900)).toBe("1 h 5 min");
+    expect(formatDuration(3900, "en")).toBe("1 h 5 min");
   });
 
   it("renders seconds below a minute", () => {
-    expect(formatDuration(45)).toBe("45 s");
+    expect(formatDuration(45, "en")).toBe("45 s");
   });
 });
 
@@ -104,11 +104,11 @@ describe("precisionLabel", () => {
 
 describe("coverageWarning", () => {
   it("stays silent when coverage is good", () => {
-    expect(coverageWarning(0.99, "uk")).toBeNull();
+    expect(coverageWarning(0.99, "en")).toBeNull();
   });
 
   it("says data exists rather than how much is missing", () => {
-    const text = coverageWarning(0.4, "uk");
+    const text = coverageWarning(0.4, "en");
     expect(text).toContain("40%");
     expect(text).not.toContain("missing");
   });
@@ -116,11 +116,11 @@ describe("coverageWarning", () => {
   it("avoids a bogus 100% when a sliver of data exists", () => {
     // A 30-day window with two minutes of history: it used to say "100%
     // missing" right next to populated KPIs.
-    expect(coverageWarning(0.00005, "uk")).toBe("Data covers less than 1% of the period");
+    expect(coverageWarning(0.00005, "en")).toBe("Data covers less than 1% of the period");
   });
 
   it("says plainly when there is no data at all", () => {
-    expect(coverageWarning(0, "uk")).toBe("No data for this period");
+    expect(coverageWarning(0, "en")).toBe("No data for this period");
   });
 });
 
@@ -141,5 +141,27 @@ describe("formatCoverage", () => {
 
   it("shows a dash when coverage is unknown", () => {
     expect(formatCoverage(null, "en")).toBe("—");
+  });
+});
+
+describe("in Ukrainian", () => {
+  it("prints Ukrainian units", () => {
+    expect(formatPower(950, "uk")).toBe("950 Вт");
+    expect(formatPower(6800, "uk")).toBe("6,8 кВт");
+    expect(formatEnergy(12.5, "uk")).toBe("12,5 кВт·год");
+  });
+
+  it("prints durations with Ukrainian units", () => {
+    expect(formatDuration(100, "uk")).toBe("1 хв 40 с");
+    expect(formatDuration(3900, "uk")).toBe("1 год 5 хв");
+  });
+
+  it("words the coverage warning in Ukrainian", () => {
+    expect(coverageWarning(0, "uk")).toBe(uk.format.noData);
+    expect(coverageWarning(0.4, "uk")).toContain("40");
+  });
+
+  it("names the precision in Ukrainian", () => {
+    expect(precisionLabel("lts", null, "uk")).toBe(uk.format.hourlyAverages);
   });
 });

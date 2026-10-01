@@ -25,9 +25,9 @@ import type {
 
 const DASH = "—";
 
-function formatHours(hours: number | null): string {
+function formatHours(hours: number | null, locale: string): string {
   if (hours === null) return DASH;
-  return formatDuration(hours * 3600);
+  return formatDuration(hours * 3600, locale);
 }
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -113,12 +113,12 @@ export class IaGridTab extends LitElement {
       ["Outages", measured ? `${kpi.count}` : DASH, ""],
       [
         "Without grid",
-        measured ? formatDuration(kpi.off_seconds) : DASH,
+        measured ? formatDuration(kpi.off_seconds, locale) : DASH,
         // Only measured absence is in the figure, while "Longest" and "Mean"
         // include the gaps bridged inside an outage; unsaid, the two contradict
         // each other on a single outage that a restart cut in half.
         kpi.bridged_seconds > 0
-          ? `+ ${formatDuration(kpi.bridged_seconds)} unrecorded, assumed off`
+          ? `+ ${formatDuration(kpi.bridged_seconds, locale)} unrecorded, assumed off`
           : "",
       ],
       // Not formatPercent: a real 0.007% share beside "Outages: 3" rounds to a
@@ -126,10 +126,10 @@ export class IaGridTab extends LitElement {
       ["Share of time", formatCoverage(kpi.off_share, locale), "of measured time"],
       [
         "Longest",
-        kpi.longest_seconds === null ? DASH : formatDuration(kpi.longest_seconds),
+        kpi.longest_seconds === null ? DASH : formatDuration(kpi.longest_seconds, locale),
         kpi.longest_start ? `from ${new Date(kpi.longest_start).toLocaleString(locale)}` : "",
       ],
-      ["Mean duration", kpi.mean_seconds === null ? DASH : formatDuration(kpi.mean_seconds), ""],
+      ["Mean duration", kpi.mean_seconds === null ? DASH : formatDuration(kpi.mean_seconds, locale), ""],
     ];
     if (kpi.brief_interruptions !== null) {
       cells.push(["Brief interruptions", `${kpi.brief_interruptions}`, "under a minute"]);
@@ -147,13 +147,13 @@ export class IaGridTab extends LitElement {
 
   private renderDuration(episode: OutageEpisode): string {
     const cut = episode.started_before_window || episode.ongoing;
-    return `${cut ? "at least " : ""}${formatDuration(episode.seconds)}`;
+    return `${cut ? "at least " : ""}${formatDuration(episode.seconds, this.i18n.locale)}`;
   }
 
   private renderEpisodes(payload: GridPayload) {
     if (!payload.episodes.length) {
       return html`<p class="empty">
-        No outages in this period — none in ${formatDuration(payload.measured_seconds)} of
+        No outages in this period — none in ${formatDuration(payload.measured_seconds, this.i18n.locale)} of
         measurement.
       </p>`;
     }
@@ -178,7 +178,7 @@ export class IaGridTab extends LitElement {
             <td>
               ${this.renderDuration(item)}
               ${item.bridged_seconds > 0
-                ? html`<span class="hint">(${formatDuration(item.bridged_seconds)} unrecorded)</span>`
+                ? html`<span class="hint">(${formatDuration(item.bridged_seconds, locale)} unrecorded)</span>`
                 : nothing}
             </td>
             ${payload.has_soc
@@ -203,7 +203,7 @@ export class IaGridTab extends LitElement {
         no_outages: "There were no outages in this period to read a discharge rate from.",
         no_soc_in_outages:
           "The battery's charge was not recorded during any of this period's outages, so there is no discharge to read a rate from.",
-        too_little_evidence: `The outages with a charge reading at both ends add up to ${formatHours(autonomy.evidence_hours)}, and an estimate needs at least an hour.`,
+        too_little_evidence: `The outages with a charge reading at both ends add up to ${formatHours(autonomy.evidence_hours, locale)}, and an estimate needs at least an hour.`,
         no_net_discharge:
           "The charge did not fall during this period's outages — the sun covered them — so there is no discharge rate to read.",
       };
@@ -213,11 +213,11 @@ export class IaGridTab extends LitElement {
       <div class="cards">
         <div class="card">
           <span class="name">From full to ${formatPercent(lowPct / 100, locale)}</span>
-          <span class="value">${formatHours(autonomy.hours_from_full)}</span>
+          <span class="value">${formatHours(autonomy.hours_from_full, locale)}</span>
         </div>
         <div class="card">
           <span class="name">From where it is now</span>
-          <span class="value">${formatHours(autonomy.hours_from_now)}</span>
+          <span class="value">${formatHours(autonomy.hours_from_now, locale)}</span>
           <span class="row">
             <span>Charge now</span>
             <span>${autonomy.soc_now === null ? DASH : formatPercent(autonomy.soc_now / 100, locale)}</span>
@@ -232,7 +232,7 @@ export class IaGridTab extends LitElement {
         </div>
       </div>
       <p class="note">
-        At the rate seen during this period's outages — ${formatHours(autonomy.evidence_hours)} of
+        At the rate seen during this period's outages — ${formatHours(autonomy.evidence_hours, locale)} of
         them. Whether a summer afternoon's outage says anything about a winter evening's is for
         the reader to judge; the mean load beside it is there to help.
       </p>

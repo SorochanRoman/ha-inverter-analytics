@@ -6,27 +6,21 @@
  * copy that has to stay exact lives in pure functions and the element only
  * arranges what they return.
  */
+import type { Messages } from "./i18n/en";
 import type { SizingCardKey, Verdict } from "./types";
 
-export function verdictLabel(verdict: Verdict | null): string {
+export function verdictLabel(m: Messages, verdict: Verdict | null): string {
   switch (verdict) {
     case "enough":
-      return "Enough";
+      return m.verdict.enough;
     case "borderline":
-      return "Borderline";
+      return m.verdict.borderline;
     case "short":
-      return "Short";
+      return m.verdict.short;
     default:
-      return "No verdict";
+      return m.verdict.none;
   }
 }
-
-const NO_DATA: Record<SizingCardKey, string> = {
-  inverter: "There are no statistics for the load in this span.",
-  battery: "There are no statistics for the battery's charge in this span.",
-  solar:
-    "There are no statistics for the counters in this span, or too little consumption to take a share of.",
-};
 
 /**
  * Why a verdict is withheld, in a sentence the card can print.
@@ -35,11 +29,9 @@ const NO_DATA: Record<SizingCardKey, string> = {
  * that arrives without one at all — a mapped entity that has since been
  * deleted — must still be explained rather than rendered as an empty card.
  */
-export function reasonSentence(card: SizingCardKey, reason: string): string {
-  if (card === "battery" && reason === "never_full") {
-    return "The battery never filled in this span, so the nights say nothing about its size.";
-  }
-  return NO_DATA[card];
+export function reasonSentence(m: Messages, card: SizingCardKey, reason: string): string {
+  if (card === "battery" && reason === "never_full") return m.verdict.neverFull;
+  return m.verdict.noData[card];
 }
 
 /**
@@ -49,6 +41,8 @@ export function reasonSentence(card: SizingCardKey, reason: string): string {
  * both "No verdict" in the strip, and they are not the same reading: the
  * first is the tab's own rule doing its job, the second is missing data.
  */
-export function reasonHint(card: SizingCardKey, reason: string): string {
-  return card === "battery" && reason === "never_full" ? "never filled" : "no data";
+export function reasonHint(m: Messages, card: SizingCardKey, reason: string): string {
+  return card === "battery" && reason === "never_full"
+    ? m.verdict.hintNeverFilled
+    : m.verdict.hintNoData;
 }

@@ -239,10 +239,10 @@ export class IaSizingTab extends LitElement {
       // Everything the payload could name has been ruled out above, so this
       // is a sensor that was mapped and has since been deleted. It still gets
       // a sentence: an empty card reads as a bug.
-      body = html`<p class="note">${reasonSentence(card, "no_data")}</p>`;
+      body = html`<p class="note">${reasonSentence(this.i18n.m, card, "no_data")}</p>`;
     } else if (block.verdict === null) {
       body = html`
-        <p class="note">${reasonSentence(card, block.reason ?? "no_data")}</p>
+        <p class="note">${reasonSentence(this.i18n.m, card, block.reason ?? "no_data")}</p>
         ${this.renderCoverageNote(block, payload)}
       `;
     } else {
@@ -261,7 +261,7 @@ export class IaSizingTab extends LitElement {
     }
     return html`<div class="card">
       <span class="name">${title}</span>
-      <span class="value ${block?.verdict ?? "none"}">${verdictLabel(block?.verdict ?? null)}</span>
+      <span class="value ${block?.verdict ?? "none"}">${verdictLabel(this.i18n.m, block?.verdict ?? null)}</span>
       ${body}
     </div>`;
   }
@@ -280,12 +280,12 @@ export class IaSizingTab extends LitElement {
       // judged from twelve days is presented under a full month.
       const thin = month.complete && block.coverage < payload.incomplete_below;
       return html`<td class=${block.verdict ?? "none"}>
-        ${verdictLabel(block.verdict)}
+        ${verdictLabel(this.i18n.m, block.verdict)}
         ${block.verdict === null
           ? // Why there is no verdict: a month the battery never filled is the
             // rule working, a month with no statistics is missing data, and
             // "No verdict" alone reads the same for both.
-            html`<span class="hint">${reasonHint(card, block.reason ?? "no_data")}</span>`
+            html`<span class="hint">${reasonHint(this.i18n.m, card, block.reason ?? "no_data")}</span>`
           : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
         ${thin
           ? html`<span class="hint">from ${formatCoverage(block.coverage, locale)}</span>`

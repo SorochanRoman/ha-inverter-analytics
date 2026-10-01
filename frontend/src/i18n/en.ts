@@ -10,6 +10,15 @@ export const en = {
   common: {
     and: "and",
   },
+  units: {
+    w: "W",
+    kw: "kW",
+    kwh: "kWh",
+    s: "s",
+    min: "min",
+    h: "h",
+    ofRated: "of rated",
+  },
   panel: {
     language: "Language",
     couldNotLoad: (p: { error: string }) => `Could not load configuration: ${p.error}`,
@@ -84,6 +93,34 @@ export const en = {
   errors: {
     not_found: "Inverter not found or disabled",
     invalid_window: "Window end must be later than its start",
+  },
+  // format.ts: precisionLabel and coverageWarning.
+  format: {
+    exactData: "Exact data",
+    hourlyAverages: "Hourly averages",
+    mixed: "Mixed",
+    mixedSince: (p: { date: string }) => `Mixed since ${p.date}`,
+    noData: "No data for this period",
+    coversUnderOnePercent: "Data covers less than 1% of the period",
+    coversOnly: (p: { share: string }) => `Data covers only ${p.share} of the period`,
+  },
+  // verdict.ts: the sizing verdicts and why one is withheld.
+  verdict: {
+    enough: "Enough",
+    borderline: "Borderline",
+    short: "Short",
+    none: "No verdict",
+    // Keyed by sizing card.
+    noData: {
+      inverter: "There are no statistics for the load in this span.",
+      battery: "There are no statistics for the battery's charge in this span.",
+      solar:
+        "There are no statistics for the counters in this span, or too little consumption to take a share of.",
+    },
+    neverFull:
+      "The battery never filled in this span, so the nights say nothing about its size.",
+    hintNeverFilled: "never filled",
+    hintNoData: "no data",
   },
 };
 

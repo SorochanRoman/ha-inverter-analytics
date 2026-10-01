@@ -136,7 +136,7 @@ export class IaLoadTab extends LitElement {
         ${payload.overloads.map(
           (item) => html`<tr>
             <td>${new Date(item.start).toLocaleString(locale)}</td>
-            <td>${formatDuration(item.seconds)}</td>
+            <td>${formatDuration(item.seconds, locale)}</td>
             <td>${formatPower(item.peak, locale)}</td>
           </tr>`,
         )}

@@ -1,17 +1,19 @@
 import type { Messages } from "./i18n/en";
+import { messagesForLocale } from "./i18n/lang";
 import type { Precision } from "./types";
 
 const DASH = "—";
 
 export function formatPower(value: number | null, locale: string): string {
   if (value === null || Number.isNaN(value)) return DASH;
+  const m = messagesForLocale(locale);
   if (Math.abs(value) >= 1000) {
     const kilowatts = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
       value / 1000,
     );
-    return `${kilowatts} kW`;
+    return `${kilowatts} ${m.units.kw}`;
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} W`;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)} ${m.units.w}`;
 }
 
 export function formatPercent(value: number | null, locale: string): string {
@@ -39,11 +41,13 @@ const SECONDS_SHOWN_BELOW = 10 * 60;
 
 export function formatEnergy(kwh: number | null, locale: string): string {
   if (kwh === null || Number.isNaN(kwh)) return DASH;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kwh)} kWh`;
+  const { units } = messagesForLocale(locale);
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kwh)} ${units.kwh}`;
 }
 
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)} s`;
+export function formatDuration(seconds: number, locale: string): string {
+  const { units } = messagesForLocale(locale);
+  if (seconds < 60) return `${Math.round(seconds)} ${units.s}`;
 
   const whole = Math.round(seconds);
   if (whole < SECONDS_SHOWN_BELOW) {
@@ -52,12 +56,14 @@ export function formatDuration(seconds: number): string {
     // most: 100 seconds shown as "2 min" overstates it by a fifth.
     const rest = whole % 60;
     const minutes = (whole - rest) / 60;
-    return rest === 0 ? `${minutes} min` : `${minutes} min ${rest} s`;
+    return rest === 0
+      ? `${minutes} ${units.min}`
+      : `${minutes} ${units.min} ${rest} ${units.s}`;
   }
 
   const minutes = Math.round(whole / 60);
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+  if (minutes < 60) return `${minutes} ${units.min}`;
+  return `${Math.floor(minutes / 60)} ${units.h} ${minutes % 60} ${units.min}`;
 }
 
 /** An error from Home Assistant arrives as an object {code, message}, not a string. */
@@ -84,12 +90,13 @@ export function precisionLabel(
   boundary: string | null,
   locale: string,
 ): string {
-  if (precision === "raw") return "Exact data";
-  if (precision === "lts") return "Hourly averages";
+  const { format } = messagesForLocale(locale);
+  if (precision === "raw") return format.exactData;
+  if (precision === "lts") return format.hourlyAverages;
   if (boundary) {
-    return `Mixed since ${new Date(boundary).toLocaleDateString(locale)}`;
+    return format.mixedSince({ date: new Date(boundary).toLocaleDateString(locale) });
   }
-  return "Mixed";
+  return format.mixed;
 }
 
 /**
@@ -103,7 +110,8 @@ export function precisionLabel(
  */
 export function coverageWarning(coverage: number, locale: string): string | null {
   if (coverage >= 0.95) return null;
-  if (coverage <= 0) return "No data for this period";
-  if (coverage < 0.01) return "Data covers less than 1% of the period";
-  return `Data covers only ${formatPercent(coverage, locale)} of the period`;
+  const { format } = messagesForLocale(locale);
+  if (coverage <= 0) return format.noData;
+  if (coverage < 0.01) return format.coversUnderOnePercent;
+  return format.coversOnly({ share: formatPercent(coverage, locale) });
 }
