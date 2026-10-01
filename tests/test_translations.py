@@ -6,6 +6,7 @@ is checked rather than remembered.
 
 import json
 import pathlib
+import re
 
 from custom_components.inverter_analytics.config_flow import build_schema
 from custom_components.inverter_analytics.detect import CT_CHOICE, GRID_CHOICE
@@ -119,3 +120,38 @@ def test_the_duplicated_blocks_stay_identical():
 def test_the_options_step_points_at_reconfigure_for_the_mapping():
     """The mapping moved; the form the user knew has to say where it went."""
     assert "reconfigure" in _step("init")["description"].lower()
+
+
+UK = pathlib.Path("custom_components/inverter_analytics/translations/uk.json")
+PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
+
+
+def _leaves(node: object, path: str = "") -> dict[str, str]:
+    if isinstance(node, dict):
+        out: dict[str, str] = {}
+        for key, value in node.items():
+            out.update(_leaves(value, f"{path}.{key}" if path else key))
+        return out
+    return {path: str(node)}
+
+
+def test_the_ukrainian_file_has_exactly_the_english_keys():
+    """A key missing here is shown in English; an extra one labels nothing."""
+    en = _leaves(json.loads(TRANSLATIONS.read_text()))
+    uk = _leaves(json.loads(UK.read_text()))
+    assert set(uk) == set(en)
+
+
+def test_the_ukrainian_file_keeps_every_placeholder():
+    """Home Assistant fills {found} by name; a translated placeholder stays empty."""
+    en = _leaves(json.loads(TRANSLATIONS.read_text()))
+    uk = _leaves(json.loads(UK.read_text()))
+    for key, text in en.items():
+        assert sorted(PLACEHOLDER.findall(uk[key])) == sorted(PLACEHOLDER.findall(text)), key
+
+
+def test_the_ukrainian_file_is_translated():
+    en = _leaves(json.loads(TRANSLATIONS.read_text()))
+    uk = _leaves(json.loads(UK.read_text()))
+    untranslated = [key for key, text in en.items() if uk[key] == text and len(text) > 3]
+    assert not untranslated

@@ -86,6 +86,15 @@
 | low mark / full mark (charge thresholds) | низька позначка / позначка повного заряду |
 | Low battery charge / Full battery charge (option fields) | Низький заряд батареї / Повний заряд батареї |
 | "X, against the Y" (sizing card titles) | «X проти Y» |
+| map (a sensor to a role, in the forms) | вказати (сенсор) |
+| mapping (sensor to role) | відповідність сенсорів |
+| detection (sensor discovery) | виявлення |
+| installation (the user's HA) | інсталяція |
+| entity (HA) | сутність |
+| wizard (config flow) | майстер |
+| current transformer / clamp | трансформатор струму / кліщі |
+| invert (sign switch) | інвертувати |
+| Configure (options, in en.json) | «Параметри» |
 
 ---
 
