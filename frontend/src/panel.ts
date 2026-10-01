@@ -28,7 +28,9 @@ export class InverterAnalyticsPanel extends LitElement {
   @property({ attribute: false }) public route?: { path: string };
 
   @state() private config?: ConfigResult;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private entryId?: string;
   @state() private tab: string = "load";
   @state() private range: RangeKey = "30d";
@@ -59,7 +61,7 @@ export class InverterAnalyticsPanel extends LitElement {
     // Wait for the first hass value and try again if the config hasn't
     // loaded yet (and the previous attempt didn't fail with an error the
     // user can retry via the button).
-    if (changed.has("hass") && this.hass && !this.config && !this.error) {
+    if (changed.has("hass") && this.hass && !this.config && this.error === undefined) {
       void this.loadConfig();
     }
   }
@@ -110,7 +112,9 @@ export class InverterAnalyticsPanel extends LitElement {
       }
       this.writeLocation();
     } catch (err) {
-      this.error = describeError(err, this.i18n.m);
+      // A rejection with no value at all must still count as a failure, or
+      // willUpdate would ask again on every hass update; its text is the same.
+      this.error = err === undefined ? String(err) : err;
     }
   }
 
@@ -144,9 +148,9 @@ export class InverterAnalyticsPanel extends LitElement {
 
   protected render() {
     const m = this.i18n.m;
-    if (this.error) {
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        ${m.panel.couldNotLoad({ error: this.error })}
+        ${m.panel.couldNotLoad({ error: describeError(this.error, m) })}
         <button @click=${() => { this.error = undefined; void this.loadConfig(); }}>
           ${m.common.tryAgain}
         </button>
