@@ -233,14 +233,6 @@ around a placeholder but not what the backend puts in it. Doing better means the
 counts and keys rather than phrases — and the translation files composing
 them; nothing else needs that yet, so it waits.
 
-**The English Sizing rules say less exactly what the code does.** The battery
-rule says the charge "fell to" the low mark, where the code counts a day when
-it fell *below* it (`< low`); the inverter rule says "above 80%" of rated,
-where the code counts 80% itself (`>= 80%`). The Ukrainian sentences follow
-the code exactly, so on these two points the languages differ. The English
-wording is a follow-up; it was left alone here because the Ukrainian work was
-not to change a word of the English.
-
 **Year-on-year comparison.** Windows are capped at 400 days, so the same month
 in two different years cannot both be in view. Lifting the cap is a separate
 decision about how much one query may ask of the recorder.

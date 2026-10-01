@@ -952,11 +952,12 @@ const mb = {
     producedConsumed: "Produced / consumed",
     selfSufficiency: "Self-sufficiency",
     daysBatteryFilled: "Days the battery filled",
-    // The rule each verdict was read by, in the reader's own numbers. With no
+    // The rule each verdict was read by, in the reader's own numbers, saying
+    // exactly what sizing.py tests: "reaching" is >=, "fell below" is <. With no
     // charge sensor mapped the solar rule has no fill clause, and is a
     // sentence of its own rather than one with a hole in it.
-    inverterRule: (r) => `Short when the load reached rated power in more than ${r.shortShare} of hours; borderline on any such hour, or above ${r.highShare} of rated in more than ${r.borderlineShare} of hours.`,
-    batteryRule: (r) => `Counted over days with data: short when the battery filled to ${r.full} and still fell to ${r.low} on at least ${r.share} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`,
+    inverterRule: (r) => `Short when the load reached rated power in more than ${r.shortShare} of hours; borderline on any such hour, or reaching ${r.highShare} of rated in more than ${r.borderlineShare} of hours.`,
+    batteryRule: (r) => `Counted over days with data: short when the battery filled to ${r.full} and still fell below ${r.low} on at least ${r.share} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`,
     solarRuleWithFill: (r) => `Enough when production is at least ${r.enough} of consumption and the battery filled on at least ${r.fill} of days; borderline from ${r.borderline} of consumption; short below.`,
     solarRule: (r) => `Enough when production is at least ${r.enough} of consumption; borderline from ${r.borderline} of consumption; short below.`,
     // What a card is short of before a verdict can be read. Rated power is a

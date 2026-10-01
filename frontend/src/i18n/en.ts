@@ -402,16 +402,17 @@ export const en = {
     producedConsumed: "Produced / consumed",
     selfSufficiency: "Self-sufficiency",
     daysBatteryFilled: "Days the battery filled",
-    // The rule each verdict was read by, in the reader's own numbers. With no
+    // The rule each verdict was read by, in the reader's own numbers, saying
+    // exactly what sizing.py tests: "reaching" is >=, "fell below" is <. With no
     // charge sensor mapped the solar rule has no fill clause, and is a
     // sentence of its own rather than one with a hole in it.
     inverterRule: (p: { shortShare: string; highShare: string; borderlineShare: string }) =>
       `Short when the load reached rated power in more than ${p.shortShare} of hours; ` +
-      `borderline on any such hour, or above ${p.highShare} of rated in more than ` +
+      `borderline on any such hour, or reaching ${p.highShare} of rated in more than ` +
       `${p.borderlineShare} of hours.`,
     batteryRule: (p: { full: string; low: string; share: string }) =>
       `Counted over days with data: short when the battery filled to ${p.full} and still ` +
-      `fell to ${p.low} on at least ${p.share} of them; borderline when it happened at all; ` +
+      `fell below ${p.low} on at least ${p.share} of them; borderline when it happened at all; ` +
       "no verdict for a span in which it never filled. A day it ran low without filling " +
       "counts against the sun, not the battery.",
     solarRuleWithFill: (p: { enough: string; fill: string; borderline: string }) =>

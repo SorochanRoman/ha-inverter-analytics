@@ -3,15 +3,15 @@ import { en } from "./en";
 import { uk } from "./uk";
 
 describe("the sizing rules", () => {
-  it("read in English exactly as the tab printed them", () => {
+  it("say in English what the code tests", () => {
     expect(
       en.sizing.inverterRule({ shortShare: "1%", highShare: "80%", borderlineShare: "5%" }),
     ).toBe(
       "Short when the load reached rated power in more than 1% of hours; borderline on any " +
-        "such hour, or above 80% of rated in more than 5% of hours.",
+        "such hour, or reaching 80% of rated in more than 5% of hours.",
     );
     expect(en.sizing.batteryRule({ full: "95%", low: "20%", share: "25%" })).toBe(
-      "Counted over days with data: short when the battery filled to 95% and still fell to " +
+      "Counted over days with data: short when the battery filled to 95% and still fell below " +
         "20% on at least 25% of them; borderline when it happened at all; no verdict for a " +
         "span in which it never filled. A day it ran low without filling counts against the " +
         "sun, not the battery.",
