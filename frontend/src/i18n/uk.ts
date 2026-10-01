@@ -1,5 +1,6 @@
 /** The panel's words in Ukrainian. Typed against en.ts; see there. */
 import type { Messages } from "./en";
+import { plural } from "./plural";
 
 export const uk: Messages = {
   common: {
@@ -105,5 +106,40 @@ export const uk: Messages = {
       "За цей період батарея жодного разу не зарядилася повністю, тож ночі нічого не кажуть про її ємність.",
     hintNeverFilled: "без повного заряду",
     hintNoData: "немає даних",
+  },
+  charts: {
+    monthNamesLocale: "uk",
+    percentOfTime: "% часу",
+    percentImbalance: "% перекосу фаз",
+    percentCharge: "% заряду",
+    percentOfMeasuredTime: "% виміряного часу",
+    hour: "година",
+    hours: "години",
+    mean: "Середнє",
+    peak: "Пік",
+    load: "Навантаження",
+    pv: "СЕС",
+    in: "Надходження",
+    out: "Витрата",
+    flows: {
+      pv_energy_total: "Сонце",
+      grid_import_total: "З мережі",
+      battery_discharge_total: "З батареї",
+      load_energy_total: "Будинок",
+      grid_export_total: "У мережу",
+      battery_charge_total: "У батарею",
+    },
+    hoursWithoutGrid: (p) => `${p.hours} год без мережі`,
+    // The verb agrees with the count: 1 відключення почалося, 2 почалися,
+    // 5 відключень почалося.
+    outagesBegan: (p) =>
+      p.n === 0
+        ? "жодне відключення не почалося"
+        : plural("uk", p.n, {
+            one: `${p.n} відключення почалося`,
+            few: `${p.n} відключення почалися`,
+            many: `${p.n} відключень почалося`,
+            other: `${p.n} відключення почалося`,
+          }),
   },
 };

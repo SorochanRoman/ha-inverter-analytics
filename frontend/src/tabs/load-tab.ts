@@ -186,17 +186,17 @@ export class IaLoadTab extends LitElement {
             this.mode = this.mode === "watts" ? "percent" : "watts";
           }}>${this.mode === "watts" ? "as % of rated" : "in watts"}</button>
         </header>
-        <ia-chart .option=${histogramOption(payload, this.mode)}></ia-chart>
+        <ia-chart .option=${histogramOption(payload, this.mode, this.i18n.m)}></ia-chart>
       </section>
 
       <section>
         <h2>Load duration curve</h2>
-        <ia-chart .option=${durationCurveOption(payload)}></ia-chart>
+        <ia-chart .option=${durationCurveOption(payload, this.i18n.m)}></ia-chart>
       </section>
 
       <section>
         <h2>Distribution across rated-power bands</h2>
-        <ia-chart .option=${bandsOption(payload)} height="220px"></ia-chart>
+        <ia-chart .option=${bandsOption(payload, this.i18n.m)} height="220px"></ia-chart>
       </section>
 
       <section>

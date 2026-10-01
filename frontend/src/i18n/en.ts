@@ -6,6 +6,8 @@
  * object of already-formatted strings: each language orders and inflects
  * its own sentence rather than gluing words around a number.
  */
+import { plural } from "./plural";
+
 export const en = {
   common: {
     and: "and",
@@ -121,6 +123,47 @@ export const en = {
       "The battery never filled in this span, so the nights say nothing about its size.",
     hintNeverFilled: "never filled",
     hintNoData: "no data",
+  },
+  // charts/options.ts: axis names, legend entries and series names. A legend
+  // finds its series by name, so both sides read the same entry here.
+  charts: {
+    // The locale month names on the charts and the month table are written
+    // in. The language's own, not Home Assistant's: an English panel has
+    // always said "Mar", whatever the profile's locale.
+    monthNamesLocale: "en",
+    percentOfTime: "% of time",
+    percentImbalance: "% imbalance",
+    percentCharge: "% charge",
+    percentOfMeasuredTime: "% of measured time",
+    hour: "hour",
+    hours: "hours",
+    mean: "Mean",
+    peak: "Peak",
+    load: "Load",
+    pv: "PV",
+    // The two rows of the balance bar: what came into the system, what left it.
+    in: "In",
+    out: "Out",
+    // The six energy counters as movements of energy, in the order shown.
+    // Not the setup-form names in roles: "From grid" is right on an axis and
+    // useless in an instruction to go and map a sensor.
+    flows: {
+      pv_energy_total: "Solar",
+      grid_import_total: "From grid",
+      battery_discharge_total: "From battery",
+      load_energy_total: "House",
+      grid_export_total: "To grid",
+      battery_charge_total: "To battery",
+    },
+    // The by-day outage tooltip.
+    hoursWithoutGrid: (p: { hours: string }) => `${p.hours} h without grid`,
+    outagesBegan: (p: { n: number }) =>
+      p.n === 0
+        ? "no outages began"
+        : plural("en", p.n, {
+            one: `${p.n} outage began`,
+            other: `${p.n} outages began`,
+          }),
   },
 };
 

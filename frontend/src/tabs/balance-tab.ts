@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchBalance } from "../api";
-import { FLOW_LABELS, dailyFlowsOption, flowBarsOption } from "../charts/options";
+import { dailyFlowsOption, flowBarsOption, flowLabel } from "../charts/options";
 import "../charts/echart";
 import { describeError, formatEnergy, formatPercent } from "../format";
 import { I18nController } from "../i18n/controller";
@@ -73,7 +73,7 @@ export class IaBalanceTab extends LitElement {
     return html`<div class="kpi">
       ${ALL.filter((role) => role in payload.totals).map(
         (role) => html`<div class="cell">
-          <span class="label">${FLOW_LABELS[role]}</span>
+          <span class="label">${flowLabel(this.i18n.m, role)}</span>
           <span class="value">${formatEnergy(payload.totals[role], locale)}</span>
           <span class="hint">
             ${(SOURCES as readonly string[]).includes(role) ? "into the system" : "out of it"}
@@ -89,7 +89,7 @@ export class IaBalanceTab extends LitElement {
     if (payload.unaccounted === null) {
       return html`<p class="empty">
         The books can only be closed with all six counters mapped. Missing:
-        ${payload.missing.map((role) => FLOW_LABELS[role]).join(", ")}. Until then the difference
+        ${payload.missing.map((role) => flowLabel(this.i18n.m, role)).join(", ")}. Until then the difference
         between the two bars would measure what is not mapped rather than what was lost.
       </p>`;
     }
@@ -191,7 +191,7 @@ export class IaBalanceTab extends LitElement {
       <section>
         <h2>In against out</h2>
         <ia-chart
-          .option=${flowBarsOption(payload.totals, SOURCES, SINKS)}
+          .option=${flowBarsOption(payload.totals, SOURCES, SINKS, this.i18n.m)}
           height="220px"
         ></ia-chart>
         ${this.renderBalance(payload)}
@@ -205,7 +205,7 @@ export class IaBalanceTab extends LitElement {
       <section>
         <h2>Day by day</h2>
         ${payload.days.length
-          ? html`<ia-chart .option=${dailyFlowsOption(payload.days, SOURCES, SINKS)}></ia-chart>`
+          ? html`<ia-chart .option=${dailyFlowsOption(payload.days, SOURCES, SINKS, this.i18n.m)}></ia-chart>`
           : html`<p class="empty">No days with energy statistics in this period.</p>`}
         <p class="note">
           Two bars a day: what came in, and what went out. Adding the two together would count

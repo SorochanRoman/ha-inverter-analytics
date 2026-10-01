@@ -185,12 +185,12 @@ export class IaBatteryTab extends LitElement {
 
       <section>
         <h2>Time spent at each state of charge</h2>
-        <ia-chart .option=${socHistogramOption(payload)}></ia-chart>
+        <ia-chart .option=${socHistogramOption(payload, this.i18n.m)}></ia-chart>
       </section>
 
       <section>
         <h2>Distribution across charge bands</h2>
-        <ia-chart .option=${socBandsOption(payload.bands)} height="220px"></ia-chart>
+        <ia-chart .option=${socBandsOption(payload.bands, this.i18n.m)} height="220px"></ia-chart>
       </section>
 
       <section>

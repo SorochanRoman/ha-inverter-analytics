@@ -1,3 +1,4 @@
+import type { Messages } from "../i18n/en";
 import { SERIES, chartBaseOption } from "../theme";
 import type {
   BalanceDay,
@@ -19,6 +20,7 @@ const round = (value: number, digits: number): number =>
 export function histogramOption(
   payload: LoadPayload,
   mode: "watts" | "percent",
+  m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const buckets = payload.histogram.buckets;
@@ -34,10 +36,10 @@ export function histogramOption(
       ...axis,
       type: "category",
       data: labels,
-      name: mode === "watts" ? "W" : "% of rated",
+      name: mode === "watts" ? m.units.w : `% ${m.units.ofRated}`,
       nameLocation: "end",
     },
-    yAxis: { ...axis, type: "value", name: "% of time" },
+    yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
       {
         type: "bar",
@@ -49,12 +51,12 @@ export function histogramOption(
   };
 }
 
-export function durationCurveOption(payload: LoadPayload): Record<string, unknown> {
+export function durationCurveOption(payload: LoadPayload, m: Messages): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
-    yAxis: { ...axis, type: "value", name: "W" },
+    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
+    yAxis: { ...axis, type: "value", name: m.units.w },
     series: [
       {
         type: "line",
@@ -71,13 +73,13 @@ export function durationCurveOption(payload: LoadPayload): Record<string, unknow
   };
 }
 
-export function bandsOption(payload: LoadPayload): Record<string, unknown> {
+export function bandsOption(payload: LoadPayload, m: Messages): Record<string, unknown> {
   // ECharts draws Y-axis categories bottom-up, so the band order is reversed.
   const { base, axis } = chartBaseOption();
   const bands = [...payload.bands].reverse();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
+    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
     yAxis: { ...axis, type: "category", data: bands.map((band) => band.key) },
     series: [
       {
@@ -92,7 +94,7 @@ export function bandsOption(payload: LoadPayload): Record<string, unknown> {
   };
 }
 
-export function imbalanceOption(imbalance: Imbalance): Record<string, unknown> {
+export function imbalanceOption(imbalance: Imbalance, m: Messages): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const buckets = imbalance.histogram;
   return {
@@ -101,10 +103,10 @@ export function imbalanceOption(imbalance: Imbalance): Record<string, unknown> {
       ...axis,
       type: "category",
       data: buckets.map((bucket) => String(round(bucket.start * 100, 0))),
-      name: "% imbalance",
+      name: m.charts.percentImbalance,
       nameLocation: "end",
     },
-    yAxis: { ...axis, type: "value", name: "% of time" },
+    yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
       {
         type: "bar",
@@ -127,6 +129,7 @@ export function imbalanceOption(imbalance: Imbalance): Record<string, unknown> {
 export function partsOption(
   parts: PartSummary[],
   colour: string,
+  m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   return {
@@ -134,19 +137,19 @@ export function partsOption(
     // Two bar colours with nothing naming them is a guess. The shared grid
     // starts 24px from the top, which is exactly where the legend draws, so
     // the plot has to be pushed down to make room for it.
-    legend: { data: ["Mean", "Peak"], top: 0, textStyle: base.textStyle },
+    legend: { data: [m.charts.mean, m.charts.peak], top: 0, textStyle: base.textStyle },
     grid: { ...(base.grid as Record<string, unknown>), top: 48 },
     xAxis: { ...axis, type: "category", data: parts.map((part) => part.label) },
-    yAxis: { ...axis, type: "value", name: "W" },
+    yAxis: { ...axis, type: "value", name: m.units.w },
     series: [
       {
-        name: "Mean",
+        name: m.charts.mean,
         type: "bar",
         data: parts.map((part) => (part.mean === null ? null : round(part.mean, 1))),
         itemStyle: { color: colour },
       },
       {
-        name: "Peak",
+        name: m.charts.peak,
         type: "bar",
         data: parts.map((part) => (part.peak === null ? null : round(part.peak, 1))),
         itemStyle: { color: SERIES.muted },
@@ -155,7 +158,7 @@ export function partsOption(
   };
 }
 
-export function socHistogramOption(payload: BatteryPayload): Record<string, unknown> {
+export function socHistogramOption(payload: BatteryPayload, m: Messages): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const buckets = payload.histogram.buckets;
   return {
@@ -164,10 +167,10 @@ export function socHistogramOption(payload: BatteryPayload): Record<string, unkn
       ...axis,
       type: "category",
       data: buckets.map((bucket) => String(round(bucket.start, 0))),
-      name: "% charge",
+      name: m.charts.percentCharge,
       nameLocation: "end",
     },
-    yAxis: { ...axis, type: "value", name: "% of time" },
+    yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
       {
         type: "bar",
@@ -185,13 +188,13 @@ export function socHistogramOption(payload: BatteryPayload): Record<string, unkn
   };
 }
 
-export function socBandsOption(bands: Band[]): Record<string, unknown> {
+export function socBandsOption(bands: Band[], m: Messages): Record<string, unknown> {
   // ECharts draws Y-axis categories bottom-up, so the band order is reversed.
   const { base, axis } = chartBaseOption();
   const ordered = [...bands].reverse();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: "% of time", min: 0, max: 100 },
+    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
     yAxis: { ...axis, type: "category", data: ordered.map((band) => band.key) },
     series: [
       {
@@ -206,20 +209,27 @@ export function socBandsOption(bands: Band[]): Record<string, unknown> {
   };
 }
 
-/** Shortens 2026-03 to Mar, keeping the year only where it turns over. */
-export function monthLabel(key: string, previous?: string): string {
+/**
+ * Shortens 2026-03 to Mar (бер. in Ukrainian), keeping the year only where
+ * it turns over.
+ */
+export function monthLabel(key: string, previous: string | undefined, locale: string): string {
   const [year, month] = key.split("-").map(Number);
-  const name = new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString("en", { month: "short" });
+  const name = new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString(locale, { month: "short" });
   return previous && previous.slice(0, 4) === String(year) ? name : `${name} ${year}`;
 }
 
-export function monthlyOption(months: MonthBucket[], hasPv: boolean): Record<string, unknown> {
+export function monthlyOption(
+  months: MonthBucket[],
+  hasPv: boolean,
+  m: Messages,
+): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
-  const labels = months.map((month, index) => monthLabel(month.key, months[index - 1]?.key));
+  const labels = months.map((month, index) => monthLabel(month.key, months[index - 1]?.key, m.charts.monthNamesLocale));
 
   const series: Record<string, unknown>[] = [
     {
-      name: "Load",
+      name: m.charts.load,
       type: "bar",
       data: months.map((month) => (month.load_mean === null ? null : round(month.load_mean, 1))),
       // An incomplete month keeps its bar and loses its solidity: dropping it
@@ -232,7 +242,7 @@ export function monthlyOption(months: MonthBucket[], hasPv: boolean): Record<str
   ];
   if (hasPv) {
     series.push({
-      name: "PV",
+      name: m.charts.pv,
       type: "bar",
       data: months.map((month) => (month.pv_mean === null ? null : round(month.pv_mean, 1))),
       itemStyle: { color: SERIES.pv },
@@ -241,19 +251,23 @@ export function monthlyOption(months: MonthBucket[], hasPv: boolean): Record<str
 
   return {
     ...base,
-    legend: hasPv ? { data: ["Load", "PV"], top: 0, textStyle: base.textStyle } : undefined,
+    legend: hasPv ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle } : undefined,
     grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
     xAxis: { ...axis, type: "category", data: labels },
-    yAxis: { ...axis, type: "value", name: "W" },
+    yAxis: { ...axis, type: "value", name: m.units.w },
     series,
   };
 }
 
-export function hourOfDayOption(hours: HourBucket[], hasPv: boolean): Record<string, unknown> {
+export function hourOfDayOption(
+  hours: HourBucket[],
+  hasPv: boolean,
+  m: Messages,
+): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const series: Record<string, unknown>[] = [
     {
-      name: "Load",
+      name: m.charts.load,
       type: "line",
       showSymbol: false,
       areaStyle: { opacity: 0.15 },
@@ -264,7 +278,7 @@ export function hourOfDayOption(hours: HourBucket[], hasPv: boolean): Record<str
   ];
   if (hasPv) {
     series.push({
-      name: "PV",
+      name: m.charts.pv,
       type: "line",
       showSymbol: false,
       lineStyle: { color: SERIES.pv },
@@ -274,16 +288,16 @@ export function hourOfDayOption(hours: HourBucket[], hasPv: boolean): Record<str
   }
   return {
     ...base,
-    legend: hasPv ? { data: ["Load", "PV"], top: 0, textStyle: base.textStyle } : undefined,
+    legend: hasPv ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle } : undefined,
     grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
     xAxis: {
       ...axis,
       type: "category",
       data: hours.map((hour) => String(hour.hour)),
-      name: "hour",
+      name: m.charts.hour,
       nameLocation: "end",
     },
-    yAxis: { ...axis, type: "value", name: "W" },
+    yAxis: { ...axis, type: "value", name: m.units.w },
     series,
   };
 }
@@ -291,10 +305,11 @@ export function hourOfDayOption(hours: HourBucket[], hasPv: boolean): Record<str
 export function monthHourHeatmapOption(
   cells: MonthHourCell[],
   months: MonthBucket[],
+  m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const keys = months.map((month) => month.key);
-  const labels = keys.map((key, index) => monthLabel(key, keys[index - 1]));
+  const labels = keys.map((key, index) => monthLabel(key, keys[index - 1], m.charts.monthNamesLocale));
   const index = new Map(keys.map((key, position) => [key, position]));
 
   const data = cells
@@ -311,7 +326,7 @@ export function monthHourHeatmapOption(
       ...axis,
       type: "category",
       data: Array.from({ length: 24 }, (_, hour) => String(hour)),
-      name: "hour",
+      name: m.charts.hour,
     },
     visualMap: {
       min: values.length ? Math.min(...values) : 0,
@@ -327,15 +342,10 @@ export function monthHourHeatmapOption(
   };
 }
 
-/** Human labels for the six energy roles, in the order they are shown. */
-export const FLOW_LABELS: Record<string, string> = {
-  pv_energy_total: "Solar",
-  grid_import_total: "From grid",
-  battery_discharge_total: "From battery",
-  load_energy_total: "House",
-  grid_export_total: "To grid",
-  battery_charge_total: "To battery",
-};
+/** An energy role's name as a movement of energy, or the raw key if it is a stranger. */
+export function flowLabel(m: Messages, role: string): string {
+  return (m.charts.flows as Record<string, string>)[role] ?? role;
+}
 
 // Every flow gets its own colour: the two grid directions were both grey and
 // indistinguishable in the legend, and charging the battery was drawn in the
@@ -353,6 +363,7 @@ export function flowBarsOption(
   totals: Record<string, number>,
   sources: readonly string[],
   sinks: readonly string[],
+  m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const present = [...sources, ...sinks].filter((role) => role in totals);
@@ -361,12 +372,12 @@ export function flowBarsOption(
   // visible as the two bars matching rather than as a number to be compared.
   return {
     ...base,
-    legend: { data: present.map((role) => FLOW_LABELS[role]), top: 0, textStyle: base.textStyle },
+    legend: { data: present.map((role) => flowLabel(m, role)), top: 0, textStyle: base.textStyle },
     grid: { ...(base.grid as Record<string, unknown>), top: 56 },
-    xAxis: { ...axis, type: "value", name: "kWh" },
-    yAxis: { ...axis, type: "category", data: ["Out", "In"] },
+    xAxis: { ...axis, type: "value", name: m.units.kwh },
+    yAxis: { ...axis, type: "category", data: [m.charts.out, m.charts.in] },
     series: present.map((role) => ({
-      name: FLOW_LABELS[role],
+      name: flowLabel(m, role),
       type: "bar",
       stack: sources.includes(role) ? "in" : "out",
       itemStyle: { color: FLOW_COLOURS[role] },
@@ -382,6 +393,7 @@ export function dailyFlowsOption(
   days: BalanceDay[],
   sources: readonly string[],
   sinks: readonly string[],
+  m: Messages,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const present = [...sources, ...sinks].filter((role) =>
@@ -390,12 +402,12 @@ export function dailyFlowsOption(
 
   return {
     ...base,
-    legend: { data: present.map((role) => FLOW_LABELS[role]), top: 0, textStyle: base.textStyle },
+    legend: { data: present.map((role) => flowLabel(m, role)), top: 0, textStyle: base.textStyle },
     grid: { ...(base.grid as Record<string, unknown>), top: 56 },
     xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
-    yAxis: { ...axis, type: "value", name: "kWh" },
+    yAxis: { ...axis, type: "value", name: m.units.kwh },
     series: present.map((role) => ({
-      name: FLOW_LABELS[role],
+      name: flowLabel(m, role),
       type: "bar",
       // Two stacks per day, not one. Adding a day's sources to its sinks
       // produces a column whose height means nothing — the same energy counted
@@ -408,7 +420,7 @@ export function dailyFlowsOption(
   };
 }
 
-export function outageDaysOption(days: GridDay[]): Record<string, unknown> {
+export function outageDaysOption(days: GridDay[], m: Messages): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   return {
     ...base,
@@ -420,13 +432,12 @@ export function outageDaysOption(days: GridDay[]): Record<string, unknown> {
       formatter: (params: { name: string; value: number; dataIndex: number }[]) => {
         const point = params[0];
         const count = days[point.dataIndex].count;
-        const began =
-          count === 0 ? "no outages began" : `${count} outage${count === 1 ? "" : "s"} began`;
-        return `${point.name}<br/>${point.value} h without grid<br/>${began}`;
+        const hours = m.charts.hoursWithoutGrid({ hours: String(point.value) });
+        return `${point.name}<br/>${hours}<br/>${m.charts.outagesBegan({ n: count })}`;
       },
     },
     xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
-    yAxis: { ...axis, type: "value", name: "hours" },
+    yAxis: { ...axis, type: "value", name: m.charts.hours },
     series: [
       {
         type: "bar",
@@ -439,12 +450,12 @@ export function outageDaysOption(days: GridDay[]): Record<string, unknown> {
   };
 }
 
-export function outageHoursOption(hours: GridHour[]): Record<string, unknown> {
+export function outageHoursOption(hours: GridHour[], m: Messages): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   return {
     ...base,
     xAxis: { ...axis, type: "category", data: hours.map((item) => `${item.hour}`) },
-    yAxis: { ...axis, type: "value", name: "% of measured time", min: 0, max: 100 },
+    yAxis: { ...axis, type: "value", name: m.charts.percentOfMeasuredTime, min: 0, max: 100 },
     series: [
       {
         type: "bar",

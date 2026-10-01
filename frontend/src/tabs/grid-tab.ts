@@ -293,7 +293,7 @@ export class IaGridTab extends LitElement {
         <h2>Hours without grid, by day</h2>
         ${daysWithoutData
           ? html`<p class="empty">No days with data in this period.</p>`
-          : html`<ia-chart .option=${outageDaysOption(payload.days)} height="220px"></ia-chart>
+          : html`<ia-chart .option=${outageDaysOption(payload.days, this.i18n.m)} height="220px"></ia-chart>
               ${missingDays > 0
                 ? html`<p class="note">
                     ${missingDays} ${missingDays === 1 ? "day" : "days"} in this period had no data
@@ -304,7 +304,7 @@ export class IaGridTab extends LitElement {
 
       <section>
         <h2>Share of time without grid, by hour of day</h2>
-        <ia-chart .option=${outageHoursOption(payload.hours)} height="220px"></ia-chart>
+        <ia-chart .option=${outageHoursOption(payload.hours, this.i18n.m)} height="220px"></ia-chart>
         <p class="note">Hours the sensor never recorded are left empty rather than drawn at zero.</p>
       </section>
 

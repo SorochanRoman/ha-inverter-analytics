@@ -56,6 +56,8 @@
 | W / kW / kWh | Вт / кВт / кВт·год |
 | s / min / h (durations) | с / хв / год |
 | 24 h / 7 days / 30 days / This month / Year | 24 год / 7 днів / 30 днів / Цей місяць / Рік |
+| House (balance flow) | Будинок |
+| In / Out (balance bars) | Надходження / Витрата |
 | sensor | сенсор |
 | capacity (battery) | ємність |
 | Exact data / Hourly averages / Mixed (precision) | Точні дані / Погодинні середні / Змішані |

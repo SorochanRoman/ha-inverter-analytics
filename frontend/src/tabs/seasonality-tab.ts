@@ -86,7 +86,7 @@ export class IaSeasonalityTab extends LitElement {
       <tbody>
         ${payload.months.map(
           (month, index) => html`<tr class=${month.complete ? "" : "partial"}>
-            <td>${monthLabel(month.key, keys[index - 1])}</td>
+            <td>${monthLabel(month.key, keys[index - 1], this.i18n.m.charts.monthNamesLocale)}</td>
             <td>${formatPower(month.load_mean, locale)}</td>
             <td>${formatPower(month.load_peak_hourly, locale)}</td>
             ${payload.has_pv ? html`<td>${formatPower(month.pv_mean, locale)}</td>` : nothing}
@@ -130,7 +130,7 @@ export class IaSeasonalityTab extends LitElement {
 
       <section>
         <h2>Mean power by month</h2>
-        <ia-chart .option=${monthlyOption(payload.months, payload.has_pv)}></ia-chart>
+        <ia-chart .option=${monthlyOption(payload.months, payload.has_pv, this.i18n.m)}></ia-chart>
         ${thin.length
           ? html`<p class="note">
               ${thin.length === 1
@@ -165,7 +165,7 @@ export class IaSeasonalityTab extends LitElement {
 
       <section>
         <h2>Mean power by hour of day</h2>
-        <ia-chart .option=${hourOfDayOption(payload.hours, payload.has_pv)}></ia-chart>
+        <ia-chart .option=${hourOfDayOption(payload.hours, payload.has_pv, this.i18n.m)}></ia-chart>
         <p class="note">
           Averaged across the whole period, so it blends the seasons. The heat map below is the
           same question asked per month.
@@ -175,7 +175,7 @@ export class IaSeasonalityTab extends LitElement {
       <section>
         <h2>Hour of day, month by month</h2>
         <ia-chart
-          .option=${monthHourHeatmapOption(payload.cells, payload.months)}
+          .option=${monthHourHeatmapOption(payload.cells, payload.months, this.i18n.m)}
           height="420px"
         ></ia-chart>
         <p class="note">

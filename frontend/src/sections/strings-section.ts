@@ -14,9 +14,7 @@ export class IaStringsSection extends LitElement {
   @property({ attribute: false }) public series: Record<string, SeriesInfo> = {};
   @property({ type: String }) public locale = "en";
 
-  // Protected only until this section reads its own words from it:
-  // noUnusedLocals rejects a private field nothing reads yet.
-  protected i18n = new I18nController(this);
+  private i18n = new I18nController(this);
 
   protected render() {
     const { parts, aligned_coverage } = this.strings;
@@ -37,7 +35,7 @@ export class IaStringsSection extends LitElement {
             </div>`;
           })}
         </div>
-        <ia-chart .option=${partsOption(parts, SERIES.pv)}></ia-chart>
+        <ia-chart .option=${partsOption(parts, SERIES.pv, this.i18n.m)}></ia-chart>
         ${aligned_coverage < 0.95
           ? html`<p class="warn">
               All strings had data at the same moment for only

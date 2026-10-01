@@ -13,9 +13,7 @@ export class IaPhasesSection extends LitElement {
   @property({ attribute: false }) public series: Record<string, SeriesInfo> = {};
   @property({ type: String }) public locale = "en";
 
-  // Protected only until this section reads its own words from it:
-  // noUnusedLocals rejects a private field nothing reads yet.
-  protected i18n = new I18nController(this);
+  private i18n = new I18nController(this);
 
   private renderCards() {
     const { rating_per_phase } = this.phases;
@@ -64,7 +62,7 @@ export class IaPhasesSection extends LitElement {
           <span class="row"><span>of the measured time</span></span>
         </div>
       </div>
-      <ia-chart .option=${imbalanceOption(imbalance)}></ia-chart>
+      <ia-chart .option=${imbalanceOption(imbalance, this.i18n.m)}></ia-chart>
       <p class="note">
         Measured over ${formatDuration(imbalance.analysed_seconds, this.locale)}
         (${formatCoverage(imbalance.coverage, this.locale)} of the period).${imbalance.below_floor_seconds >

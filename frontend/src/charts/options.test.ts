@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SERIES } from "../theme";
+import { en } from "../i18n/en";
+import { uk } from "../i18n/uk";
 import { SUPPORTED_OPTION_KEYS } from "./registry";
 import type {
   BalanceDay,
@@ -15,7 +17,6 @@ import type {
   PartSummary,
 } from "../types";
 import {
-  FLOW_LABELS,
   bandsOption,
   dailyFlowsOption,
   durationCurveOption,
@@ -68,17 +69,17 @@ const payload: LoadPayload = {
 
 describe("histogramOption", () => {
   it("labels the x axis in watts by default", () => {
-    const option = histogramOption(payload, "watts") as any;
+    const option = histogramOption(payload, "watts", en) as any;
     expect(option.xAxis.data).toEqual(["0", "200"]);
   });
 
   it("labels the x axis as a share of rated power in percent mode", () => {
-    const option = histogramOption(payload, "percent") as any;
+    const option = histogramOption(payload, "percent", en) as any;
     expect(option.xAxis.data).toEqual(["0", "2.5"]);
   });
 
   it("plots the fraction of time, not raw seconds", () => {
-    const option = histogramOption(payload, "watts") as any;
+    const option = histogramOption(payload, "watts", en) as any;
     expect(option.series[0].data).toEqual([50, 50]);
   });
 
@@ -87,27 +88,27 @@ describe("histogramOption", () => {
       ...payload,
       histogram: { bucket_width: 200, clipped_low_seconds: 0, clipped_high_seconds: 0, buckets: [] },
     };
-    const option = histogramOption(empty, "watts") as any;
+    const option = histogramOption(empty, "watts", en) as any;
     expect(option.series[0].data).toEqual([]);
   });
 });
 
 describe("durationCurveOption", () => {
   it("plots percent of time against power", () => {
-    const option = durationCurveOption(payload) as any;
+    const option = durationCurveOption(payload, en) as any;
     expect(option.series[0].data).toEqual([[0, 6800], [100, 0]]);
   });
 });
 
 describe("bandsOption", () => {
   it("keeps band order and converts fractions to percent", () => {
-    const option = bandsOption(payload) as any;
+    const option = bandsOption(payload, en) as any;
     expect(option.yAxis.data).toEqual(["100+", "0-10"]);
     expect(option.series[0].data).toEqual([75, 25]);
   });
 
   it("paints the overload band in the overload colour", () => {
-    const option = bandsOption(payload) as any;
+    const option = bandsOption(payload, en) as any;
     // After the reversal, index zero is "100+".
     expect(option.series[0].itemStyle.color({ dataIndex: 0 })).toBe(SERIES.overload);
     expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.load);
@@ -133,13 +134,13 @@ describe("imbalanceOption", () => {
   };
 
   it("labels the axis in percent and plots the share of time", () => {
-    const option = imbalanceOption(imbalance) as any;
+    const option = imbalanceOption(imbalance, en) as any;
     expect(option.xAxis.data).toEqual(["0", "20", "40"]);
     expect(option.series[0].data).toEqual([60, 30, 10]);
   });
 
   it("colours only the buckets at or above the threshold as a problem", () => {
-    const option = imbalanceOption(imbalance) as any;
+    const option = imbalanceOption(imbalance, en) as any;
     const colourOf = option.series[0].itemStyle.color;
     expect(colourOf({ dataIndex: 0 })).toBe(SERIES.load);
     expect(colourOf({ dataIndex: 1 })).toBe(SERIES.load);
@@ -148,7 +149,7 @@ describe("imbalanceOption", () => {
   });
 
   it("survives an empty distribution", () => {
-    const option = imbalanceOption({ ...imbalance, histogram: [] }) as any;
+    const option = imbalanceOption({ ...imbalance, histogram: [] }, en) as any;
     expect(option.series[0].data).toEqual([]);
   });
 });
@@ -160,14 +161,14 @@ describe("partsOption", () => {
   ];
 
   it("plots mean against peak for each part", () => {
-    const option = partsOption(parts, SERIES.pv) as any;
+    const option = partsOption(parts, SERIES.pv, en) as any;
     expect(option.xAxis.data).toEqual(["PV1", "PV2"]);
     expect(option.series[0].data).toEqual([1200.4, 800]);
     expect(option.series[1].data).toEqual([3400, 2600]);
   });
 
   it("keeps a part with no data as a hole rather than a zero", () => {
-    const option = partsOption([{ ...parts[0], mean: null, peak: null }], SERIES.pv) as any;
+    const option = partsOption([{ ...parts[0], mean: null, peak: null }], SERIES.pv, en) as any;
     expect(option.series[0].data).toEqual([null]);
     expect(option.series[1].data).toEqual([null]);
   });
@@ -178,6 +179,7 @@ describe("partsOption legend", () => {
     const option = partsOption(
       [{ key: "pv_s1", label: "PV1", index: 1, mean: 1, p95: 2, peak: 3, share: 1 }],
       SERIES.pv,
+      en,
     ) as any;
     expect(option.legend.data).toEqual(["Mean", "Peak"]);
     expect(option.grid.top).toBeGreaterThan(option.legend.top);
@@ -195,11 +197,11 @@ describe("option builders against what the bundle registers", () => {
   };
 
   const built: [string, Record<string, unknown>][] = [
-    ["histogram", histogramOption(payload, "watts")],
-    ["durationCurve", durationCurveOption(payload)],
-    ["bands", bandsOption(payload)],
-    ["imbalance", imbalanceOption(imbalance)],
-    ["parts", partsOption(parts, SERIES.pv)],
+    ["histogram", histogramOption(payload, "watts", en)],
+    ["durationCurve", durationCurveOption(payload, en)],
+    ["bands", bandsOption(payload, en)],
+    ["imbalance", imbalanceOption(imbalance, en)],
+    ["parts", partsOption(parts, SERIES.pv, en)],
   ];
 
   it.each(built)("%s uses only keys a registered component can render", (_name, option) => {
@@ -231,7 +233,7 @@ describe("battery charts", () => {
   ];
 
   it("colours only the buckets at or below the low mark as a warning", () => {
-    const option = socHistogramOption(battery) as any;
+    const option = socHistogramOption(battery, en) as any;
     const colourOf = option.series[0].itemStyle.color;
     expect(colourOf({ dataIndex: 0 })).toBe(SERIES.overload);
     // Ends exactly at the threshold, so it is still below it.
@@ -240,14 +242,14 @@ describe("battery charts", () => {
   });
 
   it("reverses the bands so the highest charge sits at the top", () => {
-    const option = socBandsOption(bands) as any;
+    const option = socBandsOption(bands, en) as any;
     expect(option.yAxis.data).toEqual(["80-100", "0-20"]);
     expect(option.series[0].data).toEqual([90, 10]);
     expect(option.series[0].itemStyle.color({ dataIndex: 1 })).toBe(SERIES.overload);
   });
 
   it("uses only keys a registered component can render", () => {
-    for (const option of [socHistogramOption(battery), socBandsOption(bands)]) {
+    for (const option of [socHistogramOption(battery, en), socBandsOption(bands, en)]) {
       expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
     }
   });
@@ -270,13 +272,13 @@ describe("seasonality charts", () => {
   ];
 
   it("labels the year only where it turns over", () => {
-    expect(monthLabel("2025-12")).toBe("Dec 2025");
-    expect(monthLabel("2026-01", "2025-12")).toBe("Jan 2026");
-    expect(monthLabel("2026-02", "2026-01")).toBe("Feb");
+    expect(monthLabel("2025-12", undefined, "en")).toBe("Dec 2025");
+    expect(monthLabel("2026-01", "2025-12", "en")).toBe("Jan 2026");
+    expect(monthLabel("2026-02", "2026-01", "en")).toBe("Feb");
   });
 
   it("greys an incomplete month rather than dropping it", () => {
-    const option = monthlyOption(months, false) as any;
+    const option = monthlyOption(months, false, en) as any;
     const colourOf = option.series[0].itemStyle.color;
     expect(option.series[0].data).toEqual([3000, 3200]);
     expect(colourOf({ dataIndex: 0 })).toBe(SERIES.load);
@@ -284,13 +286,13 @@ describe("seasonality charts", () => {
   });
 
   it("adds a PV series only when there is PV", () => {
-    expect((monthlyOption(months, false) as any).series).toHaveLength(1);
-    expect((monthlyOption(months, true) as any).series).toHaveLength(2);
-    expect((hourOfDayOption(hours, true) as any).series).toHaveLength(2);
+    expect((monthlyOption(months, false, en) as any).series).toHaveLength(1);
+    expect((monthlyOption(months, true, en) as any).series).toHaveLength(2);
+    expect((hourOfDayOption(hours, true, en) as any).series).toHaveLength(2);
   });
 
   it("maps heat-map cells onto the month axis and ignores strays", () => {
-    const option = monthHourHeatmapOption(cells, months) as any;
+    const option = monthHourHeatmapOption(cells, months, en) as any;
     // The 1999 cell belongs to no column on this axis and must not shift the rest.
     expect(option.series[0].data).toEqual([[0, 18, 4000], [1, 12, 2000]]);
     expect(option.visualMap.min).toBe(2000);
@@ -298,16 +300,16 @@ describe("seasonality charts", () => {
   });
 
   it("survives having no cells at all", () => {
-    const option = monthHourHeatmapOption([], months) as any;
+    const option = monthHourHeatmapOption([], months, en) as any;
     expect(option.series[0].data).toEqual([]);
     expect(option.visualMap.max).toBe(1);
   });
 
   it("uses only keys a registered component can render", () => {
     const built = [
-      monthlyOption(months, true),
-      hourOfDayOption(hours, true),
-      monthHourHeatmapOption(cells, months),
+      monthlyOption(months, true, en),
+      hourOfDayOption(hours, true, en),
+      monthHourHeatmapOption(cells, months, en),
     ];
     for (const option of built) {
       const unsupported = Object.keys(option)
@@ -315,6 +317,19 @@ describe("seasonality charts", () => {
         .filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
       expect(unsupported).toEqual([]);
     }
+  });
+
+  describe("in Ukrainian", () => {
+    it("names the axes and series in Ukrainian", () => {
+      const option = monthlyOption(months, true, uk) as { legend: { data: string[] } };
+      expect(option.legend.data).toEqual([uk.charts.load, uk.charts.pv]);
+    });
+
+    it("shortens month names in the panel's locale", () => {
+      expect(monthLabel("2026-03", undefined, "uk")).toBe(
+        `${new Date(Date.UTC(2000, 2, 1)).toLocaleDateString("uk", { month: "short" })} 2026`,
+      );
+    });
   });
 });
 
@@ -331,7 +346,7 @@ describe("balance charts", () => {
   ];
 
   it("stacks each side onto its own bar", () => {
-    const option = flowBarsOption(totals, SOURCES, SINKS) as any;
+    const option = flowBarsOption(totals, SOURCES, SINKS, en) as any;
     const stacks = Object.fromEntries(option.series.map((s: any) => [s.name, s.stack]));
     expect(stacks["Solar"]).toBe("in");
     expect(stacks["House"]).toBe("out");
@@ -344,25 +359,25 @@ describe("balance charts", () => {
 
   it("leaves out a flow that is not mapped", () => {
     const partial = { pv_energy_total: 10, load_energy_total: 8 };
-    const option = flowBarsOption(partial, SOURCES, SINKS) as any;
+    const option = flowBarsOption(partial, SOURCES, SINKS, en) as any;
     expect(option.series.map((s: any) => s.name)).toEqual(["Solar", "House"]);
   });
 
   it("keeps a day without a counter as a hole rather than a zero", () => {
-    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
+    const option = dailyFlowsOption(days, SOURCES, SINKS, en) as any;
     const house = option.series.find((s: any) => s.name === "House");
     expect(house.data).toEqual([4, null]);
   });
 
   it("drops a series no day has any accounting for", () => {
-    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
+    const option = dailyFlowsOption(days, SOURCES, SINKS, en) as any;
     expect(option.series.map((s: any) => s.name)).toEqual(["Solar", "House"]);
   });
 
   it("keeps a day's sources and sinks on separate stacks", () => {
     // One stack would add a day's production to its consumption and draw a
     // column whose height counts the same energy twice.
-    const option = dailyFlowsOption(days, SOURCES, SINKS) as any;
+    const option = dailyFlowsOption(days, SOURCES, SINKS, en) as any;
     const stacks = Object.fromEntries(option.series.map((s: any) => [s.name, s.stack]));
     expect(stacks["Solar"]).toBe("in");
     expect(stacks["House"]).toBe("out");
@@ -370,8 +385,8 @@ describe("balance charts", () => {
 
   it("uses only keys a registered component can render", () => {
     const built = [
-      flowBarsOption(totals, SOURCES, SINKS),
-      dailyFlowsOption(days, SOURCES, SINKS),
+      flowBarsOption(totals, SOURCES, SINKS, en),
+      dailyFlowsOption(days, SOURCES, SINKS, en),
     ];
     for (const option of built) {
       expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
@@ -383,11 +398,12 @@ describe("flow colours", () => {
   it("gives every flow a colour of its own", () => {
     // Two greys sat side by side in the legend for the two grid directions,
     // and charging the battery was drawn in the red that means a fault here.
-    const totals = Object.fromEntries(Object.keys(FLOW_LABELS).map((role) => [role, 1]));
+    const totals = Object.fromEntries(Object.keys(en.charts.flows).map((role) => [role, 1]));
     const option = flowBarsOption(
       totals,
       ["pv_energy_total", "grid_import_total", "battery_discharge_total"],
       ["load_energy_total", "grid_export_total", "battery_charge_total"],
+      en,
     ) as any;
 
     const colours = option.series.map((s: any) => s.itemStyle.color);
@@ -408,7 +424,7 @@ describe("outage charts", () => {
   }));
 
   it("draws hours without grid per day, in the overload colour", () => {
-    const option = outageDaysOption(days);
+    const option = outageDaysOption(days, en);
     const series = option.series as { data: unknown[]; itemStyle: { color: string } }[];
     expect(series[0].data).toEqual([2, 0]);
     expect(series[0].itemStyle.color).toBe(SERIES.overload);
@@ -417,7 +433,7 @@ describe("outage charts", () => {
 
   it("names the outages that began on a day in the tooltip", () => {
     // The count is the second by-day requirement and has no axis of its own.
-    const tooltip = outageDaysOption(days).tooltip as {
+    const tooltip = outageDaysOption(days, en).tooltip as {
       formatter: (params: { name: string; value: number; dataIndex: number }[]) => string;
     };
     const text = tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }]);
@@ -429,7 +445,7 @@ describe("outage charts", () => {
   });
 
   it("draws the share of measured time per hour, with an unmeasured hour left empty", () => {
-    const option = outageHoursOption(hours);
+    const option = outageHoursOption(hours, en);
     const data = (option.series as { data: (number | null)[] }[])[0].data;
     expect(data[20]).toBe(50);
     expect(data[5]).toBeNull();
@@ -437,10 +453,35 @@ describe("outage charts", () => {
   });
 
   it("uses only keys the registered components can render", () => {
-    for (const option of [outageDaysOption(days), outageHoursOption(hours)]) {
+    for (const option of [outageDaysOption(days, en), outageHoursOption(hours, en)]) {
       for (const key of Object.keys(option)) {
         expect(SUPPORTED_OPTION_KEYS.has(key), key).toBe(true);
       }
     }
+  });
+});
+
+describe("chart words in Ukrainian", () => {
+  it("names the flows, units and outage counts in Ukrainian", () => {
+    const option = flowBarsOption(
+      { pv_energy_total: 1, load_energy_total: 1 },
+      ["pv_energy_total"],
+      ["load_energy_total"],
+      uk,
+    ) as any;
+    expect(option.legend.data).toEqual([uk.charts.flows.pv_energy_total, uk.charts.flows.load_energy_total]);
+    expect(option.xAxis.name).toBe(uk.units.kwh);
+
+    const days: GridDay[] = [
+      { day: "2026-01-01", off_seconds: 7200, measured_seconds: 86400, count: 2 },
+      { day: "2026-01-02", off_seconds: 0, measured_seconds: 86400, count: 5 },
+      { day: "2026-01-03", off_seconds: 0, measured_seconds: 86400, count: 0 },
+    ];
+    const tooltip = outageDaysOption(days, uk).tooltip as {
+      formatter: (params: { name: string; value: number; dataIndex: number }[]) => string;
+    };
+    expect(tooltip.formatter([{ name: "01-01", value: 2, dataIndex: 0 }])).toContain("2 відключення");
+    expect(tooltip.formatter([{ name: "01-02", value: 0, dataIndex: 1 }])).toContain("5 відключень");
+    expect(tooltip.formatter([{ name: "01-03", value: 0, dataIndex: 2 }])).not.toContain("outage");
   });
 });

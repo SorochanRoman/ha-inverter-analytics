@@ -9,8 +9,8 @@ import type { Messages } from "./i18n/en";
  * charge" sends the reader looking for a field that exists under exactly that
  * name rather than for something they have to translate first.
  *
- * Distinct from FLOW_LABELS in charts/options, which names the same counters
- * as movements of energy — "From grid" is right on an axis and useless in an
+ * Distinct from m.charts.flows (flowLabel in charts/options), which names
+ * the same counters as movements of energy — "From grid" is right on an axis and useless in an
  * instruction to go and map a sensor.
  *
  * The names live in m.roles. The English ones equal translations/en.json;
