@@ -19,7 +19,9 @@ export class IaBalanceTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "30d";
 
   @state() private payload?: BalancePayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
 
   private i18n = new I18nController(this);
@@ -60,7 +62,7 @@ export class IaBalanceTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -69,14 +71,17 @@ export class IaBalanceTab extends LitElement {
   }
 
   private renderTotals(payload: BalancePayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     return html`<div class="kpi">
       ${ALL.filter((role) => role in payload.totals).map(
         (role) => html`<div class="cell">
-          <span class="label">${flowLabel(this.i18n.m, role)}</span>
+          <span class="label">${flowLabel(m, role)}</span>
           <span class="value">${formatEnergy(payload.totals[role], locale)}</span>
           <span class="hint">
-            ${(SOURCES as readonly string[]).includes(role) ? "into the system" : "out of it"}
+            ${(SOURCES as readonly string[]).includes(role)
+              ? m.balance.intoSystem
+              : m.balance.outOfIt}
           </span>
         </div>`,
       )}
@@ -84,48 +89,46 @@ export class IaBalanceTab extends LitElement {
   }
 
   private renderBalance(payload: BalancePayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
 
     if (payload.unaccounted === null) {
       return html`<p class="empty">
-        The books can only be closed with all six counters mapped. Missing:
-        ${payload.missing.map((role) => flowLabel(this.i18n.m, role)).join(", ")}. Until then the difference
-        between the two bars would measure what is not mapped rather than what was lost.
+        ${m.balance.needsAllSix({
+          missing: payload.missing.map((role) => flowLabel(m, role)).join(", "),
+        })}
       </p>`;
     }
 
     return html`
       <p class="balance">
-        In ${formatEnergy(payload.sources_total, locale)}, out
-        ${formatEnergy(payload.sinks_total, locale)} —
+        ${m.balance.inOut({
+          in: formatEnergy(payload.sources_total, locale),
+          out: formatEnergy(payload.sinks_total, locale),
+        })}
         <strong>${formatEnergy(Math.abs(payload.unaccounted), locale)}</strong>
-        ${payload.unaccounted >= 0 ? "unaccounted for" : "more out than in"}
-        (${formatPercent(payload.unaccounted_share, locale)}).
+        ${(payload.unaccounted >= 0 ? m.balance.unaccountedFor : m.balance.moreOutThanIn)({
+          share: formatPercent(payload.unaccounted_share, locale),
+        })}
       </p>
-      <p class="note">
-        Conversion and battery round-trip losses live in this figure, and so does every
-        disagreement between the six meters. It is called unaccounted rather than losses because
-        nothing here can tell heat in the inverter from error in a clamp.
-      </p>
+      <p class="note">${m.balance.unaccountedNote}</p>
     `;
   }
 
   private renderRatios(payload: BalancePayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const totals = payload.totals;
     const has = (role: string) => role in totals;
 
     if (payload.self_sufficiency === null && payload.self_consumption === null) {
-      return html`<p class="empty">
-        Self-sufficiency needs the house and grid-import counters; self-consumption needs solar
-        and grid export.
-      </p>`;
+      return html`<p class="empty">${m.balance.ratiosNeedCounters}</p>`;
     }
 
     return html`<div class="kpi">
       ${payload.self_sufficiency !== null
         ? html`<div class="cell">
-            <span class="label">Self-sufficiency</span>
+            <span class="label">${m.balance.selfSufficiency}</span>
             <span class="value">${formatPercent(payload.self_sufficiency, locale)}</span>
             <span class="hint">
               ${has("load_energy_total") && has("grid_import_total")
@@ -139,7 +142,7 @@ export class IaBalanceTab extends LitElement {
         : nothing}
       ${payload.self_consumption !== null
         ? html`<div class="cell">
-            <span class="label">Self-consumption</span>
+            <span class="label">${m.balance.selfConsumption}</span>
             <span class="value">${formatPercent(payload.self_consumption, locale)}</span>
             <span class="hint">
               ${has("pv_energy_total") && has("grid_export_total")
@@ -155,14 +158,15 @@ export class IaBalanceTab extends LitElement {
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
 
     const payload = this.payload;
@@ -170,49 +174,48 @@ export class IaBalanceTab extends LitElement {
 
     return html`
       <div class="status">
-        <span class="badge">Hourly statistics</span>
-        <span class="badge">Days in ${payload.timezone}</span>
+        <span class="badge">${m.balance.hourlyStatistics}</span>
+        <span class="badge">${m.balance.daysIn({ timezone: payload.timezone })}</span>
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
         ${!payload.covers_whole_window && payload.covered_end
           ? html`<span class="warn">
-              Counted up to ${new Date(payload.covered_end).toLocaleString(locale)}
+              ${m.balance.countedUpTo({
+                time: new Date(payload.covered_end).toLocaleString(locale),
+              })}
             </span>`
           : nothing}
         ${!payload.covered_end
-          ? html`<span class="warn">No energy statistics in this period</span>`
+          ? html`<span class="warn">${m.balance.noEnergyStatistics}</span>`
           : nothing}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       ${this.renderTotals(payload)}
 
       <section>
-        <h2>In against out</h2>
+        <h2>${m.balance.inAgainstOut}</h2>
         <ia-chart
-          .option=${flowBarsOption(payload.totals, SOURCES, SINKS, this.i18n.m)}
+          .option=${flowBarsOption(payload.totals, SOURCES, SINKS, m)}
           height="220px"
         ></ia-chart>
         ${this.renderBalance(payload)}
       </section>
 
       <section>
-        <h2>Self-sufficiency and self-consumption</h2>
+        <h2>${m.balance.ratiosTitle}</h2>
         ${this.renderRatios(payload)}
       </section>
 
       <section>
-        <h2>Day by day</h2>
+        <h2>${m.balance.dayByDay}</h2>
         ${payload.days.length
-          ? html`<ia-chart .option=${dailyFlowsOption(payload.days, SOURCES, SINKS, this.i18n.m)}></ia-chart>`
-          : html`<p class="empty">No days with energy statistics in this period.</p>`}
-        <p class="note">
-          Two bars a day: what came in, and what went out. Adding the two together would count
-          the same energy twice. Energy is read from Home Assistant's hourly statistics, which is where counter resets
-          are already accounted for. The current hour is compiled only once it ends, so a period
-          running up to now stops at the last completed hour.
-        </p>
+          ? html`<ia-chart
+              .option=${dailyFlowsOption(payload.days, SOURCES, SINKS, m)}
+            ></ia-chart>`
+          : html`<p class="empty">${m.balance.noDays}</p>`}
+        <p class="note">${m.balance.dayByDayNote}</p>
       </section>
     `;
   }

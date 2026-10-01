@@ -21,7 +21,9 @@ export class IaSeasonalityTab extends LitElement {
   @property({ type: String }) public range: RangeKey = "year";
 
   @state() private payload?: SeasonalityPayload;
-  @state() private error?: string;
+  // The error itself, not its sentence: render() words it, so a language
+  // switch re-words an error already on screen.
+  @state() private error?: unknown;
   @state() private loading = false;
 
   private i18n = new I18nController(this);
@@ -62,7 +64,7 @@ export class IaSeasonalityTab extends LitElement {
       this.payload = payload;
     } catch (err) {
       if (requestId !== this.requestId) return;
-      this.error = describeError(err, this.i18n.m);
+      this.error = err;
     } finally {
       if (requestId === this.requestId) {
         this.loading = false;
@@ -71,22 +73,23 @@ export class IaSeasonalityTab extends LitElement {
   }
 
   private renderMonthTable(payload: SeasonalityPayload) {
+    const m = this.i18n.m;
     const locale = this.i18n.locale;
     const keys = payload.months.map((month) => month.key);
     return html`<table>
       <thead>
         <tr>
-          <th>Month</th>
-          <th>Mean load</th>
-          <th>Busiest hour</th>
-          ${payload.has_pv ? html`<th>Mean PV</th>` : nothing}
-          <th>Of the month</th>
+          <th>${m.seasonality.month}</th>
+          <th>${m.seasonality.meanLoad}</th>
+          <th>${m.seasonality.busiestHour}</th>
+          ${payload.has_pv ? html`<th>${m.seasonality.meanPv}</th>` : nothing}
+          <th>${m.seasonality.ofTheMonth}</th>
         </tr>
       </thead>
       <tbody>
         ${payload.months.map(
           (month, index) => html`<tr class=${month.complete ? "" : "partial"}>
-            <td>${monthLabel(month.key, keys[index - 1], this.i18n.m.charts.locale)}</td>
+            <td>${monthLabel(month.key, keys[index - 1], m.charts.locale)}</td>
             <td>${formatPower(month.load_mean, locale)}</td>
             <td>${formatPower(month.load_peak_hourly, locale)}</td>
             ${payload.has_pv ? html`<td>${formatPower(month.pv_mean, locale)}</td>` : nothing}
@@ -98,14 +101,15 @@ export class IaSeasonalityTab extends LitElement {
   }
 
   protected render() {
-    if (this.error) {
+    const m = this.i18n.m;
+    if (this.error !== undefined) {
       return html`<div class="notice">
-        Could not load data: ${this.error}
-        <button @click=${() => this.load()}>Try again</button>
+        ${m.common.couldNotLoadData({ error: describeError(this.error, m) })}
+        <button @click=${() => this.load()}>${m.common.tryAgain}</button>
       </div>`;
     }
     if (!this.payload) {
-      return html`<div class="notice">Computing…</div>`;
+      return html`<div class="notice">${m.common.computing}</div>`;
     }
 
     const payload = this.payload;
@@ -120,68 +124,53 @@ export class IaSeasonalityTab extends LitElement {
     return html`
       <div class="status">
         <span class="badge">${precisionLabel(payload.precision, payload.boundary, locale)}</span>
-        <span class="badge">Months in ${payload.timezone}</span>
+        <span class="badge">${m.seasonality.monthsIn({ timezone: payload.timezone })}</span>
         ${warning ? html`<span class="warn">${warning}</span>` : nothing}
         ${payload.clamped
-          ? html`<span class="warn">Period shortened to the maximum allowed</span>`
+          ? html`<span class="warn">${m.common.periodShortened}</span>`
           : nothing}
-        ${this.loading ? html`<span class="warn">Refreshing…</span>` : nothing}
+        ${this.loading ? html`<span class="warn">${m.common.refreshing}</span>` : nothing}
       </div>
 
       <section>
-        <h2>Mean power by month</h2>
-        <ia-chart .option=${monthlyOption(payload.months, payload.has_pv, this.i18n.m)}></ia-chart>
+        <h2>${m.seasonality.meanByMonth}</h2>
+        <ia-chart .option=${monthlyOption(payload.months, payload.has_pv, m)}></ia-chart>
         ${thin.length
           ? html`<p class="note">
-              ${thin.length === 1
-                ? html`One month is covered by less than
-                    ${formatPercent(payload.incomplete_below, locale)} of its days and is drawn in
-                    grey.`
-                : html`${thin.length} months are covered by less than
-                    ${formatPercent(payload.incomplete_below, locale)} of their days and are drawn
-                    in grey.`}
-              A month the recorder only saw part of is not a lower month; the figures stand, the
-              comparison does not.
+              ${m.seasonality.thinMonths({
+                n: thin.length,
+                share: formatPercent(payload.incomplete_below, locale),
+              })}
+              ${m.seasonality.partialNotLower}
             </p>`
           : nothing}
         ${absent.length
           ? html`<p class="note">
-              ${absent.length === 1 ? "One month has" : `${absent.length} months have`} no recorded
-              data at all and ${absent.length === 1 ? "carries" : "carry"} no bar. Home Assistant
-              keeps long-term statistics only from the moment a sensor starts producing them.
+              ${m.seasonality.absentMonths({ n: absent.length })}
+              ${m.seasonality.statisticsFromStart}
             </p>`
           : nothing}
       </section>
 
       <section>
-        <h2>Month by month</h2>
+        <h2>${m.seasonality.monthByMonth}</h2>
         ${this.renderMonthTable(payload)}
-        <p class="note">
-          "Busiest hour" is the highest hourly average, not the highest load. Beyond the
-          recorder's retention Home Assistant keeps only an hourly mean, so a brief peak inside an
-          hour has already been averaged away by the time this page sees it.
-        </p>
+        <p class="note">${m.seasonality.busiestHourNote}</p>
       </section>
 
       <section>
-        <h2>Mean power by hour of day</h2>
-        <ia-chart .option=${hourOfDayOption(payload.hours, payload.has_pv, this.i18n.m)}></ia-chart>
-        <p class="note">
-          Averaged across the whole period, so it blends the seasons. The heat map below is the
-          same question asked per month.
-        </p>
+        <h2>${m.seasonality.meanByHour}</h2>
+        <ia-chart .option=${hourOfDayOption(payload.hours, payload.has_pv, m)}></ia-chart>
+        <p class="note">${m.seasonality.byHourNote}</p>
       </section>
 
       <section>
-        <h2>Hour of day, month by month</h2>
+        <h2>${m.seasonality.hourByMonth}</h2>
         <ia-chart
-          .option=${monthHourHeatmapOption(payload.cells, payload.months, this.i18n.m)}
+          .option=${monthHourHeatmapOption(payload.cells, payload.months, m)}
           height="420px"
         ></ia-chart>
-        <p class="note">
-          Where a winter evening peak and a summer midday one stop being two averages and become
-          two shapes. Hours with no recorded data are left blank rather than drawn as zero.
-        </p>
+        <p class="note">${m.seasonality.heatmapNote}</p>
       </section>
     `;
   }

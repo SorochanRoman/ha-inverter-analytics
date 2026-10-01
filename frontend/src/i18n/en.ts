@@ -231,6 +231,80 @@ export const en = {
       "Map a battery power sensor in the integration's options to see how much moves in and " +
       "out, and how much of the time the battery is working.",
   },
+  seasonality: {
+    monthsIn: (p: { timezone: string }) => `Months in ${p.timezone}`,
+    meanByMonth: "Mean power by month",
+    // A thin month still has a bar; an absent one has none. Counted apart, so
+    // one sentence never says nine months are grey when one of them is.
+    thinMonths: (p: { n: number; share: string }) =>
+      plural("en", p.n, {
+        one: `One month is covered by less than ${p.share} of its days and is drawn in grey.`,
+        other: `${p.n} months are covered by less than ${p.share} of their days and are drawn in grey.`,
+      }),
+    partialNotLower:
+      "A month the recorder only saw part of is not a lower month; the figures stand, the " +
+      "comparison does not.",
+    absentMonths: (p: { n: number }) =>
+      plural("en", p.n, {
+        one: "One month has no recorded data at all and carries no bar.",
+        other: `${p.n} months have no recorded data at all and carry no bar.`,
+      }),
+    statisticsFromStart:
+      "Home Assistant keeps long-term statistics only from the moment a sensor starts producing them.",
+    monthByMonth: "Month by month",
+    month: "Month",
+    meanLoad: "Mean load",
+    busiestHour: "Busiest hour",
+    meanPv: "Mean PV",
+    ofTheMonth: "Of the month",
+    busiestHourNote:
+      '"Busiest hour" is the highest hourly average, not the highest load. Beyond the ' +
+      "recorder's retention Home Assistant keeps only an hourly mean, so a brief peak inside an " +
+      "hour has already been averaged away by the time this page sees it.",
+    meanByHour: "Mean power by hour of day",
+    byHourNote:
+      "Averaged across the whole period, so it blends the seasons. The heat map below is the " +
+      "same question asked per month.",
+    hourByMonth: "Hour of day, month by month",
+    heatmapNote:
+      "Where a winter evening peak and a summer midday one stop being two averages and become " +
+      "two shapes. Hours with no recorded data are left blank rather than drawn as zero.",
+  },
+  balance: {
+    hourlyStatistics: "Hourly statistics",
+    daysIn: (p: { timezone: string }) => `Days in ${p.timezone}`,
+    countedUpTo: (p: { time: string }) => `Counted up to ${p.time}`,
+    noEnergyStatistics: "No energy statistics in this period",
+    intoSystem: "into the system",
+    outOfIt: "out of it",
+    inAgainstOut: "In against out",
+    needsAllSix: (p: { missing: string }) =>
+      `The books can only be closed with all six counters mapped. Missing: ${p.missing}. ` +
+      "Until then the difference between the two bars would measure what is not mapped " +
+      "rather than what was lost.",
+    // The balance line, split around the <strong> amount the template holds.
+    // Unaccounted and more-out are two endings, not a word slot.
+    inOut: (p: { in: string; out: string }) => `In ${p.in}, out ${p.out} —`,
+    unaccountedFor: (p: { share: string }) => `unaccounted for (${p.share}).`,
+    moreOutThanIn: (p: { share: string }) => `more out than in (${p.share}).`,
+    unaccountedNote:
+      "Conversion and battery round-trip losses live in this figure, and so does every " +
+      "disagreement between the six meters. It is called unaccounted rather than losses " +
+      "because nothing here can tell heat in the inverter from error in a clamp.",
+    ratiosTitle: "Self-sufficiency and self-consumption",
+    ratiosNeedCounters:
+      "Self-sufficiency needs the house and grid-import counters; self-consumption needs " +
+      "solar and grid export.",
+    selfSufficiency: "Self-sufficiency",
+    selfConsumption: "Self-consumption",
+    dayByDay: "Day by day",
+    noDays: "No days with energy statistics in this period.",
+    dayByDayNote:
+      "Two bars a day: what came in, and what went out. Adding the two together would count " +
+      "the same energy twice. Energy is read from Home Assistant's hourly statistics, which " +
+      "is where counter resets are already accounted for. The current hour is compiled only " +
+      "once it ends, so a period running up to now stops at the last completed hour.",
+  },
   sections: {
     charge: {
       title: "Charging and discharging",

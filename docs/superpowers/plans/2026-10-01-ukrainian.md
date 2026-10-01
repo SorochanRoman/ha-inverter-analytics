@@ -71,6 +71,13 @@
 | load duration curve | крива тривалості навантаження |
 | charging and discharging | заряд і розряд |
 | P95 | P95 |
+| time zone | часовий пояс |
+| recorder (HA) | реєстратор |
+| busiest hour | найнавантаженіша година |
+| heat map | теплова карта |
+| self-sufficiency / self-consumption | самозабезпечення / самоспоживання |
+| unaccounted (energy) | неврахована |
+| bar (chart) | стовпчик |
 
 ---
 
