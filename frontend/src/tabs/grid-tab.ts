@@ -15,6 +15,7 @@ import {
 } from "../format";
 import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
+import { coveredCard, hardestCard, hoursLeftCell, neededCell } from "../reserve";
 import { sectionStyles } from "../sections/shared-styles";
 import type {
   Autonomy,
@@ -220,56 +221,76 @@ export class IaGridTab extends LitElement {
     </table>`;
   }
 
-  private reserveReason(item: OutageEpisode) {
+  private reserveReason(reason: ReserveReason) {
     const reasons: Record<ReserveReason, string> = this.i18n.m.grid.reserveReasons;
-    return html`<span class="hint">${reasons[item.reserve_reason ?? "no_soc"]}</span>`;
+    return html`<span class="hint">${reasons[reason]}</span>`;
+  }
+
+  /** "> 100 %": the need is past what a full battery holds. */
+  private overFull() {
+    return html`<span class="low">&gt; ${formatPercent(1, this.i18n.locale)}</span>`;
   }
 
   private renderHoursLeft(item: OutageEpisode) {
-    if (item.hours_left === null || item.hours_left === undefined) return this.reserveReason(item);
-    if (item.hours_left === 0) return html`<span class="low">${this.i18n.m.grid.didNotLast}</span>`;
-    return formatHours(item.hours_left, this.i18n.locale);
+    const cell = hoursLeftCell(item);
+    switch (cell.kind) {
+      case "reason":
+        return this.reserveReason(cell.reason);
+      case "didNotLast":
+        return html`<span class="low">${this.i18n.m.grid.didNotLast}</span>`;
+      case "hours":
+        return formatHours(cell.hours, this.i18n.locale);
+    }
   }
 
   private renderNeeded(item: OutageEpisode) {
-    if (item.needed_pct === null || item.needed_pct === undefined) return this.reserveReason(item);
-    const value = formatPercent(Math.min(item.needed_pct, 100) / 100, this.i18n.locale);
-    // The space between the spans is the only thing keeping the two apart.
-    return item.needed_pct > 100
-      ? html`<span class="low">&gt; ${value}</span>
-          <span class="hint">${this.i18n.m.grid.moreThanFull}</span>`
-      : value;
+    const cell = neededCell(item);
+    switch (cell.kind) {
+      case "reason":
+        return this.reserveReason(cell.reason);
+      // The whitespace between the spans is what keeps the two words apart.
+      case "over":
+        return html`${this.overFull()}
+          <span class="hint">${this.i18n.m.grid.moreThanFull}</span>`;
+      case "pct":
+        return formatPercent(cell.pct / 100, this.i18n.locale);
+    }
+  }
+
+  private renderHardest(reserve: ReserveSummary) {
+    const m = this.i18n.m;
+    const locale = this.i18n.locale;
+    const card = hardestCard(reserve);
+    if (card.kind === "none") {
+      return html`<span class="value">${DASH}</span>
+        <span class="row"><span>${m.grid.noHardestOutage}</span></span>`;
+    }
+    const date = m.grid.hardestOutageOn({
+      date: new Date(card.start).toLocaleDateString(locale),
+    });
+    return card.kind === "over"
+      ? html`<span class="value">${this.overFull()}</span>
+          <span class="row"><span>${date}</span><span>${m.grid.moreThanFull}</span></span>`
+      : html`<span class="value">${formatPercent(card.pct / 100, locale)}</span>
+          <span class="row"><span>${date}</span></span>`;
   }
 
   private renderReserve(reserve: ReserveSummary, lowPct: number) {
     const m = this.i18n.m;
     const locale = this.i18n.locale;
-    const worst = reserve.worst_needed_pct;
+    const covered = coveredCard(reserve);
     return html`
       <div class="cards">
         <div class="card">
           <span class="name">${m.grid.hardestOutageNeeds}</span>
-          <span class="value"
-            >${worst === null ? DASH : formatPercent(Math.min(worst, 100) / 100, locale)}</span
-          >
-          <span class="row"
-            ><span
-              >${reserve.worst_start === null
-                ? m.grid.noHardestOutage
-                : worst !== null && worst > 100
-                  ? m.grid.moreThanFull
-                  : m.grid.hardestOutageOn({
-                      date: new Date(reserve.worst_start).toLocaleDateString(locale),
-                    })}</span
-            ></span
-          >
+          ${this.renderHardest(reserve)}
         </div>
         <div class="card">
           <span class="name">${m.grid.outagesCovered}</span>
           <span class="value"
-            >${reserve.judged === 0
+            >${covered.kind === "none"
               ? DASH
-              : m.grid.coveredOf({ covered: reserve.covered, judged: reserve.judged })}</span
+              : m.grid.coveredOf({ covered: covered.covered, judged: covered.judged })}</span
           >
           <span class="row"
             ><span>${m.grid.coveredHint({ level: formatPercent(lowPct / 100, locale) })}</span></span

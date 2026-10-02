@@ -89,8 +89,9 @@ beyond pointing the integration at the ones you already have.
   hardest outage's need and how many outages the battery covered — all in
   points of charge, never from the nameplate. An outage cut by the window's
   edge says "at least". A restart of Home Assistant in the middle of an
-  outage does not make two of it. The grid-presence sensor is a binary sensor with no statistics, so a window
-  reaching past the recorder's retention says from which date it counts.
+  outage does not make two of it. The grid-presence sensor is a binary
+  sensor with no statistics, so a window reaching past the recorder's
+  retention says from which date it counts.
 - **Autonomy, read off the battery.** How long the battery would last from
   full and from where it is now, at the discharge rate seen during this
   period's outages — the nameplate capacity is never multiplied into it. It
