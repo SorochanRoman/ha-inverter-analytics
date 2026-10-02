@@ -97,11 +97,11 @@ def wanted_fill(config: EntryConfig, filled: Mapping[str, Any]) -> dict[str, Any
 
     Detection recognises more than any feature asks for — grid power is read
     by the Grid tab only as a fallback, to infer outages when no presence
-    sensor is mapped, so no feature lists it as missing. Raising a repair about a
-    sensor that would change nothing on screen is how a notification area
-    becomes something users learn to scroll past, so the checks are gated on
-    this rather than on the fill itself. The reconfigure form still offers the
-    whole fill: the user is already there, and a stored role costs them
+    sensor is mapped, so no feature lists it as missing. Raising a repair
+    about a sensor that would change nothing on screen is how a notification
+    area becomes something users learn to scroll past, so the checks are gated
+    on this rather than on the fill itself. The reconfigure form still offers
+    the whole fill: the user is already there, and a stored role costs them
     nothing.
     """
     wanted = {role for feature in FEATURES for role in missing_roles(config, feature)}

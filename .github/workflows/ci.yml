@@ -61,3 +61,7 @@ jobs:
       # repository. A source change without a rebuild would ship the old panel.
       - name: Check that the committed bundle matches the source
         run: git diff --exit-code -- ../custom_components/inverter_analytics/frontend/dist
+      # git diff ignores untracked files, so a new chunk the build emitted
+      # alongside the bundle would pass the step above unnoticed.
+      - name: Check that the build left no untracked files in the bundle folder
+        run: test -z "$(git status --porcelain -- ../custom_components/inverter_analytics/frontend/dist)"

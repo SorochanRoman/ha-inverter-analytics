@@ -74,9 +74,8 @@ def _check_unmapped_sensors(hass: HomeAssistant, entry: ConfigEntry, config: Ent
     # Grid power is detected and stored, but the Grid tab reads it only as a
     # fallback when no presence sensor is mapped, so no feature lists it as
     # missing. A card about it would be a notification the user learns to
-    # dismiss without reading, and
-    # that habit is expensive to have taught them by the time something does
-    # matter.
+    # dismiss without reading, and that habit is expensive to have taught them
+    # by the time something does matter.
     filled = wanted_fill(config, fill(classify(cluster, grid_candidates(sensors)), config))
     if not filled:
         _resolve(hass, UNMAPPED_SENSORS, entry)

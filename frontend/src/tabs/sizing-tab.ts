@@ -24,7 +24,6 @@ import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "../ve
 
 const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
-
 /** 2026-03 → "Mar 2026", in the reader's language. */
 function monthName(key: string, locale: string): string {
   const [year, month] = key.split("-").map(Number);
