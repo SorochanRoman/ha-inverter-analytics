@@ -48,9 +48,9 @@ def test_clusters_are_ordered_by_size_so_the_main_inverter_comes_first():
 def test_a_device_id_groups_sensors_that_share_no_prefix():
     """Integrations that register a device are grouped by it, not by name."""
     sensors = (
-        SensorInfo("sensor.alpha_output", "power", "W", "measurement", device_id="dev1"),
-        SensorInfo("sensor.beta_output", "power", "W", "measurement", device_id="dev1"),
-        SensorInfo("sensor.gamma_output", "power", "W", "measurement", device_id="dev1"),
+        SensorInfo("sensor.alpha_output", "power", "measurement", device_id="dev1"),
+        SensorInfo("sensor.beta_output", "power", "measurement", device_id="dev1"),
+        SensorInfo("sensor.gamma_output", "power", "measurement", device_id="dev1"),
     )
     clusters = cluster_sensors(sensors)
     assert len(clusters) == 1
@@ -61,13 +61,13 @@ def test_a_device_backed_cluster_is_labelled_with_the_device_name():
     """The plan's done-criterion asks for the inverter by name, not by device_id."""
     sensors = (
         SensorInfo(
-            "sensor.alpha_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+            "sensor.alpha_output", "power", "measurement", "dev1", device_name="Deye SUN-12K"
         ),
         SensorInfo(
-            "sensor.beta_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+            "sensor.beta_output", "power", "measurement", "dev1", device_name="Deye SUN-12K"
         ),
         SensorInfo(
-            "sensor.gamma_output", "power", "W", "measurement", "dev1", device_name="Deye SUN-12K"
+            "sensor.gamma_output", "power", "measurement", "dev1", device_name="Deye SUN-12K"
         ),
     )
     clusters = cluster_sensors(sensors)
@@ -77,9 +77,9 @@ def test_a_device_backed_cluster_is_labelled_with_the_device_name():
 
 def test_a_device_backed_cluster_falls_back_to_the_key_without_a_device_name():
     sensors = (
-        SensorInfo("sensor.alpha_output", "power", "W", "measurement", device_id="dev1"),
-        SensorInfo("sensor.beta_output", "power", "W", "measurement", device_id="dev1"),
-        SensorInfo("sensor.gamma_output", "power", "W", "measurement", device_id="dev1"),
+        SensorInfo("sensor.alpha_output", "power", "measurement", device_id="dev1"),
+        SensorInfo("sensor.beta_output", "power", "measurement", device_id="dev1"),
+        SensorInfo("sensor.gamma_output", "power", "measurement", device_id="dev1"),
     )
     clusters = cluster_sensors(sensors)
     assert clusters[0].label == "Dev1"
@@ -87,8 +87,8 @@ def test_a_device_backed_cluster_falls_back_to_the_key_without_a_device_name():
 
 def test_a_group_too_small_to_be_an_inverter_is_dropped():
     sensors = (
-        SensorInfo("sensor.lonely_power", "power", "W", "measurement", device_id=None),
-        SensorInfo("sensor.lonely_energy", "energy", "kWh", "total_increasing", device_id=None),
+        SensorInfo("sensor.lonely_power", "power", "measurement", device_id=None),
+        SensorInfo("sensor.lonely_energy", "energy", "total_increasing", device_id=None),
     )
     assert cluster_sensors(sensors) == []
 
@@ -96,11 +96,11 @@ def test_a_group_too_small_to_be_an_inverter_is_dropped():
 def test_a_three_sensor_appliance_is_not_offered_as_an_inverter():
     """Power plus daily and monthly energy is the shape of any monitored appliance."""
     appliance = tuple(
-        SensorInfo(f"sensor.dishwasher_{name}", device_class, unit, state_class, device_id=None)
-        for name, device_class, unit, state_class in (
-            ("current_consumption", "power", "W", "measurement"),
-            ("today_s_consumption", "energy", "kWh", "total_increasing"),
-            ("this_month_s_consumption", "energy", "kWh", "total_increasing"),
+        SensorInfo(f"sensor.dishwasher_{name}", device_class, state_class, device_id=None)
+        for name, device_class, state_class in (
+            ("current_consumption", "power", "measurement"),
+            ("today_s_consumption", "energy", "total_increasing"),
+            ("this_month_s_consumption", "energy", "total_increasing"),
         )
     )
     assert cluster_sensors(appliance) == []
@@ -109,11 +109,11 @@ def test_a_three_sensor_appliance_is_not_offered_as_an_inverter():
 def test_the_same_three_sensors_are_trusted_when_a_device_vouches_for_them():
     """A registered device is evidence; a shared prefix is only a guess."""
     vouched = tuple(
-        SensorInfo(f"sensor.dishwasher_{name}", device_class, unit, state_class, device_id="dev9")
-        for name, device_class, unit, state_class in (
-            ("current_consumption", "power", "W", "measurement"),
-            ("today_s_consumption", "energy", "kWh", "total_increasing"),
-            ("this_month_s_consumption", "energy", "kWh", "total_increasing"),
+        SensorInfo(f"sensor.dishwasher_{name}", device_class, state_class, device_id="dev9")
+        for name, device_class, state_class in (
+            ("current_consumption", "power", "measurement"),
+            ("today_s_consumption", "energy", "total_increasing"),
+            ("this_month_s_consumption", "energy", "total_increasing"),
         )
     )
     assert len(cluster_sensors(vouched)) == 1
@@ -124,7 +124,6 @@ def test_a_binary_sensor_never_joins_a_cluster_even_with_a_power_class():
     binary = SensorInfo(
         entity_id="binary_sensor.solarman_grid_connected",
         device_class="power",
-        unit=None,
         state_class=None,
         device_id=None,
     )

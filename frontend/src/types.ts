@@ -137,9 +137,6 @@ export interface FeatureInfo {
 export interface EntryInfo {
   entry_id: string;
   title: string;
-  entities: Record<string, string[]>;
-  numbers: Record<string, number>;
-  inverted: string[];
   features: FeatureInfo[];
 }
 
@@ -278,13 +275,9 @@ export interface BalancePayload {
   days: BalanceDay[];
   covered_start: string | null;
   covered_end: string | null;
-  window_start: string;
-  window_end: string;
   covers_whole_window: boolean;
   entities: Record<string, string>;
   timezone: string;
-  precision: Precision;
-  boundary: string | null;
   window: { start: string; end: string };
   clamped: boolean;
 }
@@ -444,8 +437,6 @@ export interface SizingPayload {
   covered_end: string | null;
   covers_whole_window: boolean;
   timezone: string;
-  precision: Precision;
-  boundary: string | null;
   window: { start: string; end: string };
   clamped: boolean;
 }

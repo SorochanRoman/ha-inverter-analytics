@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { formatEnergy, formatPercent, formatPower } from "../format";
+import { DASH, formatEnergy, formatPercent, formatPower } from "../format";
 import { I18nController } from "../i18n/controller";
 import type { ChargeFlow } from "../types";
 import { sectionStyles } from "./shared-styles";
@@ -67,7 +67,7 @@ export class IaChargeSection extends LitElement {
             <span class="name">${t.fullCyclesPerDay}</span>
             <span class="value">
               ${flow.cycles_per_day === null
-                ? "—"
+                ? DASH
                 : new Intl.NumberFormat(this.locale, { maximumFractionDigits: 2 }).format(
                     flow.cycles_per_day,
                   )}

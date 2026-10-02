@@ -45,9 +45,6 @@ class SensorInfo:
 
     entity_id: str
     device_class: str | None
-    # Collected as a guard for plan 2, against e.g. a kW sensor being read as
-    # W; nothing in this module reads it yet.
-    unit: str | None
     state_class: str | None
     device_id: str | None
     device_name: str | None = None
@@ -164,7 +161,6 @@ def collect_sensors(hass: HomeAssistant) -> list[SensorInfo]:
             SensorInfo(
                 entity_id=state.entity_id,
                 device_class=state.attributes.get("device_class"),
-                unit=state.attributes.get("unit_of_measurement"),
                 state_class=state.attributes.get("state_class"),
                 device_id=device_id,
                 device_name=(device.name_by_user or device.name) if device else None,

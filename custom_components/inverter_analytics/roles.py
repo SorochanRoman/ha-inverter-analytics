@@ -109,23 +109,27 @@ class Feature:
     alternatives: tuple[tuple[str, ...], ...] = ()
 
 
-# The six energy counters are named here rather than imported from
-# analytics.balance, which imports this module; test_roles asserts the two
-# lists stay identical.
-_BALANCE_COUNTERS = (
+# The six energy counters of the Balance tab, split by which side of the books
+# they belong to. Order is the order they appear on screen. They live here
+# rather than in analytics.balance, which imports this module, so the feature
+# below gates the tab on exactly the counters the tab reads.
+BALANCE_SOURCE_ROLES: tuple[str, ...] = (
     "pv_energy_total",
     "grid_import_total",
     "battery_discharge_total",
+)
+BALANCE_SINK_ROLES: tuple[str, ...] = (
     "load_energy_total",
     "grid_export_total",
     "battery_charge_total",
 )
+BALANCE_FLOW_ROLES: tuple[str, ...] = BALANCE_SOURCE_ROLES + BALANCE_SINK_ROLES
 
 FEATURES: tuple[Feature, ...] = (
     Feature("load", "Load analytics", ("load_power", "rated_power")),
     Feature("battery", "Battery analytics", ("battery_soc",)),
     Feature("seasonal", "Seasonality", ("load_power",)),
-    Feature("balance", "Energy balance", _BALANCE_COUNTERS, needs_all=False),
+    Feature("balance", "Energy balance", BALANCE_FLOW_ROLES, needs_all=False),
     Feature(
         "grid",
         "Grid outages",
@@ -261,11 +265,6 @@ def entity_roles() -> tuple[Role, ...]:
 def number_roles() -> tuple[Role, ...]:
     """Roles that are set as a number in the configuration."""
     return tuple(role for role in ROLES if role.kind is RoleKind.NUMBER)
-
-
-def required_role_keys() -> frozenset[str]:
-    """Keys of the required roles."""
-    return frozenset(role.key for role in ROLES if role.required)
 
 
 @dataclass(frozen=True, slots=True)

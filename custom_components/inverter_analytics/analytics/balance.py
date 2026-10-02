@@ -13,22 +13,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from ..roles import EntryConfig
+from ..roles import BALANCE_FLOW_ROLES, BALANCE_SINK_ROLES, BALANCE_SOURCE_ROLES, EntryConfig
 from .source import EnergySeries, Window, async_energy_many
-
-# The flows, split by which side of the books they belong to. Order is the order
-# they appear on screen.
-SOURCE_ROLES: tuple[str, ...] = (
-    "pv_energy_total",
-    "grid_import_total",
-    "battery_discharge_total",
-)
-SINK_ROLES: tuple[str, ...] = (
-    "load_energy_total",
-    "grid_export_total",
-    "battery_charge_total",
-)
-FLOW_ROLES: tuple[str, ...] = SOURCE_ROLES + SINK_ROLES
 
 # Below this a ratio is arithmetic noise: a night with 0.02 kWh of production
 # has no meaningful self-consumption, and a number there would be a claim.
@@ -69,9 +55,9 @@ def build_balance_payload(
     """Totals, the balance, the two ratios and a day-by-day breakdown."""
     totals = {role: series.total for role, series in flows.items()}
 
-    sources = sum(totals.get(role, 0.0) for role in SOURCE_ROLES)
-    sinks = sum(totals.get(role, 0.0) for role in SINK_ROLES)
-    complete = all(role in flows for role in FLOW_ROLES)
+    sources = sum(totals.get(role, 0.0) for role in BALANCE_SOURCE_ROLES)
+    sinks = sum(totals.get(role, 0.0) for role in BALANCE_SINK_ROLES)
+    complete = all(role in flows for role in BALANCE_FLOW_ROLES)
 
     daily: dict[str, dict[str, float]] = defaultdict(dict)
     for role, series in flows.items():
@@ -85,8 +71,8 @@ def build_balance_payload(
 
     return {
         "totals": totals,
-        "mapped": [role for role in FLOW_ROLES if role in flows],
-        "missing": [role for role in FLOW_ROLES if role not in flows],
+        "mapped": [role for role in BALANCE_FLOW_ROLES if role in flows],
+        "missing": [role for role in BALANCE_FLOW_ROLES if role not in flows],
         "sources_total": sources,
         "sinks_total": sinks,
         # Only with all six. With one missing the difference measures the
@@ -110,8 +96,6 @@ def build_balance_payload(
         ],
         "covered_start": covered_start.isoformat() if covered_start else None,
         "covered_end": covered_end.isoformat() if covered_end else None,
-        "window_start": window.start.isoformat(),
-        "window_end": window.end.isoformat(),
         # Hourly statistics are compiled at the end of each hour, so a window
         # ending now is short by up to one of them. Saying so beats quietly
         # returning "today's energy" that stops fifty minutes ago.
@@ -129,7 +113,9 @@ async def async_balance_analytics(
 ) -> dict[str, Any]:
     """Read the counters and compute the energy balance."""
     mapped = {
-        role: entity_id for role in FLOW_ROLES if (entity_id := config.entity_id(role)) is not None
+        role: entity_id
+        for role in BALANCE_FLOW_ROLES
+        if (entity_id := config.entity_id(role)) is not None
     }
     if not mapped:
         raise ValueError("no energy counters are configured")
@@ -144,9 +130,4 @@ async def async_balance_analytics(
     payload = build_balance_payload(flows, tz=zone, window=window)
     payload["entities"] = mapped
     payload["timezone"] = str(zone)
-    # Counters are read from statistics whatever the window, so there is no
-    # precision choice to report — but the badge exists on every other tab and
-    # its absence here would look like an omission rather than a decision.
-    payload["precision"] = "lts"
-    payload["boundary"] = None
     return payload

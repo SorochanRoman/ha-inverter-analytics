@@ -4,7 +4,6 @@ import pytest
 
 from custom_components.inverter_analytics.roles import (
     FEATURES,
-    FEATURES_BY_KEY,
     ROLES,
     ROLES_BY_KEY,
     EntryConfig,
@@ -13,7 +12,6 @@ from custom_components.inverter_analytics.roles import (
     feature_availability,
     number_roles,
     part_identities,
-    required_role_keys,
     tuning_role_keys,
 )
 
@@ -30,10 +28,6 @@ def test_rated_power_is_a_number_not_an_entity():
     assert role.kind is RoleKind.NUMBER
     assert role in number_roles()
     assert role not in entity_roles()
-
-
-def test_only_load_power_and_rated_power_are_required():
-    assert required_role_keys() == frozenset({"load_power", "rated_power"})
 
 
 def test_battery_and_grid_power_are_invertible_pv_is_not():
@@ -242,18 +236,6 @@ def test_a_stored_number_that_is_not_a_number_names_its_role():
     """A stored entry can hold whatever a past version wrote."""
     with pytest.raises(ValueError, match="rated_power"):
         EntryConfig.from_dict({"numbers": {"rated_power": "twelve"}})
-
-
-def test_the_balance_feature_lists_exactly_the_counters_balance_reads():
-    """roles.py cannot import the analytics module that imports it.
-
-    So the six counters are written out twice, and the copy here is the one
-    the panel gates the tab on. If they drift, the tab either opens on an
-    entry that cannot fill it or stays shut on one that can.
-    """
-    from custom_components.inverter_analytics.analytics.balance import FLOW_ROLES
-
-    assert set(FEATURES_BY_KEY["balance"].requires) == set(FLOW_ROLES)
 
 
 def test_a_feature_needing_every_role_is_unavailable_until_it_has_them_all():

@@ -5,6 +5,7 @@ import { socBandsOption, socHistogramOption } from "../charts/options";
 import "../charts/echart";
 import "../sections/charge-section";
 import {
+  DASH,
   coverageWarning,
   describeError,
   formatDuration,
@@ -81,7 +82,6 @@ export class IaBatteryTab extends LitElement {
     const m = this.i18n.m;
     const locale = this.i18n.locale;
     const measurable = payload.dips_measurable;
-    const dash = "—";
 
     const cells: [string, string, string][] = [
       [
@@ -91,22 +91,22 @@ export class IaBatteryTab extends LitElement {
       ],
       [
         m.battery.lowestCharge,
-        measurable ? formatPercent(pct(payload.kpi.min_soc), locale) : dash,
+        measurable ? formatPercent(pct(payload.kpi.min_soc), locale) : DASH,
         measurable ? m.battery.exactDataOnly : m.battery.needsExactData,
       ],
       [
         m.battery.below({ level: formatPercent(pct(payload.low_pct), locale) }),
-        measurable ? formatDuration(payload.kpi.seconds_below_low, locale) : dash,
+        measurable ? formatDuration(payload.kpi.seconds_below_low, locale) : DASH,
         measurable ? m.battery.exactDataOnly : m.battery.needsExactData,
       ],
       [
         m.battery.dips,
-        measurable ? String(payload.kpi.dip_count) : dash,
+        measurable ? String(payload.kpi.dip_count) : DASH,
         measurable ? m.battery.lastingOverMinute : m.battery.needsExactData,
       ],
       [
         m.battery.meanLowPoint,
-        measurable ? formatPercent(pct(payload.kpi.mean_low_point), locale) : dash,
+        measurable ? formatPercent(pct(payload.kpi.mean_low_point), locale) : DASH,
         measurable ? m.battery.acrossThoseDips : m.battery.needsExactData,
       ],
     ];

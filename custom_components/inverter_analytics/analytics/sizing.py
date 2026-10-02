@@ -504,8 +504,4 @@ async def async_sizing_analytics(
         if entity_id
     }
     payload["timezone"] = str(zone)
-    # Statistics whatever the window: there is no precision choice to report,
-    # but the badge exists on every tab and its absence would look like an omission.
-    payload["precision"] = "lts"
-    payload["boundary"] = None
     return payload

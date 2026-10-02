@@ -16,7 +16,6 @@ def sensor(entity_id: str, device_class: str = "power", state_class: str | None 
     return SensorInfo(
         entity_id=entity_id,
         device_class=device_class,
-        unit="W",
         state_class=state_class,
         device_id=None,
     )
@@ -69,7 +68,7 @@ def test_the_two_ct_sets_become_a_question_not_a_guess():
 def test_a_lone_external_ct_set_is_mapped_to_the_grid():
     """The external clamp set is described as the grid connection, so it is safe to assume."""
     sensors = tuple(
-        SensorInfo(f"sensor.inv_external_ct_l{phase}_power", "power", "W", "measurement", None)
+        SensorInfo(f"sensor.inv_external_ct_l{phase}_power", "power", "measurement", None)
         for phase in (1, 2, 3)
     )
     detection = classify(Cluster(key="inv", label="Inv", sensors=sensors))
@@ -84,7 +83,7 @@ def test_a_lone_external_ct_set_is_mapped_to_the_grid():
 def test_a_lone_internal_ct_set_is_left_unmapped():
     """CT_CHOICES describes the internal set as the inverter's own measurement, not the grid."""
     sensors = tuple(
-        SensorInfo(f"sensor.inv_internal_ct_l{phase}_power", "power", "W", "measurement", None)
+        SensorInfo(f"sensor.inv_internal_ct_l{phase}_power", "power", "measurement", None)
         for phase in (1, 2, 3)
     )
     detection = classify(Cluster(key="inv", label="Inv", sensors=sensors))
@@ -183,7 +182,7 @@ def test_the_ct_question_carries_the_field_it_is_asked_through():
 
 def binary(entity_id: str, device_class: str | None = None) -> SensorInfo:
     return SensorInfo(
-        entity_id=entity_id, device_class=device_class, unit=None, state_class=None, device_id=None
+        entity_id=entity_id, device_class=device_class, state_class=None, device_id=None
     )
 
 

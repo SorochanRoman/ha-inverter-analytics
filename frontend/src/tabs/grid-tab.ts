@@ -4,6 +4,7 @@ import { fetchGrid } from "../api";
 import { outageDaysOption, outageHoursOption } from "../charts/options";
 import "../charts/echart";
 import {
+  DASH,
   coverageWarning,
   describeError,
   formatCoverage,
@@ -26,8 +27,6 @@ import type {
   ReserveReason,
   ReserveSummary,
 } from "../types";
-
-const DASH = "—";
 
 function formatHours(hours: number | null, locale: string): string {
   if (hours === null) return DASH;

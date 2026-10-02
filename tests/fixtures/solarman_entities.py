@@ -59,6 +59,6 @@ _RAW: tuple[tuple[str, str | None, str | None, str | None], ...] = (
 )
 
 SOLARMAN_SENSORS: tuple[SensorInfo, ...] = tuple(
-    SensorInfo(entity_id=e, device_class=d, unit=u, state_class=s, device_id=None)
-    for e, d, u, s in _RAW
+    SensorInfo(entity_id=e, device_class=d, state_class=s, device_id=None)
+    for e, d, _unit, s in _RAW
 )

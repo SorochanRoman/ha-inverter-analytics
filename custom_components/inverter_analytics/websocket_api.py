@@ -74,9 +74,6 @@ def ws_config(
             {
                 "entry_id": entry.entry_id,
                 "title": entry.title,
-                "entities": {role: list(ids) for role, ids in config.entities.items()},
-                "numbers": dict(config.numbers),
-                "inverted": sorted(config.inverted),
                 # Which tabs this entry can actually fill, and what each one
                 # is short of. The panel used to render all four regardless
                 # and let the analytics raise, so an inverter with no battery

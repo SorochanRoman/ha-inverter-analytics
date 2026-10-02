@@ -1,4 +1,4 @@
-"""Check async_series against a live recorder."""
+"""Check the recorder reads against a live recorder."""
 
 from datetime import timedelta
 from unittest.mock import patch
@@ -16,14 +16,13 @@ from custom_components.inverter_analytics.analytics.source import (
     PrecisionPlan,
     Window,
     async_energy_many,
-    async_series,
     async_series_many,
 )
 
 MODULE = "custom_components.inverter_analytics.analytics.source"
 
 
-async def test_async_series_reads_recorded_states(
+async def test_async_series_many_reads_recorded_states(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
     hass.states.async_set("sensor.load_power", "1000")
@@ -33,7 +32,8 @@ async def test_async_series_reads_recorded_states(
 
     now = dt_util.utcnow()
     window = Window(now - timedelta(hours=1), now + timedelta(seconds=1))
-    series = await async_series(hass, "sensor.load_power", window)
+    results = await async_series_many(hass, ["sensor.load_power"], window)
+    series = results["sensor.load_power"].series
 
     values = [interval.value for interval in to_intervals(series)]
     assert 1000.0 in values

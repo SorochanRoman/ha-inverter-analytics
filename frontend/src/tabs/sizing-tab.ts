@@ -2,6 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchSizing } from "../api";
 import {
+  DASH,
   describeError,
   formatCoverage,
   formatEnergy,
@@ -23,7 +24,6 @@ import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "../ve
 
 const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
-const DASH = "—";
 
 /** 2026-03 → "Mar 2026", in the reader's language. */
 function monthName(key: string, locale: string): string {

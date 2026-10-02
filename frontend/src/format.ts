@@ -2,7 +2,8 @@ import type { Messages } from "./i18n/en";
 import { messagesForLocale } from "./i18n/lang";
 import type { Precision } from "./types";
 
-const DASH = "—";
+/** What a cell shows when there is no value to show. */
+export const DASH = "—";
 
 export function formatPower(value: number | null, locale: string): string {
   if (value === null || Number.isNaN(value)) return DASH;

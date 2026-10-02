@@ -95,8 +95,9 @@ def _with_fill(config: EntryConfig, filled: Mapping[str, Any]) -> EntryConfig:
 def wanted_fill(config: EntryConfig, filled: Mapping[str, Any]) -> dict[str, Any]:
     """The part of a fill that some feature is actually waiting on.
 
-    Detection recognises more than the analytics currently read — grid power
-    is mapped and stored and drives nothing yet. Raising a repair about a
+    Detection recognises more than any feature asks for — grid power is read
+    by the Grid tab only as a fallback, to infer outages when no presence
+    sensor is mapped, so no feature lists it as missing. Raising a repair about a
     sensor that would change nothing on screen is how a notification area
     becomes something users learn to scroll past, so the checks are gated on
     this rather than on the fill itself. The reconfigure form still offers the

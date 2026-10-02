@@ -281,9 +281,9 @@ puts a coverage figure on every card and not only on the month row: the row is
 as covered as its best-covered sensor, counters included, so one sensor with a
 full month of rows would otherwise vouch for a card read from twelve days.
 
-**The units guard.** `SensorInfo.unit` is still collected and still unread. A
-kW-reporting sensor mapped to a W role is off by a thousand, and detection could
-refuse it or convert it; neither is written.
+**The units guard.** Detection does not read a sensor's unit. A kW-reporting
+sensor mapped to a W role is off by a thousand, and detection could refuse it
+or convert it; neither is written.
 
 **Detection breadth.** The patterns were read off a live StephanJoubert
 Solarman instance. Other vendors fall back to manual mapping. A shared name

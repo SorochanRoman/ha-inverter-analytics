@@ -469,14 +469,6 @@ async def async_series_many(
     return results
 
 
-async def async_series(
-    hass: HomeAssistant, entity_id: str, window: Window, sign: float = 1.0
-) -> Series:
-    """Build a series of states for a window, automatically choosing the source."""
-    results = await async_series_many(hass, [entity_id], window, {entity_id: sign})
-    return results[entity_id].series
-
-
 async def async_binary_series(hass: HomeAssistant, entity_id: str, window: Window) -> Series:
     """A binary sensor's states over a window, from raw states only.
 
