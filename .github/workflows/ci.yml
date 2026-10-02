@@ -57,3 +57,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+      # The bundle is committed, because HACS installs straight from the
+      # repository. A source change without a rebuild would ship the old panel.
+      - name: Check that the committed bundle matches the source
+        run: git diff --exit-code -- ../custom_components/inverter_analytics/frontend/dist
