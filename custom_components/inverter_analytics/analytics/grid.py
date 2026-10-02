@@ -239,17 +239,20 @@ def _battery_columns(
     moments, which is what the recorder means by a state; nothing is
     interpolated across an outage. The minimum is real: this works from raw
     states, so a fall to 8% for twenty minutes is an 8%, not the 34% an hourly
-    mean would make of it.
+    mean would make of it. ``soc_min_at`` is when that minimum was first
+    reached: the start of the first interval holding it, clipped to the start
+    of the outage.
     """
     columns: dict[str, Any] = {}
     if soc is not None:
         part = to_intervals(_between(soc, outage.start, outage.end))
-        lowest = min((item.value for item in part), default=None)
+        lowest = min(part, key=lambda item: item.value, default=None)
         columns |= {
             "soc_start": _in_force(soc, outage.start),
             "soc_end": _in_force(soc, outage.end),
-            "soc_min": lowest,
-            "below_low": None if lowest is None else lowest < low_pct,
+            "soc_min": None if lowest is None else lowest.value,
+            "soc_min_at": None if lowest is None else lowest.start.isoformat(),
+            "below_low": None if lowest is None else lowest.value < low_pct,
         }
     if load is not None:
         part = to_intervals(_between(load, outage.start, outage.end))
@@ -260,26 +263,35 @@ def _battery_columns(
 def reserve_columns(episode: Mapping[str, Any], low_pct: float) -> dict[str, Any]:
     """How much longer one outage could have run, and what it needed at the start.
 
-    Read in points of charge at that outage's own rate, never multiplied out
-    of a nameplate capacity. Withheld with the reason when the outage cannot
-    say: no charge at one end, an outage the period cuts, one the sun covered,
-    or one too short for its rate to mean anything.
+    Read from the lowest charge of the outage, not the charge it ended on: the
+    charge can recover inside an outage once the sun is up, and a night outage
+    that runs into the morning would otherwise look as if it never came near
+    the mark. The drop is from the start to that minimum, at the rate it took
+    to get there; what the outage needed at its start is the mark plus that
+    drop. Read in points of charge, never multiplied out of a nameplate
+    capacity. Withheld with the reason when the outage cannot say: no charge
+    reading, an outage the period cuts, one the sun covered, or one too short
+    for its rate to mean anything.
     """
     start = episode.get("soc_start")
-    end = episode.get("soc_end")
+    lowest = episode.get("soc_min")
+    lowest_at = episode.get("soc_min_at")
     withheld: dict[str, Any] = {"hours_left": None, "needed_pct": None}
-    if start is None or end is None:
+    if start is None or lowest is None or lowest_at is None:
         return withheld | {"reserve_reason": "no_soc"}
     if episode["started_before_window"] or episode["ongoing"]:
         return withheld | {"reserve_reason": "cut"}
-    drop = start - end
+    drop = start - lowest
+    elapsed = (
+        datetime.fromisoformat(lowest_at) - datetime.fromisoformat(episode["start"])
+    ).total_seconds()
     if drop <= 0:
         return withheld | {"reserve_reason": "no_net_discharge"}
-    if episode["seconds"] < RESERVE_MIN_SECONDS or drop < RESERVE_MIN_DROP_PCT:
+    if elapsed < RESERVE_MIN_SECONDS or drop < RESERVE_MIN_DROP_PCT:
         return withheld | {"reserve_reason": "too_short"}
-    rate = drop / (episode["seconds"] / SECONDS_PER_HOUR)
+    rate = drop / (elapsed / SECONDS_PER_HOUR)
     return {
-        "hours_left": max(0.0, end - low_pct) / rate,
+        "hours_left": 0.0 if lowest < low_pct else (lowest - low_pct) / rate,
         "needed_pct": low_pct + drop,
         "reserve_reason": None,
     }

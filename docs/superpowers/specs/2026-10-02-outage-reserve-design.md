@@ -29,12 +29,23 @@ changes there.
 
 A pure function in `analytics/grid.py`, `reserve_columns(episode, low_pct)`,
 takes one episode dict as `build_grid_payload` builds it and returns the
-columns to add. For an episode with a charge at both ends:
+columns to add. The episode carries, besides `soc_start` and `soc_min`,
+`soc_min_at`: the ISO time the lowest charge was first reached inside the
+outage — the start of the first interval holding the minimum, clipped to
+the outage start; `None` when `soc_min` is `None`. Then:
 
-- `drop` = `soc_start − soc_end`, in percentage points;
-- `rate` = `drop ÷ (seconds ÷ 3600)`, points per hour;
-- `hours_left` = `max(0, soc_end − low_pct) ÷ rate`;
+- `drop` = `soc_start − soc_min`, in percentage points;
+- `elapsed` = `soc_min_at − start`, in seconds;
+- `rate` = `drop ÷ (elapsed ÷ 3600)`, points per hour;
+- `hours_left` = `0` when `soc_min < low_pct`, else
+  `(soc_min − low_pct) ÷ rate`;
 - `needed_pct` = `low_pct + drop`, which may exceed 100.
+
+The minimum is used, not the end: the charge can recover inside an outage
+once the sun is up, and a night outage running into the morning would
+otherwise look as if it had never come near the mark. `needed_pct` is then
+exactly the charge it would have taken at the start to get through that
+same outage without going below the low mark. `soc_end` is not used.
 
 Everything is in points of charge. The nameplate capacity is never
 multiplied in, as with the existing autonomy.
@@ -43,10 +54,10 @@ Withheld — both figures `None` and `reserve_reason` set — in this order:
 
 | Reason | When |
 |---|---|
-| `no_soc` | `soc_start` or `soc_end` is `None` or absent |
+| `no_soc` | `soc_start`, `soc_min` or `soc_min_at` is `None` or absent |
 | `cut` | `started_before_window` or `ongoing`: the true drop is not visible |
-| `no_net_discharge` | `drop ≤ 0`: the sun or a charge covered the outage |
-| `too_short` | `seconds < RESERVE_MIN_SECONDS` (1800) or `drop < RESERVE_MIN_DROP_PCT` (2): with a 1 % SoC step the rate is noise |
+| `no_net_discharge` | `drop ≤ 0`: the charge never fell below where it started; the sun or a charge covered the outage |
+| `too_short` | `elapsed < RESERVE_MIN_SECONDS` (1800) or `drop < RESERVE_MIN_DROP_PCT` (2): with a 1 % SoC step the rate is noise |
 
 Otherwise `reserve_reason` is `None`. The returned dict always has the three
 keys `hours_left`, `needed_pct`, `reserve_reason` when a SoC sensor is
@@ -74,7 +85,7 @@ In the outage table, when `has_soc`, two columns after *At end*:
   `formatPercent`). `hours_left` of 0 with `below_low` reads "did not last";
   `needed_pct > 100` reads "> 100%" with a hint "more than a full battery".
 - A withheld figure renders a short reason in the cell, in quiet text, the
-  way the Sizing tab's month cells do: "no charge data", "outage cut by the
+  way the Sizing tab's month cells do: "no charge data", "cut by the
   period", "sun covered it", "too short to judge".
 
 In the Autonomy section, two cards:
@@ -93,7 +104,7 @@ All strings go into `en.ts` and `uk.ts`; types in `types.ts`
 ## 6. Tests
 
 - Python, `tests/test_grid.py`: `reserve_columns` for a normal outage, each
-  reason, the thresholds at their edges, `soc_end` below the low mark
+  reason, the thresholds at their edges, `soc_min` below the low mark
   (`hours_left` 0), `needed_pct` above 100; `reserve_summary` with and
   without figures; `build_grid_payload` carries the columns only with a SoC
   sensor, and always carries `reserve`.

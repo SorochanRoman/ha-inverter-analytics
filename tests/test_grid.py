@@ -262,6 +262,28 @@ def test_the_reserve_is_on_the_episodes_only_with_a_charge_sensor():
     }
 
 
+def test_the_lowest_charge_carries_the_moment_it_was_first_reached():
+    grid = grid_series((0, 1.0), (60, 0.0), (220, 1.0))
+    soc = soc_series((0, 80.0), (90, 60.0), (120, 30.0), (150, 45.0), (200, 30.0))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_min"] == 30.0
+    assert episode["soc_min_at"] == at(120).isoformat()
+
+
+def test_a_lowest_charge_in_force_at_the_start_is_clipped_to_the_start():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, 40.0), (30, 30.0), (100, 50.0))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_min_at"] == at(60).isoformat()
+
+
+def test_no_lowest_charge_has_no_moment():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, None))
+    episode = build(grid, soc=soc)["episodes"][0]
+    assert episode["soc_min"] is None and episode["soc_min_at"] is None
+
+
 def test_autonomy_reads_the_discharge_rate_off_the_outages():
     # Two outages, an hour each; 20 points lost in the first, 10 in the second.
     grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (210, 1.0))
@@ -370,6 +392,7 @@ def outage(**overrides):
         "soc_start": 80.0,
         "soc_end": 50.0,
         "soc_min": 50.0,
+        "soc_min_at": at(180).isoformat(),
     }
     return base | overrides
 
@@ -390,25 +413,70 @@ def test_a_battery_that_went_below_the_mark_had_no_hours_left():
     assert columns["needed_pct"] == 85.0
 
 
+def test_a_dip_that_recovered_still_counts_from_the_lowest_charge():
+    # A night outage into the morning sun: 60 -> 15 by 4 h in, back to 40 at
+    # the end. It went below the 20% mark, so it needed 20 + 45 = 65%.
+    dip = outage(
+        seconds=6 * 3600.0,
+        soc_start=60.0,
+        soc_min=15.0,
+        soc_min_at=at(240).isoformat(),
+        soc_end=40.0,
+    )
+    columns = reserve_columns(dip, 20.0)
+    assert columns["hours_left"] == 0.0
+    assert columns["needed_pct"] == 65.0
+    assert columns["reserve_reason"] is None
+
+
+def test_hours_left_are_read_at_the_rate_down_to_the_lowest_charge():
+    # 80 -> 50 in the first 2 h is 15 points an hour; 30 points above the
+    # mark is 2 more hours, whatever the sun did after.
+    recovered = outage(
+        seconds=5 * 3600.0,
+        soc_min=50.0,
+        soc_min_at=at(120).isoformat(),
+        soc_end=70.0,
+    )
+    assert reserve_columns(recovered, 20.0) == {
+        "hours_left": 2.0,
+        "needed_pct": 50.0,
+        "reserve_reason": None,
+    }
+
+
+def test_no_net_discharge_is_judged_on_the_lowest_charge_not_the_end():
+    flat = outage(soc_min=80.0, soc_min_at=at(0).isoformat(), soc_end=50.0)
+    assert reserve_columns(flat, 20.0)["reserve_reason"] == "no_net_discharge"
+    ended_higher = outage(soc_min=60.0, soc_min_at=at(60).isoformat(), soc_end=90.0)
+    assert reserve_columns(ended_higher, 20.0)["reserve_reason"] is None
+
+
 def test_the_charge_needed_may_exceed_a_full_battery():
-    columns = reserve_columns(outage(soc_start=90.0, soc_end=5.0), 20.0)
+    columns = reserve_columns(outage(soc_start=90.0, soc_end=5.0, soc_min=5.0), 20.0)
     assert columns["needed_pct"] == 105.0
 
 
 def test_reserve_reasons_in_order():
-    assert reserve_columns(outage(soc_end=None), 20.0)["reserve_reason"] == "no_soc"
+    just_under = (BASE + timedelta(seconds=1799)).isoformat()
+    assert reserve_columns(outage(soc_min=None), 20.0)["reserve_reason"] == "no_soc"
+    assert reserve_columns(outage(soc_min_at=None), 20.0)["reserve_reason"] == "no_soc"
     assert reserve_columns(outage(soc_start=None, ongoing=True), 20.0)["reserve_reason"] == "no_soc"
     assert reserve_columns(outage(ongoing=True), 20.0)["reserve_reason"] == "cut"
     assert reserve_columns(outage(started_before_window=True), 20.0)["reserve_reason"] == "cut"
-    assert reserve_columns(outage(soc_end=80.0), 20.0)["reserve_reason"] == "no_net_discharge"
-    assert reserve_columns(outage(soc_end=85.0), 20.0)["reserve_reason"] == "no_net_discharge"
-    assert reserve_columns(outage(seconds=1799.0), 20.0)["reserve_reason"] == "too_short"
-    assert reserve_columns(outage(soc_end=78.5), 20.0)["reserve_reason"] == "too_short"
+    assert reserve_columns(outage(soc_min=80.0), 20.0)["reserve_reason"] == "no_net_discharge"
+    assert reserve_columns(outage(soc_min=85.0), 20.0)["reserve_reason"] == "no_net_discharge"
+    assert reserve_columns(outage(soc_min_at=just_under), 20.0)["reserve_reason"] == "too_short"
+    assert reserve_columns(outage(soc_min=78.5), 20.0)["reserve_reason"] == "too_short"
 
 
 def test_reserve_thresholds_are_inclusive():
-    assert reserve_columns(outage(seconds=1800.0), 20.0)["reserve_reason"] is None
-    assert reserve_columns(outage(soc_end=78.0), 20.0)["reserve_reason"] is None
+    assert reserve_columns(outage(soc_min_at=at(30).isoformat()), 20.0)["reserve_reason"] is None
+    assert reserve_columns(outage(soc_min=78.0), 20.0)["reserve_reason"] is None
+
+
+def test_the_end_charge_no_longer_matters():
+    assert reserve_columns(outage(soc_end=None), 20.0)["reserve_reason"] is None
 
 
 def test_a_withheld_reserve_has_no_figures():
@@ -418,7 +486,13 @@ def test_a_withheld_reserve_has_no_figures():
 
 def test_the_summary_names_the_hardest_outage_and_counts_the_covered():
     first = outage() | reserve_columns(outage(), 20.0)
-    hard_raw = outage(start=at(600).isoformat(), soc_start=90.0, soc_end=10.0, soc_min=10.0)
+    hard_raw = outage(
+        start=at(600).isoformat(),
+        soc_start=90.0,
+        soc_end=10.0,
+        soc_min=10.0,
+        soc_min_at=at(780).isoformat(),
+    )
     hard = hard_raw | reserve_columns(hard_raw, 20.0)
     withheld = {"hours_left": None, "needed_pct": None, "reserve_reason": "cut"}
     unknown = outage(soc_min=None) | withheld

@@ -934,7 +934,7 @@ const wb = {
     outagesCovered: "Outages covered",
     coveredOf: (r) => `${r.covered} of ${r.judged}`,
     coveredHint: (r) => `Never below ${r.level}`,
-    reserveNote: "Hours left are read at each outage's own rate of discharge, and the charge needed is the low mark plus what that outage took. Both depend on the hour and the load: a daytime outage says little about a night one.",
+    reserveNote: "Hours left are read from the lowest point of each outage, at the rate the charge fell to reach it, and the charge needed is the low mark plus that fall. Both depend on the hour and the load: a daytime outage says little about a night one.",
     // Why counting starts late: two whole sentences rather than a clause slot.
     countedFromInferred: (r) => `Outages counted from ${r.date} — earlier history is only hourly averages, which cannot say when inside an hour the grid was gone`,
     countedFromNoHistory: (r) => `Outages counted from ${r.date} — the recorder keeps no earlier history of this sensor`,
@@ -1338,7 +1338,7 @@ const wb = {
     outagesCovered: "Покрито відключень",
     coveredOf: (r) => `${r.covered} з ${r.judged}`,
     coveredHint: (r) => `Ні разу нижче ${r.level}`,
-    reserveNote: "Скільки ще витримала б батарея, рахується за власною швидкістю розряду кожного відключення, а потрібний на старті заряд — це низька позначка плюс те, що забрало саме це відключення. Обидва показники залежать від години й навантаження: денне відключення мало що каже про нічне.",
+    reserveNote: "Скільки ще витримала б батарея, рахується від найнижчої точки кожного відключення, з тією швидкістю, з якою заряд падав до неї, а потрібний на старті заряд — це низька позначка плюс це падіння. Обидва показники залежать від години й навантаження: денне відключення мало що каже про нічне.",
     countedFromInferred: (r) => `Відключення пораховано з ${r.date} — для давнішого часу є лише погодинні середні, з яких не видно, коли саме в межах години зникала мережа`,
     countedFromNoHistory: (r) => `Відключення пораховано з ${r.date} — давнішої історії цього сенсора реєстратор не зберігає`,
     inferredBanner: "Визначено за потоками потужності, а не виміряно. Ніч, коли будинок живить батарея і через підключення до мережі нічого не проходить, виглядає точнісінько як відключення, а денного відключення, яке покриває сонце, взагалі не видно. Щоб вимірювати, вкажіть сенсор, який повідомляє про наявність мережі.",

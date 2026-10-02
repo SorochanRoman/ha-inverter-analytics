@@ -303,6 +303,8 @@ export interface OutageEpisode {
   soc_start?: number | null;
   soc_end?: number | null;
   soc_min?: number | null;
+  /** When the lowest charge was first reached inside the outage (ISO). */
+  soc_min_at?: string | null;
   below_low?: boolean | null;
   hours_left?: number | null;
   needed_pct?: number | null;

@@ -127,10 +127,17 @@ describe("the outage reserve", () => {
     expect(en.grid.neededAtStart).toBe("Needed at start");
     expect(en.grid.coveredOf({ covered: 5, judged: 6 })).toBe("5 of 6");
     expect(en.grid.hardestOutageOn({ date: "1 Oct" })).toBe("Outage of 1 Oct");
+    expect(en.grid.coveredHint({ level: "20%" })).toBe("Never below 20%");
+    expect(en.grid.reserveNote).toContain("from the lowest point");
+    expect(en.grid.reserveNote).not.toContain("own rate");
   });
 
   it("reads in Ukrainian", () => {
     expect(uk.grid.coveredOf({ covered: 5, judged: 6 })).toBe("5 з 6");
+    expect(uk.grid.hardestOutageOn({ date: "1 жовт." })).toBe("Відключення 1 жовт.");
+    expect(uk.grid.coveredHint({ level: "20%" })).toBe("Ні разу нижче 20%");
+    expect(uk.grid.reserveNote).toContain("від найнижчої точки");
+    expect(uk.grid.reserveNote).not.toContain("власною швидкістю");
     expect(uk.grid.reserveReasons.no_net_discharge).not.toBe(en.grid.reserveReasons.no_net_discharge);
   });
 });

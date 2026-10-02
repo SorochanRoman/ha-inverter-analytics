@@ -375,9 +375,9 @@ export const en = {
     coveredOf: (p: { covered: number; judged: number }) => `${p.covered} of ${p.judged}`,
     coveredHint: (p: { level: string }) => `Never below ${p.level}`,
     reserveNote:
-      "Hours left are read at each outage's own rate of discharge, and the charge needed is the " +
-      "low mark plus what that outage took. Both depend on the hour and the load: a daytime " +
-      "outage says little about a night one.",
+      "Hours left are read from the lowest point of each outage, at the rate the charge fell to " +
+      "reach it, and the charge needed is the low mark plus that fall. Both depend on the hour " +
+      "and the load: a daytime outage says little about a night one.",
     // Why counting starts late: two whole sentences rather than a clause slot.
     countedFromInferred: (p: { date: string }) =>
       `Outages counted from ${p.date} — earlier history is only hourly averages, which ` +
