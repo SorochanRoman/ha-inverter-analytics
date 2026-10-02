@@ -323,17 +323,29 @@ def _autonomy(
     """How long the battery would last, at the rate seen during this period's outages.
 
     Read off the battery itself rather than multiplied out of a nameplate
-    capacity: the state of charge lost per hour of outage. Withheld, with the
-    reason, when there is nothing to read it from — and when the outages were
-    covered by the sun and the charge did not fall, because there is no
-    discharge rate in that and inventing one would be worse than saying so.
+    capacity: the points of charge lost per hour. Each outage gives its fall
+    from the start to its lowest charge, over the time it took to get there,
+    not its fall to the end: the sun can refill the battery before the grid
+    returns, and a night outage running into the morning would otherwise hide
+    how fast the charge actually fell. Withheld, with the reason, when there
+    is nothing to read it from — and when the charge did not fall below where
+    any outage started, because there is no discharge rate in that and
+    inventing one would be worse than saying so.
     """
-    # Only outages with a charge reading at both ends can say anything about a
-    # rate, so evidence_hours is their total and not the period's outage time.
+    # Only outages with a charge at the start and a lowest charge with its
+    # moment can say anything about a rate, so evidence_hours is the time the
+    # charge spent falling to each one's lowest point, not the outage time.
     evidence = [
-        (item["soc_start"] - item["soc_end"], item["seconds"])
+        (
+            item["soc_start"] - item["soc_min"],
+            (
+                datetime.fromisoformat(item["soc_min_at"]) - datetime.fromisoformat(item["start"])
+            ).total_seconds(),
+        )
         for item in episodes
-        if item.get("soc_start") is not None and item.get("soc_end") is not None
+        if item.get("soc_start") is not None
+        and item.get("soc_min") is not None
+        and item.get("soc_min_at") is not None
     ]
     hours = sum(seconds for _, seconds in evidence) / SECONDS_PER_HOUR
     drop = sum(points for points, _ in evidence)
@@ -361,14 +373,17 @@ def _autonomy(
     if not episodes:
         return result | {"reason": "no_outages"}
     if not evidence:
-        # Outages, a charge sensor, and no reading at either end of any of
-        # them — a grid-powered dongle that goes unavailable for exactly the
-        # outage. Distinct from too little evidence, which has some.
+        # Outages, a charge sensor, and no reading inside any of them — a
+        # grid-powered dongle that goes unavailable for exactly the outage.
+        # Distinct from too little evidence, which has some.
         return result | {"reason": "no_soc_in_outages"}
-    if hours < AUTONOMY_MIN_HOURS:
-        return result | {"reason": "too_little_evidence"}
+    # Before the hours: an outage whose lowest charge is its start fell for
+    # no time at all, so the sun covering every outage would otherwise read as
+    # too little evidence.
     if drop <= 0:
         return result | {"reason": "no_net_discharge"}
+    if hours < AUTONOMY_MIN_HOURS:
+        return result | {"reason": "too_little_evidence"}
 
     rate = drop / hours
     soc_now = result["soc_now"]

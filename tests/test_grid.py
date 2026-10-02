@@ -285,9 +285,11 @@ def test_no_lowest_charge_has_no_moment():
 
 
 def test_autonomy_reads_the_discharge_rate_off_the_outages():
-    # Two outages, an hour each; 20 points lost in the first, 10 in the second.
-    grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (210, 1.0))
-    soc = soc_series((0, 100.0), (60, 100.0), (120, 80.0), (150, 80.0), (210, 70.0), (230, 65.0))
+    # Two outages; the charge falls 20 points in the first hour of one and 10 in
+    # the first hour of the other, then holds. The readings sit inside the
+    # outages: one written at the instant the grid returns is not part of it.
+    grid = grid_series((0, 1.0), (60, 0.0), (130, 1.0), (150, 0.0), (220, 1.0))
+    soc = soc_series((0, 100.0), (120, 80.0), (210, 70.0), (230, 65.0))
     autonomy = build(grid, soc=soc)["autonomy"]
     assert autonomy["reason"] is None
     assert autonomy["rate_pct_per_hour"] == 15.0
@@ -320,11 +322,12 @@ def test_autonomy_is_withheld_when_no_charge_was_recorded_inside_the_outages():
 
 
 def test_autonomy_needs_an_hour_of_evidence():
+    # The charge reaches its lowest twenty minutes into the outage.
     grid = grid_series((0, 1.0), (60, 0.0), (90, 1.0))
-    soc = soc_series((0, 100.0), (90, 80.0))
+    soc = soc_series((0, 100.0), (80, 80.0))
     autonomy = build(grid, soc=soc)["autonomy"]
     assert autonomy["reason"] == "too_little_evidence"
-    assert autonomy["evidence_hours"] == 0.5
+    assert autonomy["evidence_hours"] == 20 / 60
 
 
 def test_autonomy_is_withheld_when_the_sun_covered_the_outages():
@@ -335,10 +338,40 @@ def test_autonomy_is_withheld_when_the_sun_covered_the_outages():
 
 def test_hours_from_now_is_absent_below_the_low_mark():
     grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
-    soc = soc_series((0, 60.0), (180, 15.0))
+    soc = soc_series((0, 60.0), (170, 15.0))
     autonomy = build(grid, soc=soc)["autonomy"]
     assert autonomy["reason"] is None
     assert autonomy["hours_from_now"] is None
+
+
+def dip_and_recover():
+    """A night outage running into the morning: 60% at the start, 15% three
+    hours in, refilled by the sun to 40% before the grid returns at five hours."""
+    grid = grid_series((0, 1.0), (60, 0.0), (360, 1.0), end=420)
+    soc = soc_series((0, 60.0), (240, 15.0), (300, 40.0), end=420)
+    return build(grid, soc=soc)["autonomy"]
+
+
+def test_autonomy_reads_the_fall_to_the_lowest_charge_not_to_the_end():
+    autonomy = dip_and_recover()
+    assert autonomy["reason"] is None
+    # 45 points in 3 hours, not the end-based (60 - 40) / 5 = 4.
+    assert autonomy["rate_pct_per_hour"] == 15.0
+
+
+def test_autonomy_evidence_is_the_time_to_the_lowest_charge_not_the_outage_length():
+    assert dip_and_recover()["evidence_hours"] == 3.0
+
+
+def test_autonomy_is_withheld_when_every_lowest_charge_was_at_the_start():
+    # The charge only rose through the outage, so its minimum is its start.
+    # The 40% written at the instant the grid returned is not inside the
+    # outage; read off the end, it would have made a 10-point fall of it.
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    soc = soc_series((0, 50.0), (100, 60.0), (180, 40.0))
+    autonomy = build(grid, soc=soc)["autonomy"]
+    assert autonomy["reason"] == "no_net_discharge"
+    assert autonomy["rate_pct_per_hour"] is None
 
 
 def test_autonomy_reports_the_mean_load_during_the_outages():

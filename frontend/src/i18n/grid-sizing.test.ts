@@ -110,9 +110,10 @@ describe("the grid sentences", () => {
         "to measure instead.",
     );
     expect(en.grid.evidenceNote({ hours: "3 h 0 min" })).toBe(
-      "At the rate seen during this period's outages — 3 h 0 min of them. Whether a summer " +
-        "afternoon's outage says anything about a winter evening's is for the reader to " +
-        "judge; the mean load beside it is there to help.",
+      "At the rate seen during this period's outages, over the 3 h 0 min the charge spent " +
+        "falling to each one's lowest point. Whether a summer afternoon's outage says " +
+        "anything about a winter evening's is for the reader to judge; the mean load beside " +
+        "it is there to help.",
     );
     expect(en.sizing.greyMonths({ share: "80%" })).toBe(
       "A month drawn in grey was seen for less than 80% of its length; its verdict stands on " +

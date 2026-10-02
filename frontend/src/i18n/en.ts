@@ -346,17 +346,18 @@ export const en = {
         "there is no discharge rate to read.",
     },
     tooLittleEvidence: (p: { hours: string }) =>
-      `The outages with a charge reading at both ends add up to ${p.hours}, and an estimate ` +
-      "needs at least an hour.",
+      `The charge spent ${p.hours} falling to the lowest point of each outage, and an ` +
+      "estimate needs at least an hour.",
     fromFullTo: (p: { level: string }) => `From full to ${p.level}`,
     fromNow: "From where it is now",
     chargeNow: "Charge now",
     dischargeRate: "Discharge rate",
     pointsPerHour: (p: { rate: string }) => `${p.rate} pts/h`,
     evidenceNote: (p: { hours: string }) =>
-      `At the rate seen during this period's outages — ${p.hours} of them. Whether a summer ` +
-      "afternoon's outage says anything about a winter evening's is for the reader to judge; " +
-      "the mean load beside it is there to help.",
+      `At the rate seen during this period's outages, over the ${p.hours} the charge spent ` +
+      "falling to each one's lowest point. Whether a summer afternoon's outage says anything " +
+      "about a winter evening's is for the reader to judge; the mean load beside it is there " +
+      "to help.",
     hoursLeft: "Hours left",
     neededAtStart: "Needed at start",
     didNotLast: "did not last",

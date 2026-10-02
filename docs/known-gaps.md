@@ -245,24 +245,26 @@ could instead be corrected using the capacity and the drift — but that compoun
 a user-entered capacity with a percentage reading, and a corrected number that
 looks precise is worse than an absent one that explains itself.
 
-**The autonomy rate's denominator.** The state of charge lost across the
-period's outages is divided by their whole duration, not by the seconds the
-charge sensor actually had a state inside them. A sensor that dropped out for
-part of an outage therefore makes the discharge rate look gentler than it was.
-Dividing by covered seconds instead would mean carrying a second timeline
-through the calculation for a correction that only bites when the charge
-sensor is unreliable — and if it is, the figure it produces is not worth
+**The autonomy rate's denominator.** Each outage's fall to its lowest charge is
+divided by the time from the outage's start to that minimum, not by the seconds
+the charge sensor actually had a state inside that stretch. A sensor that
+dropped out for part of it therefore makes the discharge rate look gentler than
+it was. Dividing by covered seconds instead would mean carrying a second
+timeline through the calculation for a correction that only bites when the
+charge sensor is unreliable — and if it is, the figure it produces is not worth
 refining.
 
-**Autonomy uncorrected for sun during an outage.** An outage the sun partly
-covered has the battery recharging inside it, so the points lost per hour
-understate what a night would cost. Correcting it needs PV production during
-each outage and an assumption about how much of it reached the battery rather
-than the load — and a rate built on that assumption would look precise while
-resting on it. The tab instead prints the evidence beside the number: how many
-hours of outage it rests on and the mean load through them, so the reader can
-see what kind of outage it learned from. The one case where the sun wins
-outright — no net discharge at all — is withheld rather than estimated.
+**Autonomy uncorrected for sun during an outage.** The rate reads each outage's
+fall to its lowest charge, so a battery the sun refills before the grid returns
+no longer hides the fall. But the sun can still slow the fall on the way down —
+PV covering part of the load — so the points lost per hour can understate what
+a night would cost. Correcting it needs PV production during each outage and an
+assumption about how much of it reached the battery rather than the load — and
+a rate built on that assumption would look precise while resting on it. The tab
+instead prints the evidence beside the number: how many hours of falling charge
+it rests on and the mean load through them, so the reader can see what kind of
+outage it learned from. The one case where the sun wins outright — no net
+discharge at all — is withheld rather than estimated.
 
 **A real depth-of-discharge figure.** Measured across dip episodes it would be
 the threshold minus the minimum, since every episode starts at the threshold by

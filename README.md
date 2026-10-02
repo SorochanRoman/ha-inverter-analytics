@@ -94,9 +94,11 @@ beyond pointing the integration at the ones you already have.
   retention says from which date it counts.
 - **Autonomy, read off the battery.** How long the battery would last from
   full and from where it is now, at the discharge rate seen during this
-  period's outages — the nameplate capacity is never multiplied into it. It
-  is withheld, and says why, when the outages were too short to learn from
-  or the sun covered them.
+  period's outages — the nameplate capacity is never multiplied into it. Each
+  outage counts its fall to its lowest charge over the time it took, not its
+  fall to the end, because the sun can refill the battery before the grid
+  returns. It is withheld, and says why, when the outages were too short to
+  learn from or the sun covered them.
 - **Outages inferred from flows**, for an installation with no presence
   sensor: grid power at zero while the battery discharges. The tab carries a
   banner saying that a night of zero export looks the same, and asks for a
