@@ -241,7 +241,7 @@ separate JavaScript bundle and browsers cache it aggressively.
 - `docs/known-gaps.md` — what is verified, what is not, and what the next
   phases will need to change.
 - `docs/superpowers/specs/` — the design specification.
-- `docs/superpowers/plans/` — the implementation plan that was executed.
+- `docs/glossary-uk.md` — the terms the Ukrainian translation follows.
 
 ## License
 

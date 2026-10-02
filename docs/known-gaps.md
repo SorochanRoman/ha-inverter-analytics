@@ -8,63 +8,40 @@ discovering it mid-flight.
 ## 1. Verified in a live Home Assistant
 
 Three rounds of work have been brought up against a real HA 2025.1.4 instance
-(Python 3.12) with `recorder`, the real config flow and real sensors.
+(Python 3.12) with `recorder`, the real config flow and real sensors. What the
+tabs show is described in the README; what was checked on screen:
 
-**Core analytics.** The integration loads with no errors; the bundle is served
-as `text/javascript`; the sidebar item appears; the Load tab renders KPIs, the
-histogram, the duration curve, the rated-power bands and the overload table;
-switching period refetches and the precision badge changes from "Mixed since
-<date>" to "Exact data"; the watts/percent toggle rebuilds the axis.
-
-**Detection and the wizard.** Discovery offered "Deye — 7 sensors" and the
-confirm step arrived pre-filled with the total load, all three phases *in
-order*, both PV strings and the battery state of charge, with no manual typing.
-
-**Imbalance episodes and the load floor.** A history built for it — 100 s of
-heavy imbalance, a balanced stretch, 60 s of standby, then 80 s of moderate
-imbalance — produced two episodes with their per-phase values, and 60 s
-correctly excluded as below the load floor. Both had only ever been exercised
-by unit tests against hand-built data.
-
-**Long-term statistics, at last.** Five months of real hourly rows were
-imported through `recorder/import_statistics` and the Seasonality tab was read
-back from them: monthly means, the busiest hour, the hour-of-day curve and the
-month-by-hour heat map all came from statistics rather than states, with the
-deliberately thin month marked and the eight empty ones present but bar-less.
-This closes the project's largest unverified area — and it found a defect the
-moment it ran; see item 15.
-
-**Round-trip efficiency against seeded statistics.** A battery cycle imported
-beyond the recorder's retention — charged 60 kWh, discharged 50.4, ending 4.5
-points from where it began — read back as exactly 84.0%, and the same figures
-over a window whose charge drifted 23 points correctly produced no efficiency at
-all with the reason on screen.
-
-**Energy counters across a reset.** Six counters were imported as hourly
-statistics over five days with one meter reset to zero mid-window — its
-accumulated sum climbing, its own reading dropping, which is what the recorder
-writes for a `total_increasing` sensor it has caught resetting. Every total came
-back to the hundredth of a kilowatt-hour, no day held negative energy, and the
-reset day is indistinguishable from its neighbours on screen.
-
-**Battery analytics.** A history built for it — a charge, a hard discharge, a
-70-second fall to 12%, a 15-second one that must not count, and a recovery —
-produced exactly one episode with its lowest point and recovery, while the time
-below the threshold counted both. The sign check reached a verdict once it had
-enough evidence and correctly reported the wiring as right. The consistency
-check raised nothing on a correctly mapped inverter.
-
-**Phase and string analytics.** The payload carries `load_l1`/`load_l2`/
-`load_l3` and `pv_s1`/`pv_s2` with their own coverage; the per-phase shares sum
-to one; the Phases section renders the cards, the derived-rating note, the
-aligned-coverage warning, the three imbalance figures and the distribution with
-buckets above the threshold in the overload colour; the PV comparison renders
-its cards and a labelled mean-versus-peak chart. No errors from our bundle in
-the browser console.
-
-**An entry stored in the pre-multi-entity shape still loads.** The instance
-holds one from an earlier round with `"load_power": "sensor.…"` as a bare
-string; it renders normally beside a new one.
+- **Core analytics.** The integration loads with no errors, the bundle is
+  served as `text/javascript`, the sidebar item appears and the Load tab
+  renders. Switching period refetches, and the precision badge changes from
+  "Mixed since <date>" to "Exact data".
+- **Detection and the wizard.** Discovery offered "Deye — 7 sensors", and the
+  confirm step arrived pre-filled — phases *in order*, both PV strings, the
+  state of charge — with no manual typing.
+- **Imbalance episodes and the load floor**, against a history built for it:
+  two episodes with their per-phase values, and 60 s correctly excluded as
+  below the floor. Both had only been exercised by unit tests before.
+- **Long-term statistics.** Five months of hourly rows imported through
+  `recorder/import_statistics` were read back on the Seasonality tab from
+  statistics rather than states, with the thin month marked and the empty
+  ones present but bar-less. It found a defect the moment it ran; see item 15.
+- **Round-trip efficiency against seeded statistics.** A cycle beyond the
+  recorder's retention (60 kWh in, 50.4 out, ending 4.5 points from where it
+  began) read back as exactly 84.0%; a window whose charge drifted 23 points
+  correctly produced no efficiency, with the reason on screen.
+- **Energy counters across a reset.** Six counters over five days, one meter
+  reset to zero mid-window: every total came back to the hundredth of a
+  kilowatt-hour, no day held negative energy, and the reset day looks like
+  its neighbours.
+- **Battery analytics.** A 70-second fall to 12% counted as one episode and a
+  15-second one did not, while time below the threshold counted both. The sign
+  check reached a verdict and reported the wiring as right; the consistency
+  check raised nothing on a correctly mapped inverter.
+- **Phase and string analytics.** The per-phase and per-string series carry
+  their own coverage, the per-phase shares sum to one, and both sections
+  render with no errors from our bundle in the console.
+- **An entry stored in the pre-multi-entity shape still loads** — a bare
+  string for `load_power` — and renders beside a new one.
 
 ## 2. What the live runs exposed
 
@@ -205,12 +182,14 @@ the defect was only visible on screen.
 
 - **Cross-role phase counts are unvalidated.** `load_power_phase` and
   `grid_power_phase` may hold different numbers of entities. Nothing combines
-  them yet, so nothing is wrong today; the Balance tab is where that stops
-  being true.
-- **No preset produces a `grid_power` total**, only per-phase parts. A
-  three-phase Solarman user therefore has grid data as parts alone, so the
-  balance work will have to sum there with no vendor total to prefer — the
-  first place the "total wins" rule has nothing to apply to.
+  them — the Balance tab reads energy counters, not phase power — so nothing is
+  wrong today; the first analytic that sets load phases against grid phases is
+  where that stops being true.
+- **No preset produces a `grid_power` total**, only per-phase parts. This is
+  handled: when the Grid tab infers outages from flows, `sum_series` in
+  `analytics/grid.py` adds the parts on a common timeline, and a gap in any
+  phase is a gap in the sum. A later analytic that reads grid power should
+  reuse it rather than prefer a total that may not exist.
 
 ## 5. Deliberately deferred
 

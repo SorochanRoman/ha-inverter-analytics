@@ -10,9 +10,9 @@ log_cli = false
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-# ruff format reformats Python code blocks inside Markdown. The plans and
-# specs under docs/ are the verbatim source of briefs for future tasks,
-# so the formatter must not touch them. This applies to format, not check.
+# ruff format reformats Python code blocks inside Markdown. The specs under
+# docs/ quote code as it was designed, so the formatter must not touch them.
+# This applies to format, not check.
 extend-exclude = ["docs"]
 
 [tool.ruff.lint]
