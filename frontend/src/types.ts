@@ -304,8 +304,20 @@ export interface OutageEpisode {
   soc_end?: number | null;
   soc_min?: number | null;
   below_low?: boolean | null;
+  hours_left?: number | null;
+  needed_pct?: number | null;
+  reserve_reason?: ReserveReason | null;
   /** Present only when a load sensor is mapped. */
   load_mean_w?: number | null;
+}
+
+export type ReserveReason = "no_soc" | "cut" | "no_net_discharge" | "too_short";
+
+export interface ReserveSummary {
+  worst_needed_pct: number | null;
+  worst_start: string | null;
+  covered: number;
+  judged: number;
 }
 
 export interface GridHour {
@@ -366,6 +378,7 @@ export interface GridPayload {
   days: GridDay[];
   episodes: OutageEpisode[];
   autonomy: Autonomy;
+  reserve: ReserveSummary;
   series: Record<string, SeriesInfo>;
   precision: Precision;
   boundary: string | null;

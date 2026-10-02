@@ -84,9 +84,12 @@ beyond pointing the integration at the ones you already have.
   interruptions too short to be outages; hours without grid by day and the
   share by hour of day; and a table of every outage with the battery's charge
   when it began, the lowest it reached and where it ended, plus the mean load
-  through it. An outage cut by the window's edge says "at least". A restart
-  of Home Assistant in the middle of an outage does not make two of it. The
-  grid-presence sensor is a binary sensor with no statistics, so a window
+  through it. For each outage, the hours the battery would still have lasted
+  at that outage's rate and the charge it needed at the start, plus the
+  hardest outage's need and how many outages the battery covered — all in
+  points of charge, never from the nameplate. An outage cut by the window's
+  edge says "at least". A restart of Home Assistant in the middle of an
+  outage does not make two of it. The grid-presence sensor is a binary sensor with no statistics, so a window
   reaching past the recorder's retention says from which date it counts.
 - **Autonomy, read off the battery.** How long the battery would last from
   full and from where it is now, at the discharge rate seen during this

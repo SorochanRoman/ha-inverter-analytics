@@ -22,6 +22,8 @@ import type {
   GridPayload,
   HomeAssistant,
   OutageEpisode,
+  ReserveReason,
+  ReserveSummary,
 } from "../types";
 
 const DASH = "—";
@@ -181,7 +183,9 @@ export class IaGridTab extends LitElement {
           ${payload.has_soc
             ? html`<th>${m.grid.chargeAtStart}</th>
                 <th>${m.grid.lowest}</th>
-                <th>${m.grid.atEnd}</th>`
+                <th>${m.grid.atEnd}</th>
+                <th>${m.grid.hoursLeft}</th>
+                <th>${m.grid.neededAtStart}</th>`
             : nothing}
           ${payload.has_load ? html`<th>${m.common.meanLoad}</th>` : nothing}
         </tr>
@@ -203,7 +207,9 @@ export class IaGridTab extends LitElement {
             ${payload.has_soc
               ? html`<td>${soc(item.soc_start)}</td>
                   <td class=${item.below_low ? "low" : ""}>${soc(item.soc_min)}</td>
-                  <td>${soc(item.soc_end)}</td>`
+                  <td>${soc(item.soc_end)}</td>
+                  <td>${this.renderHoursLeft(item)}</td>
+                  <td>${this.renderNeeded(item)}</td>`
               : nothing}
             ${payload.has_load
               ? html`<td>${formatPower(item.load_mean_w ?? null, locale)}</td>`
@@ -212,6 +218,66 @@ export class IaGridTab extends LitElement {
         )}
       </tbody>
     </table>`;
+  }
+
+  private reserveReason(item: OutageEpisode) {
+    const reasons: Record<ReserveReason, string> = this.i18n.m.grid.reserveReasons;
+    return html`<span class="hint">${reasons[item.reserve_reason ?? "no_soc"]}</span>`;
+  }
+
+  private renderHoursLeft(item: OutageEpisode) {
+    if (item.hours_left === null || item.hours_left === undefined) return this.reserveReason(item);
+    if (item.hours_left === 0) return html`<span class="low">${this.i18n.m.grid.didNotLast}</span>`;
+    return formatHours(item.hours_left, this.i18n.locale);
+  }
+
+  private renderNeeded(item: OutageEpisode) {
+    if (item.needed_pct === null || item.needed_pct === undefined) return this.reserveReason(item);
+    const value = formatPercent(Math.min(item.needed_pct, 100) / 100, this.i18n.locale);
+    // The space between the spans is the only thing keeping the two apart.
+    return item.needed_pct > 100
+      ? html`<span class="low">&gt; ${value}</span>
+          <span class="hint">${this.i18n.m.grid.moreThanFull}</span>`
+      : value;
+  }
+
+  private renderReserve(reserve: ReserveSummary, lowPct: number) {
+    const m = this.i18n.m;
+    const locale = this.i18n.locale;
+    const worst = reserve.worst_needed_pct;
+    return html`
+      <div class="cards">
+        <div class="card">
+          <span class="name">${m.grid.hardestOutageNeeds}</span>
+          <span class="value"
+            >${worst === null ? DASH : formatPercent(Math.min(worst, 100) / 100, locale)}</span
+          >
+          <span class="row"
+            ><span
+              >${reserve.worst_start === null
+                ? m.grid.noHardestOutage
+                : worst !== null && worst > 100
+                  ? m.grid.moreThanFull
+                  : m.grid.hardestOutageOn({
+                      date: new Date(reserve.worst_start).toLocaleDateString(locale),
+                    })}</span
+            ></span
+          >
+        </div>
+        <div class="card">
+          <span class="name">${m.grid.outagesCovered}</span>
+          <span class="value"
+            >${reserve.judged === 0
+              ? DASH
+              : m.grid.coveredOf({ covered: reserve.covered, judged: reserve.judged })}</span
+          >
+          <span class="row"
+            ><span>${m.grid.coveredHint({ level: formatPercent(lowPct / 100, locale) })}</span></span
+          >
+        </div>
+      </div>
+      <p class="note">${m.grid.reserveNote}</p>
+    `;
   }
 
   private renderAutonomy(autonomy: Autonomy, lowPct: number) {
@@ -343,6 +409,7 @@ export class IaGridTab extends LitElement {
       <section>
         <h2>${m.grid.autonomy}</h2>
         ${this.renderAutonomy(payload.autonomy, payload.low_pct)}
+        ${payload.has_soc ? this.renderReserve(payload.reserve, payload.low_pct) : nothing}
       </section>
     `;
   }
@@ -389,7 +456,7 @@ export class IaGridTab extends LitElement {
       .hint { font-size: 12px; color: var(--secondary-text-color); }
       table { width: 100%; border-collapse: collapse; font-size: 14px; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); }
-      td.low { color: var(--error-color, #d64545); font-weight: 500; }
+      .low { color: var(--error-color, #d64545); font-weight: 500; }
       .empty { color: var(--secondary-text-color); margin: 0; }
       .note { font-size: 12px; color: var(--secondary-text-color); margin: 12px 0 0; }
       .notice { padding: 24px; color: var(--secondary-text-color); }

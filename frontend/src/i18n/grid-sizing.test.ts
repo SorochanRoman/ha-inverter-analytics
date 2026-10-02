@@ -120,3 +120,17 @@ describe("the grid sentences", () => {
     );
   });
 });
+
+describe("the outage reserve", () => {
+  it("reads in English", () => {
+    expect(en.grid.hoursLeft).toBe("Hours left");
+    expect(en.grid.neededAtStart).toBe("Needed at start");
+    expect(en.grid.coveredOf({ covered: 5, judged: 6 })).toBe("5 of 6");
+    expect(en.grid.hardestOutageOn({ date: "1 Oct" })).toBe("Outage of 1 Oct");
+  });
+
+  it("reads in Ukrainian", () => {
+    expect(uk.grid.coveredOf({ covered: 5, judged: 6 })).toBe("5 з 6");
+    expect(uk.grid.reserveReasons.no_net_discharge).not.toBe(en.grid.reserveReasons.no_net_discharge);
+  });
+});

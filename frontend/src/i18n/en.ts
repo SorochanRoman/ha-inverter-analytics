@@ -357,6 +357,27 @@ export const en = {
       `At the rate seen during this period's outages — ${p.hours} of them. Whether a summer ` +
       "afternoon's outage says anything about a winter evening's is for the reader to judge; " +
       "the mean load beside it is there to help.",
+    hoursLeft: "Hours left",
+    neededAtStart: "Needed at start",
+    didNotLast: "did not last",
+    moreThanFull: "more than a full battery",
+    // Keyed by ReserveReason.
+    reserveReasons: {
+      no_soc: "no charge data",
+      cut: "cut by the period",
+      no_net_discharge: "sun covered it",
+      too_short: "too short to judge",
+    },
+    hardestOutageNeeds: "Hardest outage needs",
+    hardestOutageOn: (p: { date: string }) => `Outage of ${p.date}`,
+    noHardestOutage: "No outage long enough to judge",
+    outagesCovered: "Outages covered",
+    coveredOf: (p: { covered: number; judged: number }) => `${p.covered} of ${p.judged}`,
+    coveredHint: (p: { level: string }) => `Never below ${p.level}`,
+    reserveNote:
+      "Hours left are read at each outage's own rate of discharge, and the charge needed is the " +
+      "low mark plus what that outage took. Both depend on the hour and the load: a daytime " +
+      "outage says little about a night one.",
     // Why counting starts late: two whole sentences rather than a clause slot.
     countedFromInferred: (p: { date: string }) =>
       `Outages counted from ${p.date} — earlier history is only hourly averages, which ` +

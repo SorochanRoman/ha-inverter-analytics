@@ -98,6 +98,13 @@
 | wizard (config flow) | майстер |
 | current transformer / clamp | трансформатор струму / кліщі |
 | invert (sign switch) | інвертувати |
+| Hours left (outage table column) | Ще витримала б |
+| Needed at start (charge, outage table column) | Потрібно на старті |
+| did not last (battery through an outage) | не витримала |
+| hardest outage | найважче відключення |
+| Outages covered (battery never below the low mark) | Покрито відключень |
+| cut by the period (outage at the window's edge) | обрізане періодом |
+| too short to judge | закоротке для оцінки |
 | Configure (HA button that opens the options, in en.json) | «Налаштувати» |
 
 ---
