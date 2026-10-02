@@ -9,7 +9,7 @@ is the thin layer that reads the sensors.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
@@ -58,6 +58,12 @@ INFERRED_MIN_SECONDS = 300.0
 
 # Below this much outage the discharge rate is one afternoon's weather.
 AUTONOMY_MIN_HOURS = 1.0
+
+# Below either of these one outage's rate of discharge is noise: a state of
+# charge moves in whole points, so two points in ten minutes is anything from
+# six to eighteen points an hour.
+RESERVE_MIN_SECONDS = 1800.0
+RESERVE_MIN_DROP_PCT = 2.0
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -251,6 +257,47 @@ def _battery_columns(
     return columns
 
 
+def reserve_columns(episode: Mapping[str, Any], low_pct: float) -> dict[str, Any]:
+    """How much longer one outage could have run, and what it needed at the start.
+
+    Read in points of charge at that outage's own rate, never multiplied out
+    of a nameplate capacity. Withheld with the reason when the outage cannot
+    say: no charge at one end, an outage the period cuts, one the sun covered,
+    or one too short for its rate to mean anything.
+    """
+    start = episode.get("soc_start")
+    end = episode.get("soc_end")
+    withheld: dict[str, Any] = {"hours_left": None, "needed_pct": None}
+    if start is None or end is None:
+        return withheld | {"reserve_reason": "no_soc"}
+    if episode["started_before_window"] or episode["ongoing"]:
+        return withheld | {"reserve_reason": "cut"}
+    drop = start - end
+    if drop <= 0:
+        return withheld | {"reserve_reason": "no_net_discharge"}
+    if episode["seconds"] < RESERVE_MIN_SECONDS or drop < RESERVE_MIN_DROP_PCT:
+        return withheld | {"reserve_reason": "too_short"}
+    rate = drop / (episode["seconds"] / SECONDS_PER_HOUR)
+    return {
+        "hours_left": max(0.0, end - low_pct) / rate,
+        "needed_pct": low_pct + drop,
+        "reserve_reason": None,
+    }
+
+
+def reserve_summary(episodes: Sequence[Mapping[str, Any]], low_pct: float) -> dict[str, Any]:
+    """The hardest outage of the period, and how many the battery covered."""
+    figures = [item for item in episodes if item.get("needed_pct") is not None]
+    worst = max(figures, key=lambda item: item["needed_pct"], default=None)
+    judged = [item for item in episodes if item.get("soc_min") is not None]
+    return {
+        "worst_needed_pct": worst["needed_pct"] if worst else None,
+        "worst_start": worst["start"] if worst else None,
+        "covered": sum(1 for item in judged if item["soc_min"] >= low_pct),
+        "judged": len(judged),
+    }
+
+
 def _last_known(series: Series | None) -> float | None:
     if series is None:
         return None
@@ -407,6 +454,8 @@ def build_grid_payload(
     episodes = [
         _describe(outage) | _battery_columns(outage, soc, load, low_pct) for outage in outages
     ]
+    if soc is not None:
+        episodes = [item | reserve_columns(item, low_pct) for item in episodes]
 
     return {
         "source": source,
@@ -444,6 +493,7 @@ def build_grid_payload(
         "days": _by_day(intervals, outages, tz),
         "episodes": episodes,
         "autonomy": _autonomy(episodes, soc, low_pct),
+        "reserve": reserve_summary(episodes, low_pct),
     }
 
 

@@ -11,6 +11,8 @@ from custom_components.inverter_analytics.analytics.grid import (
     build_grid_payload,
     infer_grid_series,
     outage_episodes,
+    reserve_columns,
+    reserve_summary,
     sum_series,
 )
 from custom_components.inverter_analytics.analytics.resample import Sample, Series, to_intervals
@@ -237,6 +239,29 @@ def test_the_mean_load_during_an_outage_is_time_weighted():
     assert episode["load_mean_w"] == 550.0
 
 
+def test_the_reserve_is_on_the_episodes_only_with_a_charge_sensor():
+    grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
+    payload = build(grid)
+    # without a SoC sensor: no reserve keys on episodes, an empty summary
+    assert "hours_left" not in payload["episodes"][0]
+    assert payload["reserve"] == {
+        "worst_needed_pct": None,
+        "worst_start": None,
+        "covered": 0,
+        "judged": 0,
+    }
+    payload_with_soc = build(grid, soc=soc_series((0, 80.0), (120, 65.0), (170, 50.0)))
+    # with a SoC sensor: the three keys on every episode
+    assert {"hours_left", "needed_pct", "reserve_reason"} <= set(payload_with_soc["episodes"][0])
+    assert payload_with_soc["episodes"][0]["needed_pct"] == 50.0
+    assert payload_with_soc["reserve"] == {
+        "worst_needed_pct": 50.0,
+        "worst_start": at(60).isoformat(),
+        "covered": 1,
+        "judged": 1,
+    }
+
+
 def test_autonomy_reads_the_discharge_rate_off_the_outages():
     # Two outages, an hour each; 20 points lost in the first, 10 in the second.
     grid = grid_series((0, 1.0), (60, 0.0), (120, 1.0), (150, 0.0), (210, 1.0))
@@ -334,3 +359,81 @@ def test_inferred_mode_uses_the_longer_floor_and_reports_no_flickers():
     assert payload["source"] == "inferred"
     assert payload["kpi"]["count"] == 1, "three minutes is under the inferred floor"
     assert payload["kpi"]["brief_interruptions"] is None
+
+
+def outage(**overrides):
+    base = {
+        "start": at(0).isoformat(),
+        "seconds": 3 * 3600.0,
+        "started_before_window": False,
+        "ongoing": False,
+        "soc_start": 80.0,
+        "soc_end": 50.0,
+        "soc_min": 50.0,
+    }
+    return base | overrides
+
+
+def test_reserve_reads_hours_left_and_the_charge_needed():
+    # 30 points in 3 hours is 10 points an hour; 30 points above a 20% mark
+    # is three more hours, and the outage needed 20 + 30 = 50% at its start.
+    assert reserve_columns(outage(), 20.0) == {
+        "hours_left": 3.0,
+        "needed_pct": 50.0,
+        "reserve_reason": None,
+    }
+
+
+def test_a_battery_that_went_below_the_mark_had_no_hours_left():
+    columns = reserve_columns(outage(soc_end=15.0, soc_min=15.0), 20.0)
+    assert columns["hours_left"] == 0.0
+    assert columns["needed_pct"] == 85.0
+
+
+def test_the_charge_needed_may_exceed_a_full_battery():
+    columns = reserve_columns(outage(soc_start=90.0, soc_end=5.0), 20.0)
+    assert columns["needed_pct"] == 105.0
+
+
+def test_reserve_reasons_in_order():
+    assert reserve_columns(outage(soc_end=None), 20.0)["reserve_reason"] == "no_soc"
+    assert reserve_columns(outage(soc_start=None, ongoing=True), 20.0)["reserve_reason"] == "no_soc"
+    assert reserve_columns(outage(ongoing=True), 20.0)["reserve_reason"] == "cut"
+    assert reserve_columns(outage(started_before_window=True), 20.0)["reserve_reason"] == "cut"
+    assert reserve_columns(outage(soc_end=80.0), 20.0)["reserve_reason"] == "no_net_discharge"
+    assert reserve_columns(outage(soc_end=85.0), 20.0)["reserve_reason"] == "no_net_discharge"
+    assert reserve_columns(outage(seconds=1799.0), 20.0)["reserve_reason"] == "too_short"
+    assert reserve_columns(outage(soc_end=78.5), 20.0)["reserve_reason"] == "too_short"
+
+
+def test_reserve_thresholds_are_inclusive():
+    assert reserve_columns(outage(seconds=1800.0), 20.0)["reserve_reason"] is None
+    assert reserve_columns(outage(soc_end=78.0), 20.0)["reserve_reason"] is None
+
+
+def test_a_withheld_reserve_has_no_figures():
+    columns = reserve_columns(outage(ongoing=True), 20.0)
+    assert columns["hours_left"] is None and columns["needed_pct"] is None
+
+
+def test_the_summary_names_the_hardest_outage_and_counts_the_covered():
+    first = outage() | reserve_columns(outage(), 20.0)
+    hard_raw = outage(start=at(600).isoformat(), soc_start=90.0, soc_end=10.0, soc_min=10.0)
+    hard = hard_raw | reserve_columns(hard_raw, 20.0)
+    withheld = {"hours_left": None, "needed_pct": None, "reserve_reason": "cut"}
+    unknown = outage(soc_min=None) | withheld
+    assert reserve_summary([first, hard, unknown], 20.0) == {
+        "worst_needed_pct": 100.0,
+        "worst_start": at(600).isoformat(),
+        "covered": 1,
+        "judged": 2,
+    }
+
+
+def test_the_summary_without_figures():
+    assert reserve_summary([], 20.0) == {
+        "worst_needed_pct": None,
+        "worst_start": None,
+        "covered": 0,
+        "judged": 0,
+    }
