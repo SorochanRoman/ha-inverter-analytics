@@ -129,6 +129,49 @@ def inverter_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
     return {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
 
 
+@dataclass(frozen=True, slots=True)
+class Ceiling:
+    """What the charge ceiling was read from: its hours, and the hours it could see.
+
+    `observed` is every hour all three sensors have a row for. In ceiling mode
+    a day without one was never measured, and reading it as a day the battery
+    did not fill would print "never filled" over a sensor added mid-year.
+    """
+
+    hours: frozenset[datetime]
+    observed: frozenset[datetime]
+
+
+def charge_ceiling(
+    soc: Sequence[HourlyRow],
+    battery: Sequence[HourlyRow],
+    pv: Sequence[HourlyRow],
+    *,
+    low_pct: float,
+    idle_w: float,
+) -> Ceiling:
+    """The hours the battery stood full while the sun was up, and the hours all three saw."""
+    battery_by_start = {row.start: row for row in battery}
+    pv_by_start = {row.start: row for row in pv}
+    still_w = max(idle_w, CEILING_TRICKLE_W)
+    hours: set[datetime] = set()
+    observed: set[datetime] = set()
+    for charge in soc:
+        power = battery_by_start.get(charge.start)
+        sun = pv_by_start.get(charge.start)
+        if power is None or sun is None:
+            continue
+        observed.add(charge.start)
+        if (
+            sun.mean >= CEILING_PV_MIN_W
+            and abs(power.mean) <= still_w
+            and charge.max - charge.min <= CEILING_SOC_FLAT_PCT
+            and charge.min >= low_pct + CEILING_ABOVE_LOW_PCT
+        ):
+            hours.add(charge.start)
+    return Ceiling(frozenset(hours), frozenset(observed))
+
+
 def ceiling_hours(
     soc: Sequence[HourlyRow],
     battery: Sequence[HourlyRow],
@@ -136,24 +179,9 @@ def ceiling_hours(
     *,
     low_pct: float,
     idle_w: float,
-) -> set[datetime]:
+) -> frozenset[datetime]:
     """Hours in which the battery stood full while the sun was up, whatever its limit."""
-    battery_by_start = {row.start: row for row in battery}
-    pv_by_start = {row.start: row for row in pv}
-    hours: set[datetime] = set()
-    for charge in soc:
-        power = battery_by_start.get(charge.start)
-        sun = pv_by_start.get(charge.start)
-        if power is None or sun is None:
-            continue
-        if (
-            sun.mean >= CEILING_PV_MIN_W
-            and abs(power.mean) <= max(idle_w, CEILING_TRICKLE_W)
-            and charge.max - charge.min <= CEILING_SOC_FLAT_PCT
-            and charge.min >= low_pct + CEILING_ABOVE_LOW_PCT
-        ):
-            hours.add(charge.start)
-    return hours
+    return charge_ceiling(soc, battery, pv, low_pct=low_pct, idle_w=idle_w).hours
 
 
 def battery_evidence(
@@ -162,7 +190,7 @@ def battery_evidence(
     *,
     low_pct: float,
     full_pct: float,
-    ceiling: set[datetime] | None = None,
+    ceiling: Ceiling | None = None,
 ) -> dict[str, Any]:
     """Days that filled, days that hit the low mark, and how the two overlap.
 
@@ -171,23 +199,35 @@ def battery_evidence(
     can hold and it was not enough for the night — that is the battery being
     small. A day that hit the low mark without ever filling was not a fair
     test of the battery: that is the sun, or a charging policy, and it feeds
-    the solar verdict instead. With a set of ceiling hours, "full" is the
-    battery's own limit, so a charge capped below the fixed mark still counts.
+    the solar verdict instead.
+
+    With a ceiling, "full" is the battery's own limit, so a charge capped
+    below the fixed mark still counts; so does a late fill that reached the
+    fixed mark without standing an hour there, while the marks are not
+    crossed. Only days with an hour all three sensors saw are counted.
     """
     full: dict[str, bool] = defaultdict(bool)
     low: dict[str, bool] = defaultdict(bool)
+    lowest: dict[str, float] = {}
+    late_fill = full_pct > low_pct
     for row in rows:
         day = local_day(row.start, tz)
-        reached = row.start in ceiling if ceiling is not None else row.max >= full_pct
+        if ceiling is None:
+            reached = row.max >= full_pct
+        else:
+            reached = row.start in ceiling.hours or (late_fill and row.max >= full_pct)
         full[day] = full[day] or reached
         low[day] = low[day] or row.min < low_pct
-    days = set(full) | set(low)
+        lowest[day] = min(lowest.get(day, row.min), row.min)
+    days = set(full)
+    if ceiling is not None:
+        days &= {local_day(moment, tz) for moment in ceiling.observed}
     return {
         "days_with_data": len(days),
         "days_full": sum(1 for day in days if full[day]),
         "days_full_and_low": sum(1 for day in days if full[day] and low[day]),
         "days_low_without_full": sum(1 for day in days if low[day] and not full[day]),
-        "lowest_pct": min((row.min for row in rows), default=None),
+        "lowest_pct": min((lowest[day] for day in days), default=None),
     }
 
 
@@ -390,8 +430,10 @@ def build_sizing_payload(
     energy: Mapping[str, EnergySeries],
     low_pct: float,
     full_pct: float,
-    ceiling: set[datetime] | None = None,
+    ceiling: Ceiling | None = None,
     export_limited: bool | None = None,
+    ceiling_missing: Sequence[str] = (),
+    ceiling_no_rows: Sequence[str] = (),
 ) -> dict[str, Any]:
     """The three verdicts for the period and for every month the window touches.
 
@@ -405,9 +447,11 @@ def build_sizing_payload(
     not the month's: a full month of load beside twelve days of charge would
     otherwise present the battery verdict under a full-month banner.
 
-    With a set of ceiling hours "full" is the battery's own limit, and with
+    With a ceiling "full" is the battery's own limit, and with
     `export_limited` true the Sun is judged by days at that limit. Both are
     decided once for the window, so every month reads the same rule.
+    `ceiling_missing` and `ceiling_no_rows` say why there is no ceiling, so
+    the tab never asks for a sensor that is already mapped.
     """
     load_rows = load.rows if load is not None else ()
     soc_rows = soc.rows if soc is not None else ()
@@ -443,7 +487,12 @@ def build_sizing_payload(
         }
         measured = {
             "inverter": len(load_part),
-            "battery": len(soc_part),
+            # In ceiling mode a charge row no power sensor saw judged nothing.
+            "battery": (
+                len(soc_part)
+                if ceiling is None
+                else sum(1 for row in soc_part if row.start in ceiling.observed)
+            ),
             # The pair is only as measured as its thinner half: a share of
             # consumption needs both counters to have seen the same span.
             "solar": min(counters.pv_hours, counters.consumption_hours),
@@ -515,6 +564,8 @@ def build_sizing_payload(
             "full_pct": full_pct,
             "full_mode": "ceiling" if ceiling is not None else "fixed",
             "export_limited": export_limited,
+            "ceiling_missing": list(ceiling_missing),
+            "ceiling_no_rows": list(ceiling_no_rows),
         },
         "covered_start": covered_start.isoformat() if covered_start else None,
         "covered_end": covered_end.isoformat() if covered_end else None,
@@ -540,6 +591,9 @@ def _no_statistics(hass: HomeAssistant, entity_ids: Sequence[str]) -> list[str]:
     return gone
 
 
+_CEILING_HELPERS = ("battery_power", "pv_power")
+
+
 def _ceiling(
     config: EntryConfig,
     soc: HourlySeries | None,
@@ -547,16 +601,16 @@ def _ceiling(
     pv: HourlySeries | None,
     *,
     low_pct: float,
-) -> set[datetime] | None:
-    """The window's ceiling hours, or None to judge "full" by the fixed mark.
+) -> Ceiling | None:
+    """The window's charge ceiling, or None to judge "full" by the fixed mark.
 
-    An empty set is an answer — the battery never stood at its limit — but a
-    sensor with no rows at all is not, and reading it as one would print
+    No ceiling hours is an answer — the battery never stood at its limit — but
+    a sensor with no rows at all is not, and reading it as one would print
     "never filled" over a battery nobody measured.
     """
     if not (soc and soc.rows and battery and battery.rows and pv and pv.rows):
         return None
-    return ceiling_hours(
+    return charge_ceiling(
         soc.rows,
         battery.rows,
         pv.rows,
@@ -647,6 +701,18 @@ async def async_sizing_analytics(
         if ceiling_mode
         else None
     )
+    # Why the fixed mark is read, so the tab never asks for a mapped sensor.
+    helper_ids = {"battery_power": battery_id, "pv_power": pv_id}
+    ceiling_missing = [role for role in _CEILING_HELPERS if not helper_ids[role]]
+    ceiling_no_rows = (
+        [
+            role
+            for role in _CEILING_HELPERS
+            if not ((series := extremes.get(helper_ids[role])) and series.rows)
+        ]
+        if ceiling_mode
+        else []
+    )
     # A helper sensor without statistics drops back to the fixed mark, and
     # there the crossed pair is as wrong as it ever was.
     thresholds_inverted = ceiling is None and marks_crossed
@@ -671,6 +737,8 @@ async def async_sizing_analytics(
         full_pct=full_pct,
         ceiling=ceiling,
         export_limited=export,
+        ceiling_missing=ceiling_missing,
+        ceiling_no_rows=ceiling_no_rows,
     )
     payload["cards"] = {
         "inverter": {

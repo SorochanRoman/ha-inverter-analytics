@@ -10,10 +10,12 @@ from custom_components.inverter_analytics.analytics.sizing import (
     ENOUGH,
     SHORT,
     SOLAR_CURTAILED_BORDERLINE_SHARE,
+    Ceiling,
     battery_evidence,
     battery_verdict,
     build_sizing_payload,
     ceiling_hours,
+    charge_ceiling,
     export_limited,
     inverter_evidence,
     inverter_verdict,
@@ -228,12 +230,56 @@ def test_an_hour_missing_from_the_battery_power_is_not_a_ceiling_hour():
     assert not ceiling_hours(soc, [], pv, low_pct=20.0, idle_w=50.0)
 
 
+def observed_everywhere(rows, hours=()) -> Ceiling:
+    return Ceiling(frozenset(hours), frozenset(row.start for row in rows))
+
+
 def test_a_battery_capped_at_85_counts_as_full_by_its_ceiling():
     soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(30, mean=30.0, low=15.0, high=50.0)]
-    ceiling = {BASE + timedelta(hours=12)}
+    ceiling = observed_everywhere(soc, {BASE + timedelta(hours=12)})
     evidence = battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=ceiling)
     assert evidence["days_full"] == 1
     assert evidence["days_with_data"] == 2
+
+
+def test_the_observed_hours_are_those_all_three_sensors_saw():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(13, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0), hour(13, mean=0.0)]
+    pv = [hour(12, mean=2500.0)]
+    ceiling = charge_ceiling(soc, power, pv, low_pct=20.0, idle_w=50.0)
+    assert ceiling.hours == ceiling.observed == frozenset({BASE + timedelta(hours=12)})
+
+
+def test_in_ceiling_mode_a_day_without_an_observed_hour_is_not_counted():
+    # Day two has charge rows only: unmeasured, not a day the battery failed to fill.
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(36, mean=30.0, low=15.0, high=50.0)]
+    ceiling = Ceiling(frozenset(), frozenset({BASE + timedelta(hours=12)}))
+    evidence = battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=ceiling)
+    assert evidence["days_with_data"] == 1
+    assert evidence["days_low_without_full"] == 0
+    assert evidence["lowest_pct"] == 85.0
+
+
+def test_in_ceiling_mode_a_late_fill_to_the_full_mark_counts():
+    # Touched 100% at 14:40 as the sun faded: never an hour standing at the limit.
+    soc = [hour(14, mean=97.0, low=93.0, high=100.0)]
+    evidence = battery_evidence(
+        soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=observed_everywhere(soc)
+    )
+    assert evidence["days_full"] == 1
+    capped = [hour(14, mean=84.0, low=80.0, high=85.0)]
+    evidence = battery_evidence(
+        capped, UTC, low_pct=20.0, full_pct=95.0, ceiling=observed_everywhere(capped)
+    )
+    assert evidence["days_full"] == 0, "a summer cap below the mark needs a ceiling hour"
+
+
+def test_in_ceiling_mode_crossed_marks_drop_the_late_fill_clause():
+    soc = [hour(14, mean=97.0, low=93.0, high=100.0)]
+    evidence = battery_evidence(
+        soc, UTC, low_pct=30.0, full_pct=20.0, ceiling=observed_everywhere(soc)
+    )
+    assert evidence["days_full"] == 0
 
 
 def test_without_a_ceiling_the_fixed_mark_still_applies():
@@ -642,7 +688,59 @@ def _capped_battery_payload(**kwargs):
         low_pct=20.0,
         full_pct=95.0,
         **kwargs,
-    ), {day[14].start for day in days}
+    ), Ceiling(
+        frozenset(day[14].start for day in days),
+        frozenset(row.start for day in days for row in day),
+    )
+
+
+def test_a_month_without_the_helper_sensors_is_unmeasured_in_ceiling_mode():
+    """Battery and PV power added on April 1st: March's charge rows judge nothing."""
+    start = datetime(2026, 3, 30, tzinfo=KYIV).astimezone(UTC)
+    window = Window(start, start + timedelta(days=4))
+    soc = []
+    for h in range(96):
+        moment = start + timedelta(hours=h)
+        flat = moment.astimezone(KYIV).hour == 14
+        soc.append(HourlyRow(moment, 80.0, 80.0 if flat else 55.0, 80.0 if flat else 65.0))
+    april = [row.start for row in soc if row.start.astimezone(KYIV).month == 4]
+    power = [HourlyRow(moment, 0.0, -20.0, 20.0) for moment in april]
+    pv = [HourlyRow(moment, 2500.0, 1800.0, 3200.0) for moment in april]
+    ceiling = charge_ceiling(soc, power, pv, low_pct=20.0, idle_w=50.0)
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=HourlySeries(tuple(soc)),
+        energy={
+            "pv_energy_total": _energy(0.5, start, 96),
+            "load_energy_total": _energy(1.0, start, 96),
+        },
+        low_pct=20.0,
+        full_pct=95.0,
+        ceiling=ceiling,
+        export_limited=True,
+    )
+    march, april_month = payload["months"]
+    assert march["key"] == "2026-03"
+    assert march["battery"]["reason"] == "no_data", "unmeasured, not never full"
+    assert march["battery"]["coverage"] == 0.0
+    assert march["solar"]["evidence"]["fill_share"] is None, "no fill of 0 for March"
+    assert april_month["battery"]["evidence"]["days_full"] == 2
+    assert payload["period"]["battery"]["evidence"]["days_with_data"] == 2
+    assert payload["period"]["solar"]["evidence"]["fill_share"] == 1.0
+
+
+def test_the_rules_say_why_ceiling_mode_was_not_used():
+    payload, _ = _capped_battery_payload(
+        ceiling_missing=["pv_power"], ceiling_no_rows=["battery_power"]
+    )
+    assert payload["rules"]["ceiling_missing"] == ["pv_power"]
+    assert payload["rules"]["ceiling_no_rows"] == ["battery_power"]
+    payload, ceiling = _capped_battery_payload()
+    payload, _ = _capped_battery_payload(ceiling=ceiling)
+    assert payload["rules"]["ceiling_missing"] == payload["rules"]["ceiling_no_rows"] == []
 
 
 def test_the_payload_reads_full_by_the_ceiling_and_the_sun_by_the_no_export_rule():
@@ -659,7 +757,8 @@ def test_the_payload_reads_full_by_the_ceiling_and_the_sun_by_the_no_export_rule
 
 
 def test_an_empty_ceiling_is_a_battery_that_never_reached_its_limit():
-    payload, _ = _capped_battery_payload(ceiling=set())
+    _, ceiling = _capped_battery_payload()
+    payload, _ = _capped_battery_payload(ceiling=Ceiling(frozenset(), ceiling.observed))
     assert payload["rules"]["full_mode"] == "ceiling"
     assert payload["period"]["battery"]["reason"] == "never_full"
 

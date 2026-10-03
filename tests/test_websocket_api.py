@@ -1009,6 +1009,7 @@ async def test_sizing_reads_full_by_the_charge_ceiling_and_export_by_signed_grid
     )
     assert result["rules"]["full_mode"] == "ceiling"
     assert result["rules"]["export_limited"] is False
+    assert result["rules"]["ceiling_missing"] == result["rules"]["ceiling_no_rows"] == []
     assert result["period"]["battery"]["evidence"]["days_full"] == 1
     assert result["period"]["solar"]["evidence"]["fill_share"] == 1.0
 
@@ -1031,6 +1032,8 @@ async def test_sizing_falls_back_to_the_fixed_mark_without_battery_power_rows(
     assert result["rules"]["full_mode"] == "fixed"
     assert result["rules"]["export_limited"] is True
     assert result["period"]["battery"]["reason"] == "never_full"
+    assert result["rules"]["ceiling_missing"] == []
+    assert result["rules"]["ceiling_no_rows"] == ["battery_power"]
     # Production covers the load, but without export that is not enough: the
     # battery never reached the mark, so the share alone makes it borderline.
     assert result["period"]["solar"]["verdict"] == "borderline"
@@ -1063,6 +1066,8 @@ async def test_sizing_reads_export_from_the_counter_without_naming_it_on_the_sol
     assert result["rules"]["full_mode"] == "fixed"
     assert result["rules"]["export_limited"] is True
     assert result["cards"]["solar"] == {"missing": [], "no_statistics": []}
+    assert result["rules"]["ceiling_missing"] == ["battery_power", "pv_power"]
+    assert result["rules"]["ceiling_no_rows"] == []
     # No charge sensor, so no fill share: the no-export rule cannot be read.
     assert result["period"]["solar"]["reason"] == "no_fill"
 
