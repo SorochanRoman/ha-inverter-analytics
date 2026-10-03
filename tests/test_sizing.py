@@ -12,6 +12,7 @@ from custom_components.inverter_analytics.analytics.sizing import (
     battery_evidence,
     battery_verdict,
     build_sizing_payload,
+    ceiling_hours,
     inverter_evidence,
     inverter_verdict,
     local_day,
@@ -170,6 +171,51 @@ def test_days_follow_the_local_clock_across_the_spring_change():
     evidence = battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0)
     assert evidence["days_with_data"] == 2
     assert evidence["days_full_and_low"] == 1
+
+
+def test_a_ceiling_hour_is_sun_up_battery_still_charge_flat_and_high():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
+
+
+def test_each_condition_alone_breaks_a_ceiling_hour():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    args = {"low_pct": 20.0, "idle_w": 50.0}
+    assert not ceiling_hours(soc, power, [hour(12, mean=99.0, low=0.0, high=200.0)], **args)
+    assert not ceiling_hours(soc, [hour(12, mean=0.0, low=-20.0, high=51.0)], pv, **args)
+    assert not ceiling_hours([hour(12, mean=85.0, low=83.5, high=85.0)], power, pv, **args)
+    assert not ceiling_hours([hour(12, mean=39.0, low=39.0, high=39.5)], power, pv, **args)
+
+
+def test_charge_and_discharge_in_one_hour_is_not_standing_still():
+    # Half an hour each way averages to zero; the extremes give it away.
+    soc = [hour(12, mean=85.0, low=84.5, high=85.0)]
+    power = [hour(12, mean=0.0, low=-1500.0, high=1500.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert not ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0)
+
+
+def test_an_hour_missing_from_one_sensor_is_not_a_ceiling_hour():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    assert not ceiling_hours(soc, power, [], low_pct=20.0, idle_w=50.0)
+
+
+def test_a_battery_capped_at_85_counts_as_full_by_its_ceiling():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(30, mean=30.0, low=15.0, high=50.0)]
+    ceiling = {BASE + timedelta(hours=12)}
+    evidence = battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=ceiling)
+    assert evidence["days_full"] == 1
+    assert evidence["days_with_data"] == 2
+
+
+def test_without_a_ceiling_the_fixed_mark_still_applies():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    assert battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0)["days_full"] == 0
 
 
 def solar(share: float, fill: float | None = None, load_kwh: float = 100.0):

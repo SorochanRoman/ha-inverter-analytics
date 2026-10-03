@@ -53,6 +53,14 @@ SOLAR_FILL_SHARE = 0.8
 # recorder never compiled must not drop the figure; a missing month must.
 IMPORT_COVERAGE_FLOOR = 0.9
 
+# A ceiling hour: the inverter stopped charging although the sun was up. In
+# self-consumption mode that happens only at the battery's charge limit — or
+# at its floor, which the margin above the low mark excludes. Read from the
+# hour's extremes, not its mean: half an hour each way averages to zero.
+CEILING_PV_MIN_W = 100.0
+CEILING_SOC_FLAT_PCT = 1.0
+CEILING_ABOVE_LOW_PCT = 20.0
+
 SECONDS_PER_HOUR = 3600.0
 
 
@@ -105,8 +113,41 @@ def inverter_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
     return {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
 
 
+def ceiling_hours(
+    soc: Sequence[HourlyRow],
+    battery: Sequence[HourlyRow],
+    pv: Sequence[HourlyRow],
+    *,
+    low_pct: float,
+    idle_w: float,
+) -> set[datetime]:
+    """Hours in which the battery stood full while the sun was up, whatever its limit."""
+    battery_by_start = {row.start: row for row in battery}
+    pv_by_start = {row.start: row for row in pv}
+    hours: set[datetime] = set()
+    for charge in soc:
+        power = battery_by_start.get(charge.start)
+        sun = pv_by_start.get(charge.start)
+        if power is None or sun is None:
+            continue
+        if (
+            sun.mean >= CEILING_PV_MIN_W
+            and power.min >= -idle_w
+            and power.max <= idle_w
+            and charge.max - charge.min <= CEILING_SOC_FLAT_PCT
+            and charge.min >= low_pct + CEILING_ABOVE_LOW_PCT
+        ):
+            hours.add(charge.start)
+    return hours
+
+
 def battery_evidence(
-    rows: Sequence[HourlyRow], tz: tzinfo, *, low_pct: float, full_pct: float
+    rows: Sequence[HourlyRow],
+    tz: tzinfo,
+    *,
+    low_pct: float,
+    full_pct: float,
+    ceiling: set[datetime] | None = None,
 ) -> dict[str, Any]:
     """Days that filled, days that hit the low mark, and how the two overlap.
 
@@ -115,13 +156,15 @@ def battery_evidence(
     can hold and it was not enough for the night — that is the battery being
     small. A day that hit the low mark without ever filling was not a fair
     test of the battery: that is the sun, or a charging policy, and it feeds
-    the solar verdict instead.
+    the solar verdict instead. With a set of ceiling hours, "full" is the
+    battery's own limit, so a charge capped below the fixed mark still counts.
     """
     full: dict[str, bool] = defaultdict(bool)
     low: dict[str, bool] = defaultdict(bool)
     for row in rows:
         day = local_day(row.start, tz)
-        full[day] = full[day] or row.max >= full_pct
+        reached = row.start in ceiling if ceiling is not None else row.max >= full_pct
+        full[day] = full[day] or reached
         low[day] = low[day] or row.min < low_pct
     days = set(full) | set(low)
     return {
