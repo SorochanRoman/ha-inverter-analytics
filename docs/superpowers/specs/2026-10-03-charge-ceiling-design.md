@@ -104,11 +104,16 @@ share that cannot reach *enough*.
   charge limit with the sun up" instead of "filled to 95 %".
 - The Sun rule sentence has a third form for the no-export rule, built from
   the rules in the payload; `ruleSentence` picks it when
-  `rules.export_limited` is true.
+  `rules.export_limited` is true. It follows the full mode: "reached its
+  charge limit with the sun up" in ceiling mode, "reached 95 %" (the fixed
+  mark) in fixed mode, since export is decided without the power sensors.
 - `reasonSentence` gains the solar reason `no_fill`, and `reasonHint` a
-  short hint for it.
-- A one-line note under the rules says which "full" was used and, without
-  export, why the Sun is judged by days at the limit.
+  short hint for it; the sentence says "filled", which is true in both modes.
+  In ceiling mode the battery's `never_full` sentence and hint say the
+  battery never reached its charge limit.
+- A one-line note under the rules says which "full" was used. Why the Sun is
+  judged by days at full without export is said in the opening clause of the
+  no-export rule sentence itself, not in this note.
 
 All strings in `en.ts` and `uk.ts`; types in `types.ts`.
 

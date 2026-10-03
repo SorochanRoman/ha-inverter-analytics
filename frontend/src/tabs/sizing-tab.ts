@@ -199,6 +199,13 @@ export class IaSizingTab extends LitElement {
           borderlineFill: pct(rules.solar_curtailed_borderline_share),
           borderline,
         });
+      case "no_export_fixed":
+        return m.sizing.solarRuleNoExportFixed({
+          full: pct(rules.full_pct / 100),
+          fill: pct(rules.solar_fill_share),
+          borderlineFill: pct(rules.solar_curtailed_borderline_share),
+          borderline,
+        });
       case "with_fill":
         return m.sizing.solarRuleWithFill({
           enough,
@@ -282,10 +289,14 @@ export class IaSizingTab extends LitElement {
       // Everything the payload could name has been ruled out above, so this
       // is a sensor that was mapped and has since been deleted. It still gets
       // a sentence: an empty card reads as a bug.
-      body = html`<p class="note">${reasonSentence(m, card, "no_data")}</p>`;
+      body = html`<p class="note">
+        ${reasonSentence(m, card, "no_data", payload.rules.full_mode)}
+      </p>`;
     } else if (block.verdict === null) {
       body = html`
-        <p class="note">${reasonSentence(m, card, block.reason ?? "no_data")}</p>
+        <p class="note">
+          ${reasonSentence(m, card, block.reason ?? "no_data", payload.rules.full_mode)}
+        </p>
         ${this.renderCoverageNote(block, payload)}
       `;
     } else {
@@ -331,7 +342,9 @@ export class IaSizingTab extends LitElement {
           ? // Why there is no verdict: a month the battery never filled is the
             // rule working, a month with no statistics is missing data, and
             // "No verdict" alone reads the same for both.
-            html`<span class="hint">${reasonHint(m, card, block.reason ?? "no_data")}</span>`
+            html`<span class="hint"
+              >${reasonHint(m, card, block.reason ?? "no_data", payload.rules.full_mode)}</span
+            >`
           : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
         ${thin
           ? html`<span class="hint"

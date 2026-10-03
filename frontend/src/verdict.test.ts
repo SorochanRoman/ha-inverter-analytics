@@ -19,37 +19,56 @@ describe("verdict copy", () => {
   });
 
   it("explains why a verdict is withheld, per card", () => {
-    expect(reasonSentence(en, "battery", "never_full")).toMatch(/never filled/);
-    expect(reasonSentence(en, "inverter", "no_data")).toMatch(/no statistics/);
-    expect(reasonSentence(en, "solar", "no_data")).toMatch(/no statistics/);
+    expect(reasonSentence(en, "battery", "never_full", "fixed")).toMatch(/never filled/);
+    expect(reasonSentence(en, "inverter", "no_data", "fixed")).toMatch(/no statistics/);
+    expect(reasonSentence(en, "solar", "no_data", "fixed")).toMatch(/no statistics/);
   });
 
   it("falls back to the no-data sentence for a reason it has never heard of", () => {
     // A block can arrive with no reason at all — a mapped entity that no
     // longer exists — and the card must still print a sentence.
-    expect(reasonSentence(en, "battery", "no_data")).toMatch(/no statistics/);
-    expect(reasonSentence(en, "solar", "something_new")).toBe(
-      reasonSentence(en, "solar", "no_data"),
+    expect(reasonSentence(en, "battery", "no_data", "fixed")).toMatch(/no statistics/);
+    expect(reasonSentence(en, "solar", "something_new", "fixed")).toBe(
+      reasonSentence(en, "solar", "no_data", "fixed"),
     );
   });
 
   it("tells a never-filled month apart from an unmeasured one in a cell", () => {
-    expect(reasonHint(en, "battery", "never_full")).toBe("never filled");
-    expect(reasonHint(en, "battery", "no_data")).toBe("no data");
-    expect(reasonHint(en, "solar", "never_full")).toBe("no data");
+    expect(reasonHint(en, "battery", "never_full", "fixed")).toBe("never filled");
+    expect(reasonHint(en, "battery", "no_data", "fixed")).toBe("no data");
+    expect(reasonHint(en, "solar", "never_full", "fixed")).toBe("no data");
   });
 
-  it("says a no-export span had no charge data to read the sun from", () => {
-    expect(reasonSentence(en, "solar", "no_fill")).toBe(
-      "With no export the sun is read from how often the battery reached its limit, and " +
-        "there is no charge data for this span.",
-    );
-    expect(reasonHint(en, "solar", "no_fill")).toBe("no charge data");
-    expect(reasonSentence(uk, "solar", "no_fill")).toBe(uk.verdict.noFill);
-    expect(reasonHint(uk, "solar", "no_fill")).toBe(uk.verdict.hintNoFill);
+  it("says a no-export span had no charge data to read the sun from, in either mode", () => {
+    for (const mode of ["ceiling", "fixed"] as const) {
+      expect(reasonSentence(en, "solar", "no_fill", mode)).toBe(
+        "With no export the sun is read from how often the battery filled, and there is no " +
+          "charge data for this span.",
+      );
+      expect(reasonHint(en, "solar", "no_fill", mode)).toBe("no charge data");
+      expect(reasonSentence(uk, "solar", "no_fill", mode)).toBe(uk.verdict.noFill);
+      expect(reasonHint(uk, "solar", "no_fill", mode)).toBe(uk.verdict.hintNoFill);
+    }
     // The reason belongs to the sun; on another card it is still unknown.
-    expect(reasonSentence(en, "battery", "no_fill")).toBe(en.verdict.noData.battery);
-    expect(reasonHint(en, "battery", "no_fill")).toBe("no data");
+    expect(reasonSentence(en, "battery", "no_fill", "fixed")).toBe(en.verdict.noData.battery);
+    expect(reasonHint(en, "battery", "no_fill", "fixed")).toBe("no data");
+  });
+
+  it("says the battery never reached its limit when full is the charge limit", () => {
+    expect(reasonSentence(en, "battery", "never_full", "ceiling")).toBe(
+      "The battery never reached its charge limit in this span, so the nights say nothing " +
+        "about its size.",
+    );
+    expect(reasonHint(en, "battery", "never_full", "ceiling")).toBe("limit not reached");
+    expect(reasonSentence(en, "battery", "never_full", "fixed")).toBe(en.verdict.neverFull);
+    expect(reasonHint(en, "battery", "never_full", "fixed")).toBe("never filled");
+    expect(reasonSentence(uk, "battery", "never_full", "ceiling")).toBe(
+      uk.verdict.neverReachedLimit,
+    );
+    expect(reasonHint(uk, "battery", "never_full", "ceiling")).toBe(uk.verdict.hintLimitNotReached);
+    // The mode changes only the never-full words.
+    expect(reasonSentence(en, "battery", "no_data", "ceiling")).toBe(en.verdict.noData.battery);
+    expect(reasonHint(en, "battery", "no_data", "ceiling")).toBe("no data");
   });
 
   it("prints the verdicts in Ukrainian", () => {
@@ -126,10 +145,14 @@ describe("which sun rule the payload was read by", () => {
   });
   const payloadWith = (opts: {
     export_limited?: boolean | null;
+    full_mode?: "ceiling" | "fixed";
     solar?: VerdictBlock | null;
   }): SizingPayload =>
     ({
-      rules: { export_limited: opts.export_limited ?? null },
+      rules: {
+        export_limited: opts.export_limited ?? null,
+        full_mode: opts.full_mode ?? "ceiling",
+      },
       period: { inverter: null, battery: null, solar: opts.solar ?? null },
       cards: {
         inverter: { missing: [], no_statistics: [] },
@@ -143,6 +166,23 @@ describe("which sun rule the payload was read by", () => {
     expect(solarRuleKind(payloadWith({ export_limited: true, solar: fill(null) }))).toBe(
       "no_export",
     );
+  });
+
+  it("picks the fixed no-export rule when export is limited and full is the fixed mark", () => {
+    expect(solarRuleKind(payloadWith({ export_limited: true, full_mode: "fixed" }))).toBe(
+      "no_export_fixed",
+    );
+  });
+
+  it("ignores the full mode when the system exports", () => {
+    for (const full_mode of ["ceiling", "fixed"] as const) {
+      expect(
+        solarRuleKind(payloadWith({ export_limited: false, full_mode, solar: fill(0.5) })),
+      ).toBe("with_fill");
+      expect(
+        solarRuleKind(payloadWith({ export_limited: false, full_mode, solar: fill(null) })),
+      ).toBe("plain");
+    }
   });
 
   it("picks the fill rule when the system exports and the fill was tested", () => {

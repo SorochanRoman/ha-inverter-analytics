@@ -7,7 +7,7 @@
  * arranges what they return.
  */
 import type { Messages } from "./i18n/en";
-import type { SizingCardKey, SizingPayload, Verdict } from "./types";
+import type { FullMode, SizingCardKey, SizingPayload, Verdict } from "./types";
 
 export function verdictLabel(m: Messages, verdict: Verdict | null): string {
   switch (verdict) {
@@ -28,9 +28,20 @@ export function verdictLabel(m: Messages, verdict: Verdict | null): string {
  * Any reason this does not recognise falls back to "no statistics": a block
  * that arrives without one at all — a mapped entity that has since been
  * deleted — must still be explained rather than rendered as an empty card.
+ *
+ * Takes the full mode because "never full" means what the backend read: a
+ * battery that never reached its own charge limit in ceiling mode, one that
+ * never reached the fixed mark otherwise.
  */
-export function reasonSentence(m: Messages, card: SizingCardKey, reason: string): string {
-  if (card === "battery" && reason === "never_full") return m.verdict.neverFull;
+export function reasonSentence(
+  m: Messages,
+  card: SizingCardKey,
+  reason: string,
+  fullMode: FullMode,
+): string {
+  if (card === "battery" && reason === "never_full") {
+    return fullMode === "ceiling" ? m.verdict.neverReachedLimit : m.verdict.neverFull;
+  }
   if (card === "solar" && reason === "no_fill") return m.verdict.noFill;
   return m.verdict.noData[card];
 }
@@ -42,8 +53,15 @@ export function reasonSentence(m: Messages, card: SizingCardKey, reason: string)
  * both "No verdict" in the strip, and they are not the same reading: the
  * first is the tab's own rule doing its job, the second is missing data.
  */
-export function reasonHint(m: Messages, card: SizingCardKey, reason: string): string {
-  if (card === "battery" && reason === "never_full") return m.verdict.hintNeverFilled;
+export function reasonHint(
+  m: Messages,
+  card: SizingCardKey,
+  reason: string,
+  fullMode: FullMode,
+): string {
+  if (card === "battery" && reason === "never_full") {
+    return fullMode === "ceiling" ? m.verdict.hintLimitNotReached : m.verdict.hintNeverFilled;
+  }
   if (card === "solar" && reason === "no_fill") return m.verdict.hintNoFill;
   return m.verdict.hintNoData;
 }
@@ -65,15 +83,21 @@ export function solarFillTested(payload: SizingPayload): boolean {
 }
 
 /**
- * Which of the three Sun rules the verdict was read by.
+ * Which of the Sun rules the verdict was read by.
  *
  * A system that kept its production in cannot show production above
- * consumption, so the backend judges its sun by days at the charge limit
- * instead; that rule wins whenever `export_limited` is true. An unknown
- * decision (null) is read as exporting, as the backend reads it. Otherwise the
- * fill clause is printed only when the fill was tested (see solarFillTested).
+ * consumption, so the backend judges its sun by days the battery was full
+ * instead; that rule wins whenever `export_limited` is true, in the form of
+ * the "full" that was read — the charge limit in ceiling mode, the fixed mark
+ * otherwise. An unknown decision (null) is read as exporting, as the backend
+ * reads it. Otherwise the fill clause is printed only when the fill was tested
+ * (see solarFillTested).
  */
-export function solarRuleKind(payload: SizingPayload): "no_export" | "with_fill" | "plain" {
-  if (payload.rules.export_limited === true) return "no_export";
+export function solarRuleKind(
+  payload: SizingPayload,
+): "no_export" | "no_export_fixed" | "with_fill" | "plain" {
+  if (payload.rules.export_limited === true) {
+    return payload.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed";
+  }
   return solarFillTested(payload) ? "with_fill" : "plain";
 }

@@ -753,10 +753,14 @@ const wb = {
     },
     neverFull: "The battery never filled in this span, so the nights say nothing about its size.",
     hintNeverFilled: "never filled",
+    // Battery reason "never_full" when full is the battery's own charge limit.
+    neverReachedLimit: "The battery never reached its charge limit in this span, so the nights say nothing about its size.",
+    hintLimitNotReached: "limit not reached",
     hintNoData: "no data",
     // Solar reason "no_fill": a no-export system whose sun is read from days
-    // at the charge limit, with no charge data in the span.
-    noFill: "With no export the sun is read from how often the battery reached its limit, and there is no charge data for this span.",
+    // the battery was full, with no charge data in the span. It names neither
+    // the limit nor the mark, so it reads true in both full modes.
+    noFill: "With no export the sun is read from how often the battery filled, and there is no charge data for this span.",
     hintNoFill: "no charge data"
   },
   // charts/options.ts: axis names, legend entries and series names. A legend
@@ -994,6 +998,8 @@ const wb = {
     solarRule: (r) => `Enough when production is at least ${r.enough} of consumption; borderline from ${r.borderline} of consumption; short below.`,
     // The Sun rule of a system that kept its production in.
     solarRuleNoExport: (r) => `With no export, production cannot pass consumption, so the sun is read from the battery: enough when it reached its charge limit with the sun up on at least ${r.fill} of days; borderline from ${r.borderlineFill} of days, or from ${r.borderline} of consumption; short below.`,
+    // The same rule when full is the fixed mark from the options.
+    solarRuleNoExportFixed: (r) => `With no export, production cannot pass consumption, so the sun is read from the battery: enough when it reached ${r.full} on at least ${r.fill} of days; borderline from ${r.borderlineFill} of days, or from ${r.borderline} of consumption; short below.`,
     // Which "full" the battery and Sun verdicts were read by.
     fullModeCeiling: "Full means the battery reached its own charge limit: the inverter stopped charging while the sun was up. A limit set below 100% for the summer still counts.",
     fullModeFixed: (r) => `Full means a charge of at least ${r.full}. Map battery power and PV power to read the battery's own limit instead.`,
@@ -1176,8 +1182,10 @@ const wb = {
     },
     neverFull: "За цей період батарея жодного разу не зарядилася повністю, тож ночі нічого не кажуть про її ємність.",
     hintNeverFilled: "без повного заряду",
+    neverReachedLimit: "За цей період батарея жодного разу не досягла ліміту заряду, тож ночі нічого не кажуть про її ємність.",
+    hintLimitNotReached: "ліміт не досягнуто",
     hintNoData: "немає даних",
-    noFill: "Без експорту сонце оцінюється за тим, як часто батарея досягала ліміту заряду, а даних про заряд за цей період немає.",
+    noFill: "Без експорту сонце оцінюється за тим, як часто батарея заряджалася повністю, а даних про заряд за цей період немає.",
     hintNoFill: "немає даних заряду"
   },
   charts: {
@@ -1403,6 +1411,7 @@ const wb = {
     solarRuleWithFill: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання і батарея заряджалася повністю щонайменше в ${r.fill} днів; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
     solarRule: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
     solarRuleNoExport: (r) => `Без експорту генерація не може перевищити споживання, тож сонце оцінюється за батареєю: достатньо, якщо вона досягала ліміту заряду, поки світило сонце, щонайменше в ${r.fill} днів; на межі — від ${r.borderlineFill} днів або від ${r.borderline} споживання; замало — якщо менше.`,
+    solarRuleNoExportFixed: (r) => `Без експорту генерація не може перевищити споживання, тож сонце оцінюється за батареєю: достатньо, якщо вона заряджалася до ${r.full} щонайменше в ${r.fill} днів; на межі — від ${r.borderlineFill} днів або від ${r.borderline} споживання; замало — якщо менше.`,
     fullModeCeiling: "Повний заряд означає, що батарея досягла власного ліміту заряду: інвертор припинив заряджання, поки світило сонце. Ліміт, знижений на літо нижче 100%, теж враховується.",
     fullModeFixed: (r) => `Повний заряд означає рівень заряду щонайменше ${r.full}. Вкажіть потужність батареї й потужність СЕС, щоб натомість зчитувати власний ліміт батареї.`,
     needsNotSet: (r) => `Потрібне значення ${r.roles}, але для цього інвертора його не задано.`,
@@ -26065,11 +26074,11 @@ function Xg(r, t) {
       return r.verdict.none;
   }
 }
-function qg(r, t, e) {
-  return t === "battery" && e === "never_full" ? r.verdict.neverFull : t === "solar" && e === "no_fill" ? r.verdict.noFill : r.verdict.noData[t];
+function qg(r, t, e, i) {
+  return t === "battery" && e === "never_full" ? i === "ceiling" ? r.verdict.neverReachedLimit : r.verdict.neverFull : t === "solar" && e === "no_fill" ? r.verdict.noFill : r.verdict.noData[t];
 }
-function AP(r, t, e) {
-  return t === "battery" && e === "never_full" ? r.verdict.hintNeverFilled : t === "solar" && e === "no_fill" ? r.verdict.hintNoFill : r.verdict.hintNoData;
+function AP(r, t, e, i) {
+  return t === "battery" && e === "never_full" ? i === "ceiling" ? r.verdict.hintLimitNotReached : r.verdict.hintNeverFilled : t === "solar" && e === "no_fill" ? r.verdict.hintNoFill : r.verdict.hintNoData;
 }
 function IP(r) {
   const t = r.period.solar;
@@ -26078,7 +26087,7 @@ function IP(r) {
   return !e.missing.length && !e.thresholds_inverted;
 }
 function LP(r) {
-  return r.rules.export_limited === !0 ? "no_export" : IP(r) ? "with_fill" : "plain";
+  return r.rules.export_limited === !0 ? r.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : IP(r) ? "with_fill" : "plain";
 }
 var PP = Object.defineProperty, $P = Object.getOwnPropertyDescriptor, Hi = (r, t, e, i) => {
   for (var n = i > 1 ? void 0 : i ? $P(t, e) : t, a = r.length - 1, o; a >= 0; a--)
@@ -26197,6 +26206,13 @@ let Sr = class extends Gt {
           borderlineFill: a(n.solar_curtailed_borderline_share),
           borderline: s
         });
+      case "no_export_fixed":
+        return i.sizing.solarRuleNoExportFixed({
+          full: a(n.full_pct / 100),
+          fill: a(n.solar_fill_share),
+          borderlineFill: a(n.solar_curtailed_borderline_share),
+          borderline: s
+        });
       case "with_fill":
         return i.sizing.solarRuleWithFill({
           enough: o,
@@ -26261,8 +26277,12 @@ let Sr = class extends Gt {
   renderCard(r, t) {
     const e = this.i18n.m, i = this.i18n.locale, n = t.period[r], a = this.renderSetupNote(r, t);
     let o;
-    return a !== null ? o = a : n === null ? o = L`<p class="note">${qg(e, r, "no_data")}</p>` : n.verdict === null ? o = L`
-        <p class="note">${qg(e, r, n.reason ?? "no_data")}</p>
+    return a !== null ? o = a : n === null ? o = L`<p class="note">
+        ${qg(e, r, "no_data", t.rules.full_mode)}
+      </p>` : n.verdict === null ? o = L`
+        <p class="note">
+          ${qg(e, r, n.reason ?? "no_data", t.rules.full_mode)}
+        </p>
         ${this.renderCoverageNote(n, t)}
       ` : o = L`
         ${this.renderEvidence(r, n, t.rules, i)}
@@ -26293,7 +26313,9 @@ let Sr = class extends Gt {
         // Why there is no verdict: a month the battery never filled is the
         // rule working, a month with no statistics is missing data, and
         // "No verdict" alone reads the same for both.
-        L`<span class="hint">${AP(t, n, o.reason ?? "no_data")}</span>`
+        L`<span class="hint"
+              >${AP(t, n, o.reason ?? "no_data", r.rules.full_mode)}</span
+            >`
       ) : L`<span class="hint">${this.cellFigure(n, o, e)}</span>`}
         ${s ? L`<span class="hint"
               >${t.sizing.cellCoverage({ share: cr(o.coverage, e) })}</span

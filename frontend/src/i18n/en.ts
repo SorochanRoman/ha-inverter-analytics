@@ -140,12 +140,18 @@ export const en = {
     neverFull:
       "The battery never filled in this span, so the nights say nothing about its size.",
     hintNeverFilled: "never filled",
+    // Battery reason "never_full" when full is the battery's own charge limit.
+    neverReachedLimit:
+      "The battery never reached its charge limit in this span, so the nights say nothing " +
+      "about its size.",
+    hintLimitNotReached: "limit not reached",
     hintNoData: "no data",
     // Solar reason "no_fill": a no-export system whose sun is read from days
-    // at the charge limit, with no charge data in the span.
+    // the battery was full, with no charge data in the span. It names neither
+    // the limit nor the mark, so it reads true in both full modes.
     noFill:
-      "With no export the sun is read from how often the battery reached its limit, and " +
-      "there is no charge data for this span.",
+      "With no export the sun is read from how often the battery filled, and there is no " +
+      "charge data for this span.",
     hintNoFill: "no charge data",
   },
   // charts/options.ts: axis names, legend entries and series names. A legend
@@ -469,6 +475,16 @@ export const en = {
       `battery: enough when it reached its charge limit with the sun up on at least ${p.fill} ` +
       `of days; borderline from ${p.borderlineFill} of days, or from ${p.borderline} of ` +
       "consumption; short below.",
+    // The same rule when full is the fixed mark from the options.
+    solarRuleNoExportFixed: (p: {
+      full: string;
+      fill: string;
+      borderlineFill: string;
+      borderline: string;
+    }) =>
+      "With no export, production cannot pass consumption, so the sun is read from the " +
+      `battery: enough when it reached ${p.full} on at least ${p.fill} of days; borderline ` +
+      `from ${p.borderlineFill} of days, or from ${p.borderline} of consumption; short below.`,
     // Which "full" the battery and Sun verdicts were read by.
     fullModeCeiling:
       "Full means the battery reached its own charge limit: the inverter stopped charging " +

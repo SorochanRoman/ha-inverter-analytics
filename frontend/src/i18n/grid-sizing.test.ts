@@ -54,7 +54,34 @@ describe("the sizing rules", () => {
     );
   });
 
+  it("reads the fixed no-export rule in English", () => {
+    expect(
+      en.sizing.solarRuleNoExportFixed({
+        full: "95%",
+        fill: "80%",
+        borderlineFill: "40%",
+        borderline: "70%",
+      }),
+    ).toBe(
+      "With no export, production cannot pass consumption, so the sun is read from the " +
+        "battery: enough when it reached 95% on at least 80% of days; borderline from 40% of " +
+        "days, or from 70% of consumption; short below.",
+    );
+  });
+
   it("keep the ceiling and no-export thresholds in Ukrainian", () => {
+    const fixed = uk.sizing.solarRuleNoExportFixed({
+      full: "95%",
+      fill: "80%",
+      borderlineFill: "40%",
+      borderline: "70%",
+    });
+    expect(fixed).toMatch(/^Без експорту/);
+    expect(fixed).toContain("до 95%");
+    expect(fixed).not.toContain("ліміт");
+    expect(fixed).toContain("щонайменше в 80% днів");
+    expect(fixed).toContain("від 40% днів");
+    expect(fixed).toContain("від 70% споживання");
     const battery = uk.sizing.batteryRuleCeiling({ low: "20%", share: "25%" });
     expect(battery).toContain("ліміту заряду");
     expect(battery).toContain("щонайменше в 25%");
