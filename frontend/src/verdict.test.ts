@@ -3,6 +3,7 @@ import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
 import type { SizingCard, SizingPayload, VerdictBlock } from "./types";
 import {
+  fullModeNote,
   reasonHint,
   reasonSentence,
   solarFillTested,
@@ -200,6 +201,103 @@ describe("which sun rule the payload was read by", () => {
   it("falls back to the plain rule when the fill was not tested", () => {
     expect(solarRuleKind(payloadWith({ export_limited: false, solar: fill(null) }))).toBe(
       "plain",
+    );
+  });
+});
+
+describe("which full the note says was read", () => {
+  const payloadWith = (opts: {
+    full_mode?: "ceiling" | "fixed";
+    ceiling_missing?: string[];
+    ceiling_no_rows?: string[];
+    battery_missing?: string[];
+  }): SizingPayload =>
+    ({
+      rules: {
+        full_mode: opts.full_mode ?? "fixed",
+        full_pct: 95,
+        ceiling_missing: opts.ceiling_missing ?? [],
+        ceiling_no_rows: opts.ceiling_no_rows ?? [],
+      },
+      cards: {
+        inverter: { missing: [], no_statistics: [] },
+        battery: { missing: opts.battery_missing ?? [], no_statistics: [] },
+        solar: { missing: [], no_statistics: [] },
+      },
+    }) as unknown as SizingPayload;
+
+  it("says the charge limit was read in ceiling mode", () => {
+    expect(fullModeNote(en, payloadWith({ full_mode: "ceiling" }), "95%")).toBe(
+      en.sizing.fullModeCeiling,
+    );
+  });
+
+  it("names only the roles that are not mapped", () => {
+    expect(fullModeNote(en, payloadWith({ ceiling_missing: ["pv_power"] }), "95%")).toBe(
+      "Full means a charge of at least 95%. Map PV power to read the battery's own limit " +
+        "instead.",
+    );
+    expect(
+      fullModeNote(en, payloadWith({ ceiling_missing: ["battery_power", "pv_power"] }), "95%"),
+    ).toBe(
+      "Full means a charge of at least 95%. Map Battery power and PV power to read the " +
+        "battery's own limit instead.",
+    );
+  });
+
+  it("does not ask to map a sensor that is mapped but kept no statistics", () => {
+    expect(fullModeNote(en, payloadWith({ ceiling_no_rows: ["battery_power"] }), "95%")).toBe(
+      "Battery power keeps no statistics for this period, so full is the fixed mark of 95%.",
+    );
+    expect(
+      fullModeNote(en, payloadWith({ ceiling_no_rows: ["battery_power", "pv_power"] }), "95%"),
+    ).toBe(
+      "Battery power and PV power keep no statistics for this period, so full is the fixed " +
+        "mark of 95%.",
+    );
+  });
+
+  it("prefers the unmapped roles when both lists have some", () => {
+    const note = fullModeNote(
+      en,
+      payloadWith({
+        ceiling_missing: ["pv_power"],
+        ceiling_no_rows: ["battery_power"],
+      }),
+      "95%",
+    );
+    expect(note).toMatch(/^Full means a charge of at least 95%\. Map PV power/);
+  });
+
+  it("states the fixed mark alone when no reason is known", () => {
+    expect(fullModeNote(en, payloadWith({}), "95%")).toBe("Full means a charge of at least 95%.");
+  });
+
+  it("skips the note when the charge sensor is not mapped", () => {
+    const unmapped = payloadWith({
+      battery_missing: ["battery_soc"],
+      ceiling_missing: ["pv_power"],
+    });
+    expect(fullModeNote(en, unmapped, "95%")).toBeNull();
+  });
+
+  it("says the same in Ukrainian, with the roles quoted", () => {
+    expect(fullModeNote(uk, payloadWith({ ceiling_missing: ["pv_power"] }), "95%")).toBe(
+      "Повний заряд означає рівень заряду щонайменше 95%. Вкажіть «Потужність СЕС», щоб " +
+        "натомість зчитувати власний ліміт заряду батареї.",
+    );
+    expect(fullModeNote(uk, payloadWith({ ceiling_no_rows: ["battery_power"] }), "95%")).toBe(
+      "Сенсор «Потужність батареї» не має статистики за цей період, тож повний заряд " +
+        "визначається фіксованою позначкою 95%.",
+    );
+    expect(
+      fullModeNote(uk, payloadWith({ ceiling_no_rows: ["battery_power", "pv_power"] }), "95%"),
+    ).toBe(
+      "Сенсори «Потужність батареї» і «Потужність СЕС» не мають статистики за цей період, " +
+        "тож повний заряд визначається фіксованою позначкою 95%.",
+    );
+    expect(fullModeNote(uk, payloadWith({}), "95%")).toBe(
+      "Повний заряд означає рівень заряду щонайменше 95%.",
     );
   });
 });

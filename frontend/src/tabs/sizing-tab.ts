@@ -19,7 +19,13 @@ import type {
   SizingPayload,
   VerdictBlock,
 } from "../types";
-import { reasonHint, reasonSentence, solarRuleKind, verdictLabel } from "../verdict";
+import {
+  fullModeNote,
+  reasonHint,
+  reasonSentence,
+  solarRuleKind,
+  verdictLabel,
+} from "../verdict";
 
 const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
@@ -405,6 +411,7 @@ export class IaSizingTab extends LitElement {
         part: m.sizing.parts[card],
         rule: this.ruleSentence(card, payload, locale),
       });
+    const fullNote = fullModeNote(m, payload, formatPercent(payload.rules.full_pct / 100, locale));
     return html`
       <div class="status">
         <span class="badge">${m.balance.hourlyStatistics}</span>
@@ -442,11 +449,7 @@ export class IaSizingTab extends LitElement {
         <p class="note">${ruleLine("inverter")}</p>
         <p class="note">${ruleLine("battery")}</p>
         <p class="note">${ruleLine("solar")}</p>
-        <p class="note">
-          ${payload.rules.full_mode === "ceiling"
-            ? m.sizing.fullModeCeiling
-            : m.sizing.fullModeFixed({ full: formatPercent(payload.rules.full_pct / 100, locale) })}
-        </p>
+        ${fullNote ? html`<p class="note">${fullNote}</p>` : nothing}
         <p class="note">${m.sizing.hourlyNotMean}</p>
       </section>
     `;

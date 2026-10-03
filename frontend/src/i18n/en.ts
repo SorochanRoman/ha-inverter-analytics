@@ -489,9 +489,16 @@ export const en = {
     fullModeCeiling:
       "Full means the battery reached its own charge limit: the inverter stopped charging " +
       "while the sun was up. A limit set below 100% for the summer still counts.",
-    fullModeFixed: (p: { full: string }) =>
-      `Full means a charge of at least ${p.full}. Map battery power and PV power to read the ` +
-      "battery's own limit instead.",
+    // The fixed mark, and why it was read: the roles to map, or the mapped
+    // roles that kept no statistics. The roles arrive set off by
+    // common.quoted; the count lets a language agree with one or several.
+    fullModeFixed: (p: { full: string; roles: string; n: number }) =>
+      `Full means a charge of at least ${p.full}. Map ${p.roles} to read the battery's own ` +
+      "limit instead.",
+    fullModeNoRows: (p: { full: string; roles: string; n: number }) =>
+      `${p.roles} ${p.n === 1 ? "keeps" : "keep"} no statistics for this period, so full is ` +
+      `the fixed mark of ${p.full}.`,
+    fullModePlain: (p: { full: string }) => `Full means a charge of at least ${p.full}.`,
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.

@@ -48,10 +48,16 @@ describe("the sizing rules", () => {
       "Full means the battery reached its own charge limit: the inverter stopped charging " +
         "while the sun was up. A limit set below 100% for the summer still counts.",
     );
-    expect(en.sizing.fullModeFixed({ full: "95%" })).toBe(
-      "Full means a charge of at least 95%. Map battery power and PV power to read the " +
+    expect(
+      en.sizing.fullModeFixed({ full: "95%", roles: "Battery power and PV power", n: 2 }),
+    ).toBe(
+      "Full means a charge of at least 95%. Map Battery power and PV power to read the " +
         "battery's own limit instead.",
     );
+    expect(en.sizing.fullModeNoRows({ full: "95%", roles: "PV power", n: 1 })).toBe(
+      "PV power keeps no statistics for this period, so full is the fixed mark of 95%.",
+    );
+    expect(en.sizing.fullModePlain({ full: "95%" })).toBe("Full means a charge of at least 95%.");
   });
 
   it("reads the fixed no-export rule in English", () => {
@@ -95,7 +101,13 @@ describe("the sizing rules", () => {
     expect(solar).toContain("щонайменше в 80% днів");
     expect(solar).toContain("від 40% днів");
     expect(solar).toContain("від 70% споживання");
-    expect(uk.sizing.fullModeFixed({ full: "95%" })).toContain("щонайменше 95%");
+    expect(uk.sizing.fullModeFixed({ full: "95%", roles: "«Потужність СЕС»", n: 1 })).toContain(
+      "щонайменше 95%",
+    );
+    expect(uk.sizing.fullModeNoRows({ full: "95%", roles: "«Потужність СЕС»", n: 1 })).toContain(
+      "фіксованою позначкою 95%",
+    );
+    expect(uk.sizing.fullModePlain({ full: "95%" })).toContain("щонайменше 95%");
     expect(uk.sizing.fullModeCeiling).toContain("ліміту заряду");
   });
 

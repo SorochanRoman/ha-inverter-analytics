@@ -7,6 +7,7 @@
  * arranges what they return.
  */
 import type { Messages } from "./i18n/en";
+import { listRoles } from "./roles";
 import type { FullMode, SizingCardKey, SizingPayload, Verdict } from "./types";
 
 export function verdictLabel(m: Messages, verdict: Verdict | null): string {
@@ -100,4 +101,30 @@ export function solarRuleKind(
     return payload.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed";
   }
   return solarFillTested(payload) ? "with_fill" : "plain";
+}
+
+/**
+ * The note under the rules that says which "full" was read, or null for none.
+ *
+ * In fixed mode it says why, from what the backend reports: the roles that
+ * are not mapped are named first, since mapping them is the reader's move;
+ * then the mapped roles that kept no statistics for the period, which must
+ * not be told to map what they already have. With neither, the mark alone.
+ * Without a charge sensor there is no battery to be full, so no note.
+ *
+ * `full` is the full mark already formatted in the panel's locale.
+ */
+export function fullModeNote(m: Messages, payload: SizingPayload, full: string): string | null {
+  if (payload.cards.battery.missing.includes("battery_soc")) return null;
+  const rules = payload.rules;
+  if (rules.full_mode === "ceiling") return m.sizing.fullModeCeiling;
+  const missing = rules.ceiling_missing ?? [];
+  if (missing.length) {
+    return m.sizing.fullModeFixed({ full, roles: listRoles(m, missing, true), n: missing.length });
+  }
+  const noRows = rules.ceiling_no_rows ?? [];
+  if (noRows.length) {
+    return m.sizing.fullModeNoRows({ full, roles: listRoles(m, noRows, true), n: noRows.length });
+  }
+  return m.sizing.fullModePlain({ full });
 }

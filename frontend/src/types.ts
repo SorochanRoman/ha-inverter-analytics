@@ -449,6 +449,11 @@ export interface SizingPayload {
     // Whether the system kept its production in; null when the solar
     // counters are not mapped, or when no source could tell.
     export_limited: boolean | null;
+    // Why "full" is the fixed mark: the roles among battery_power and
+    // pv_power that are not mapped, and the mapped ones that returned no
+    // rows for the window. Both empty in ceiling mode.
+    ceiling_missing: string[];
+    ceiling_no_rows: string[];
   };
   cards: Record<SizingCardKey, SizingCard>;
   entities: Record<string, string>;
