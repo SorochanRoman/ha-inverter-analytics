@@ -67,11 +67,15 @@ IMPORT_COVERAGE_FLOOR = 0.9
 
 # A ceiling hour: the inverter stopped charging although the sun was up. In
 # self-consumption mode that happens only at the battery's charge limit — or
-# at its floor, which the margin above the low mark excludes. Read from the
-# hour's extremes, not its mean: half an hour each way averages to zero.
+# at its floor, which the margin above the low mark excludes. The flat charge
+# is what tells it apart: a point of charge in an hour rules out any charging
+# or discharging worth the name, half an hour each way included. The power is
+# only asked to be small on average, because a BMS balancing at 100% draws a
+# trickle of a few hundred watts and a regulating inverter wobbles around zero.
 CEILING_PV_MIN_W = 100.0
 CEILING_SOC_FLAT_PCT = 1.0
 CEILING_ABOVE_LOW_PCT = 20.0
+CEILING_TRICKLE_W = 300.0
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -144,8 +148,7 @@ def ceiling_hours(
             continue
         if (
             sun.mean >= CEILING_PV_MIN_W
-            and power.min >= -idle_w
-            and power.max <= idle_w
+            and abs(power.mean) <= max(idle_w, CEILING_TRICKLE_W)
             and charge.max - charge.min <= CEILING_SOC_FLAT_PCT
             and charge.min >= low_pct + CEILING_ABOVE_LOW_PCT
         ):
@@ -240,13 +243,20 @@ def export_limited(
 
     Read from the first source that can answer: the export counter, against
     `EXPORT_LIMITED_SHARE` of production, when it has rows and production was
-    measured; then grid power, signed so that negative is export, against the
-    zero band; otherwise None — unknown, which the Sun rule reads as exporting.
+    measured; then grid power, signed so that negative is export; otherwise
+    None — unknown, which the Sun rule reads as exporting.
+
+    By grid power an hour exported when its mean fell below the zero band, and
+    the system kept its production in when such hours are at most
+    `EXPORT_LIMITED_SHARE` of the hours read. The hour's minimum is not used:
+    a zero-export inverter regulating against a clamp overshoots into export
+    for a few seconds whenever a load switches off.
     """
     if export is not None and export.rows and pv_kwh > 0:
         return export.total <= EXPORT_LIMITED_SHARE * pv_kwh
     if grid:
-        return all(row.min >= -zero_w for row in grid)
+        exporting = sum(1 for row in grid if row.mean < -zero_w)
+        return exporting <= EXPORT_LIMITED_SHARE * len(grid)
     return None
 
 

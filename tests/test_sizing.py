@@ -188,14 +188,14 @@ def test_each_condition_alone_breaks_a_ceiling_hour():
     pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
     args = {"low_pct": 20.0, "idle_w": 50.0}
     assert not ceiling_hours(soc, power, [hour(12, mean=99.0, low=0.0, high=200.0)], **args)
-    assert not ceiling_hours(soc, [hour(12, mean=0.0, low=-20.0, high=51.0)], pv, **args)
+    assert not ceiling_hours(soc, [hour(12, mean=301.0, low=250.0, high=350.0)], pv, **args)
     assert not ceiling_hours([hour(12, mean=85.0, low=83.5, high=85.0)], power, pv, **args)
     assert not ceiling_hours([hour(12, mean=39.0, low=39.0, high=39.5)], power, pv, **args)
 
 
 def test_charge_and_discharge_in_one_hour_is_not_standing_still():
-    # Half an hour each way averages to zero; the extremes give it away.
-    soc = [hour(12, mean=85.0, low=84.5, high=85.0)]
+    # Half an hour each way averages the power to zero; the charge moving gives it away.
+    soc = [hour(12, mean=85.0, low=83.0, high=85.0)]
     power = [hour(12, mean=0.0, low=-1500.0, high=1500.0)]
     pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
     assert not ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0)
@@ -207,9 +207,17 @@ def test_an_hour_missing_from_one_sensor_is_not_a_ceiling_hour():
     assert not ceiling_hours(soc, power, [], low_pct=20.0, idle_w=50.0)
 
 
+def test_a_trickle_at_the_limit_is_still_a_ceiling_hour():
+    # A BMS balancing at 100% draws a few hundred watts; the flat charge says it is full.
+    soc = [hour(12, mean=100.0, low=100.0, high=100.0)]
+    power = [hour(12, mean=250.0, low=0.0, high=900.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
+
+
 def test_a_ceiling_hour_exactly_on_every_limit_counts():
     soc = [hour(12, mean=40.5, low=40.0, high=41.0)]
-    power = [hour(12, mean=0.0, low=-50.0, high=50.0)]
+    power = [hour(12, mean=-300.0, low=-900.0, high=50.0)]
     pv = [hour(12, mean=100.0, low=50.0, high=150.0)]
     assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
 
@@ -553,9 +561,26 @@ def test_export_is_limited_by_the_counter():
 
 def test_export_is_limited_by_grid_power_when_no_counter():
     never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
-    out = [hour(12, mean=300.0, low=-800.0, high=900.0)]
+    out = [hour(12, mean=-300.0, low=-800.0, high=900.0)]
     assert export_limited(pv_kwh=1000.0, export=None, grid=never_out, zero_w=10.0) is True
     assert export_limited(pv_kwh=1000.0, export=None, grid=out, zero_w=10.0) is False
+
+
+def test_a_second_of_overshoot_is_not_export():
+    # A zero-export inverter regulating against a CT overshoots when a load switches off.
+    overshoot = [hour(h, mean=200.0, low=-300.0, high=900.0) for h in range(100)]
+    assert export_limited(pv_kwh=1000.0, export=None, grid=overshoot, zero_w=10.0) is True
+
+
+def test_export_by_grid_power_tolerates_one_percent_of_exporting_hours():
+    def grid(exporting: int) -> list[HourlyRow]:
+        return [
+            hour(h, mean=-200.0 if h < exporting else 200.0, low=-900.0, high=900.0)
+            for h in range(100)
+        ]
+
+    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(1), zero_w=10.0) is True
+    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(2), zero_w=10.0) is False
 
 
 def test_an_export_counter_with_no_rows_falls_back_to_grid_power():
