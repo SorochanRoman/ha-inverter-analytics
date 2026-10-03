@@ -21,7 +21,12 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from ..const import DEFAULT_BATTERY_FULL_PCT, DEFAULT_BATTERY_LOW_PCT
+from ..const import (
+    DEFAULT_BATTERY_FULL_PCT,
+    DEFAULT_BATTERY_IDLE_W,
+    DEFAULT_BATTERY_LOW_PCT,
+    DEFAULT_GRID_ZERO_W,
+)
 from ..roles import EntryConfig
 from .balance import MIN_DENOMINATOR_KWH
 from .load import HIGH_LOAD_SHARE
@@ -47,6 +52,13 @@ BATTERY_SHORT_SHARE = 0.25
 SOLAR_ENOUGH_SHARE = 1.0
 SOLAR_BORDERLINE_SHARE = 0.7
 SOLAR_FILL_SHARE = 0.8
+# A system that cannot export throws its surplus away, so its production is
+# capped near consumption and the battery's days at its limit say more.
+SOLAR_CURTAILED_BORDERLINE_SHARE = 0.4
+
+# Export at or below this share of production is a system that does not
+# export: a meter's rounding and the odd second of overshoot, not a feed-in.
+EXPORT_LIMITED_SHARE = 0.01
 
 # The share of the consumption counter's hours the import counter must also
 # have before (load - import) / load is a share of the same span. One hour the
@@ -217,12 +229,52 @@ def solar_evidence(
     }
 
 
-def solar_verdict(evidence: Mapping[str, Any]) -> dict[str, Any]:
-    """enough at full cover with the battery filling; borderline from 70% cover; short below."""
+def export_limited(
+    *,
+    pv_kwh: float,
+    export: EnergySeries | None,
+    grid: Sequence[HourlyRow] | None,
+    zero_w: float,
+) -> bool | None:
+    """Whether the system kept its production in, decided once for the window.
+
+    Read from the first source that has rows: the export counter, against
+    `EXPORT_LIMITED_SHARE` of production; then grid power, signed so that
+    negative is export, against the zero band; otherwise None — unknown,
+    which the Sun rule reads as exporting.
+    """
+    if export is not None and export.rows:
+        return export.total <= EXPORT_LIMITED_SHARE * pv_kwh
+    if grid:
+        return all(row.min >= -zero_w for row in grid)
+    return None
+
+
+def solar_verdict(
+    evidence: Mapping[str, Any], *, export_limited: bool | None = None
+) -> dict[str, Any]:
+    """enough at full cover with the battery filling; borderline from 70% cover; short below.
+
+    Without export the battery's days at its limit decide instead: enough at
+    80% of days, borderline from 40% or from 70% cover, short below.
+    """
     share = evidence["production_share"]
     if share is None:
         return withheld("no_data", evidence)
     fill = evidence["fill_share"]
+    if export_limited:
+        # Without export, production cannot pass consumption plus charging, so
+        # a share of consumption never reaches "enough". The sun of such a
+        # system is enough when it keeps taking the battery to its limit.
+        if fill is None:
+            return withheld("no_fill", evidence)
+        if fill >= SOLAR_FILL_SHARE:
+            verdict = ENOUGH
+        elif fill >= SOLAR_CURTAILED_BORDERLINE_SHARE or share >= SOLAR_BORDERLINE_SHARE:
+            verdict = BORDERLINE
+        else:
+            verdict = SHORT
+        return {"verdict": verdict, "reason": None, "evidence": dict(evidence)}
     filling = fill is None or fill >= SOLAR_FILL_SHARE
     if share >= SOLAR_ENOUGH_SHARE and filling:
         verdict = ENOUGH
@@ -289,7 +341,11 @@ def _coverage(measured_hours: float, span_hours: float) -> float:
 
 
 def _solar_block(
-    energy: Mapping[str, EnergySeries], counters: _Counters, battery: Mapping[str, Any] | None
+    energy: Mapping[str, EnergySeries],
+    counters: _Counters,
+    battery: Mapping[str, Any] | None,
+    *,
+    export_limited: bool | None,
 ) -> dict[str, Any] | None:
     """The solar card, or None when the two counters it needs are not mapped."""
     if "pv_energy_total" not in energy or "load_energy_total" not in energy:
@@ -301,7 +357,7 @@ def _solar_block(
         # A counter with no rows for this span sums to zero, and reading that
         # as a month without sun would print "short" over an unmeasured month.
         return withheld("no_data", evidence)
-    return solar_verdict(evidence)
+    return solar_verdict(evidence, export_limited=export_limited)
 
 
 def _covered(
@@ -324,6 +380,8 @@ def build_sizing_payload(
     energy: Mapping[str, EnergySeries],
     low_pct: float,
     full_pct: float,
+    ceiling: set[datetime] | None = None,
+    export_limited: bool | None = None,
 ) -> dict[str, Any]:
     """The three verdicts for the period and for every month the window touches.
 
@@ -336,6 +394,10 @@ def build_sizing_payload(
     Every card carries the coverage of the sensors it was read from, which is
     not the month's: a full month of load beside twelve days of charge would
     otherwise present the battery verdict under a full-month banner.
+
+    With a set of ceiling hours "full" is the battery's own limit, and with
+    `export_limited` true the Sun is judged by days at that limit. Both are
+    decided once for the window, so every month reads the same rule.
     """
     load_rows = load.rows if load is not None else ()
     soc_rows = soc.rows if soc is not None else ()
@@ -356,7 +418,7 @@ def build_sizing_payload(
         span_hours: float,
     ) -> dict[str, Any]:
         battery = (
-            battery_evidence(soc_part, tz, low_pct=low_pct, full_pct=full_pct)
+            battery_evidence(soc_part, tz, low_pct=low_pct, full_pct=full_pct, ceiling=ceiling)
             if soc is not None
             else None
         )
@@ -367,7 +429,7 @@ def build_sizing_payload(
                 else None
             ),
             "battery": battery_verdict(battery) if battery is not None else None,
-            "solar": _solar_block(energy, counters, battery),
+            "solar": _solar_block(energy, counters, battery, export_limited=export_limited),
         }
         measured = {
             "inverter": len(load_part),
@@ -438,8 +500,11 @@ def build_sizing_payload(
             "solar_enough_share": SOLAR_ENOUGH_SHARE,
             "solar_borderline_share": SOLAR_BORDERLINE_SHARE,
             "solar_fill_share": SOLAR_FILL_SHARE,
+            "solar_curtailed_borderline_share": SOLAR_CURTAILED_BORDERLINE_SHARE,
             "low_pct": low_pct,
             "full_pct": full_pct,
+            "full_mode": "ceiling" if ceiling is not None else "fixed",
+            "export_limited": export_limited,
         },
         "covered_start": covered_start.isoformat() if covered_start else None,
         "covered_end": covered_end.isoformat() if covered_end else None,
@@ -465,6 +530,43 @@ def _no_statistics(hass: HomeAssistant, entity_ids: Sequence[str]) -> list[str]:
     return gone
 
 
+def _ceiling(
+    config: EntryConfig,
+    soc: HourlySeries | None,
+    battery: HourlySeries | None,
+    pv: HourlySeries | None,
+    *,
+    low_pct: float,
+) -> set[datetime] | None:
+    """The window's ceiling hours, or None to judge "full" by the fixed mark.
+
+    An empty set is an answer — the battery never stood at its limit — but a
+    sensor with no rows at all is not, and reading it as one would print
+    "never filled" over a battery nobody measured.
+    """
+    if not (soc and soc.rows and battery and battery.rows and pv and pv.rows):
+        return None
+    return ceiling_hours(
+        soc.rows,
+        battery.rows,
+        pv.rows,
+        low_pct=low_pct,
+        idle_w=config.number("battery_idle_w") or DEFAULT_BATTERY_IDLE_W,
+    )
+
+
+def _signed_grid(config: EntryConfig, grid: HourlySeries | None) -> list[HourlyRow] | None:
+    """Grid power hours with the configured sign applied, so that negative is export.
+
+    Inverting a row swaps its extremes: the lowest raw reading is the highest signed one.
+    """
+    if grid is None:
+        return None
+    if config.sign("grid_power") >= 0:
+        return list(grid.rows)
+    return [HourlyRow(row.start, -row.mean, -row.max, -row.min) for row in grid.rows]
+
+
 async def async_sizing_analytics(
     hass: HomeAssistant, config: EntryConfig, window: Window
 ) -> dict[str, Any]:
@@ -474,6 +576,12 @@ async def async_sizing_analytics(
     rated_power = config.number("rated_power")
     solar_ids = {role: config.entity_id(role) for role in _SOLAR_ROLES}
     import_id = config.entity_id("grid_import_total")
+    export_id = config.entity_id("grid_export_total")
+    battery_id = config.entity_id("battery_power")
+    pv_id = config.entity_id("pv_power")
+    # Ceiling mode reads "full" as the battery's own limit, which needs the
+    # charge, the battery's power and the sun's together.
+    ceiling_mode = bool(soc_id and battery_id and pv_id)
     has_solar = all(solar_ids.values())
     # rated_power is a required role, so a missing or zero one means a
     # corrupted entry — but read as a threshold it would put every hour "at
@@ -493,21 +601,53 @@ async def async_sizing_analytics(
     full_pct = config.number("battery_full_pct") or DEFAULT_BATTERY_FULL_PCT
     # Both marks are user-editable, and crossed they make every day full and
     # low at once — a battery judged "short" by arithmetic alone. The card
-    # says which pair is wrong instead of pretending to a verdict.
-    thresholds_inverted = full_pct <= low_pct
+    # says which pair is wrong instead of pretending to a verdict. Ceiling
+    # mode never reads the full mark, so a crossed pair does no harm there.
+    marks_crossed = full_pct <= low_pct
 
     judged_load = load_id if has_rated else None
-    judged_soc = None if thresholds_inverted else soc_id
+    read_soc = soc_id if ceiling_mode or not marks_crossed else None
+    # Grid power is only the fallback for the export counter, and export only
+    # feeds the Sun card.
+    grid_id = config.entity_id("grid_power") if has_solar and not export_id else None
+    helpers = (battery_id, pv_id) if ceiling_mode else ()
     extremes = await async_hourly_extremes_many(
-        hass, [entity_id for entity_id in (judged_load, judged_soc) if entity_id], window
+        hass,
+        [entity_id for entity_id in (judged_load, read_soc, *helpers, grid_id) if entity_id],
+        window,
     )
     energy_ids = {role: entity_id for role, entity_id in solar_ids.items() if entity_id}
     if has_solar and import_id:
         energy_ids["grid_import_total"] = import_id
+    if has_solar and export_id:
+        energy_ids["grid_export_total"] = export_id
     energy: dict[str, EnergySeries] = {}
     if has_solar:
         energy_by_id = await async_energy_many(hass, list(energy_ids.values()), window)
         energy = {role: energy_by_id[entity_id] for role, entity_id in energy_ids.items()}
+
+    ceiling = (
+        _ceiling(
+            config,
+            extremes.get(soc_id),
+            extremes.get(battery_id),
+            extremes.get(pv_id),
+            low_pct=low_pct,
+        )
+        if ceiling_mode
+        else None
+    )
+    # A helper sensor without statistics drops back to the fixed mark, and
+    # there the crossed pair is as wrong as it ever was.
+    thresholds_inverted = ceiling is None and marks_crossed
+    judged_soc = None if thresholds_inverted else read_soc
+    pv_series = energy.get("pv_energy_total")
+    export = export_limited(
+        pv_kwh=pv_series.total if pv_series is not None else 0.0,
+        export=energy.get("grid_export_total"),
+        grid=_signed_grid(config, extremes.get(grid_id) if grid_id else None),
+        zero_w=config.number("grid_zero_w") or DEFAULT_GRID_ZERO_W,
+    )
 
     zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
     payload = build_sizing_payload(
@@ -519,6 +659,8 @@ async def async_sizing_analytics(
         energy=energy,
         low_pct=low_pct,
         full_pct=full_pct,
+        ceiling=ceiling,
+        export_limited=export,
     )
     payload["cards"] = {
         "inverter": {
