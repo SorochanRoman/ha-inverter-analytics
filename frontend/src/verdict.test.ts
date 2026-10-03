@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
 import type { SizingCard, SizingPayload, VerdictBlock } from "./types";
-import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "./verdict";
+import {
+  reasonHint,
+  reasonSentence,
+  solarFillTested,
+  solarRuleKind,
+  verdictLabel,
+} from "./verdict";
 
 describe("verdict copy", () => {
   it("names each verdict", () => {
@@ -31,6 +37,19 @@ describe("verdict copy", () => {
     expect(reasonHint(en, "battery", "never_full")).toBe("never filled");
     expect(reasonHint(en, "battery", "no_data")).toBe("no data");
     expect(reasonHint(en, "solar", "never_full")).toBe("no data");
+  });
+
+  it("says a no-export span had no charge data to read the sun from", () => {
+    expect(reasonSentence(en, "solar", "no_fill")).toBe(
+      "With no export the sun is read from how often the battery reached its limit, and " +
+        "there is no charge data for this span.",
+    );
+    expect(reasonHint(en, "solar", "no_fill")).toBe("no charge data");
+    expect(reasonSentence(uk, "solar", "no_fill")).toBe(uk.verdict.noFill);
+    expect(reasonHint(uk, "solar", "no_fill")).toBe(uk.verdict.hintNoFill);
+    // The reason belongs to the sun; on another card it is still unknown.
+    expect(reasonSentence(en, "battery", "no_fill")).toBe(en.verdict.noData.battery);
+    expect(reasonHint(en, "battery", "no_fill")).toBe("no data");
   });
 
   it("prints the verdicts in Ukrainian", () => {
@@ -89,5 +108,58 @@ describe("whether the solar rule tested the battery filling", () => {
 
   it("falls back to the battery mapping when there is no period verdict", () => {
     expect(solarFillTested(payload(null))).toBe(true);
+  });
+});
+
+describe("which sun rule the payload was read by", () => {
+  const fill = (share: number | null): VerdictBlock => ({
+    verdict: "enough",
+    reason: null,
+    evidence: {
+      pv_kwh: 100,
+      load_kwh: 90,
+      production_share: 1.1,
+      self_sufficiency: 0.8,
+      fill_share: share,
+    },
+    coverage: 1,
+  });
+  const payloadWith = (opts: {
+    export_limited?: boolean | null;
+    solar?: VerdictBlock | null;
+  }): SizingPayload =>
+    ({
+      rules: { export_limited: opts.export_limited ?? null },
+      period: { inverter: null, battery: null, solar: opts.solar ?? null },
+      cards: {
+        inverter: { missing: [], no_statistics: [] },
+        battery: { missing: [], no_statistics: [] },
+        solar: { missing: [], no_statistics: [] },
+      },
+    }) as unknown as SizingPayload;
+
+  it("picks the no-export sun rule when export is limited", () => {
+    expect(solarRuleKind(payloadWith({ export_limited: true }))).toBe("no_export");
+    expect(solarRuleKind(payloadWith({ export_limited: true, solar: fill(null) }))).toBe(
+      "no_export",
+    );
+  });
+
+  it("picks the fill rule when the system exports and the fill was tested", () => {
+    expect(solarRuleKind(payloadWith({ export_limited: false, solar: fill(0.5) }))).toBe(
+      "with_fill",
+    );
+  });
+
+  it("reads an unknown export decision as exporting", () => {
+    expect(solarRuleKind(payloadWith({ export_limited: null, solar: fill(0.5) }))).toBe(
+      "with_fill",
+    );
+  });
+
+  it("falls back to the plain rule when the fill was not tested", () => {
+    expect(solarRuleKind(payloadWith({ export_limited: false, solar: fill(null) }))).toBe(
+      "plain",
+    );
   });
 });

@@ -19,7 +19,7 @@ import type {
   SizingPayload,
   VerdictBlock,
 } from "../types";
-import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "../verdict";
+import { reasonHint, reasonSentence, solarRuleKind, verdictLabel } from "../verdict";
 
 const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
@@ -156,10 +156,13 @@ export class IaSizingTab extends LitElement {
   /**
    * The rule the verdict was read by, in the reader's own numbers.
    *
-   * Takes the whole payload and not just the rules because the solar rule is
-   * not the same rule on every installation: the fill clause is printed only
-   * when the span has a fill share, which is when the verdict tested it (see
-   * solarFillTested). With no charge sensor, inverted thresholds, or a charge
+   * Takes the whole payload and not just the rules because neither the
+   * battery nor the solar rule is the same rule on every installation. The
+   * battery rule names the charge limit when "full" was read from it. The
+   * solar rule has three forms (see solarRuleKind): a system that kept its
+   * production in is judged by days at the charge limit; otherwise the fill
+   * clause is printed only when the span has a fill share, which is when the
+   * verdict tested it. With no charge sensor, inverted thresholds, or a charge
    * sensor with no rows in the span, printing the clause would describe a
    * condition the verdict never tested.
    */
@@ -175,6 +178,12 @@ export class IaSizingTab extends LitElement {
       });
     }
     if (card === "battery") {
+      if (rules.full_mode === "ceiling") {
+        return m.sizing.batteryRuleCeiling({
+          low: pct(rules.low_pct / 100),
+          share: pct(rules.battery_short_share),
+        });
+      }
       return m.sizing.batteryRule({
         full: pct(rules.full_pct / 100),
         low: pct(rules.low_pct / 100),
@@ -183,9 +192,22 @@ export class IaSizingTab extends LitElement {
     }
     const enough = pct(rules.solar_enough_share);
     const borderline = pct(rules.solar_borderline_share);
-    return solarFillTested(payload)
-      ? m.sizing.solarRuleWithFill({ enough, fill: pct(rules.solar_fill_share), borderline })
-      : m.sizing.solarRule({ enough, borderline });
+    switch (solarRuleKind(payload)) {
+      case "no_export":
+        return m.sizing.solarRuleNoExport({
+          fill: pct(rules.solar_fill_share),
+          borderlineFill: pct(rules.solar_curtailed_borderline_share),
+          borderline,
+        });
+      case "with_fill":
+        return m.sizing.solarRuleWithFill({
+          enough,
+          fill: pct(rules.solar_fill_share),
+          borderline,
+        });
+      case "plain":
+        return m.sizing.solarRule({ enough, borderline });
+    }
   }
 
   /**
@@ -407,6 +429,11 @@ export class IaSizingTab extends LitElement {
         <p class="note">${ruleLine("inverter")}</p>
         <p class="note">${ruleLine("battery")}</p>
         <p class="note">${ruleLine("solar")}</p>
+        <p class="note">
+          ${payload.rules.full_mode === "ceiling"
+            ? m.sizing.fullModeCeiling
+            : m.sizing.fullModeFixed({ full: formatPercent(payload.rules.full_pct / 100, locale) })}
+        </p>
         <p class="note">${m.sizing.hourlyNotMean}</p>
       </section>
     `;

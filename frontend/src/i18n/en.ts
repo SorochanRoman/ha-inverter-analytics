@@ -141,6 +141,12 @@ export const en = {
       "The battery never filled in this span, so the nights say nothing about its size.",
     hintNeverFilled: "never filled",
     hintNoData: "no data",
+    // Solar reason "no_fill": a no-export system whose sun is read from days
+    // at the charge limit, with no charge data in the span.
+    noFill:
+      "With no export the sun is read from how often the battery reached its limit, and " +
+      "there is no charge data for this span.",
+    hintNoFill: "no charge data",
   },
   // charts/options.ts: axis names, legend entries and series names. A legend
   // finds its series by name, so both sides read the same entry here.
@@ -444,6 +450,12 @@ export const en = {
       `fell below ${p.low} on at least ${p.share} of them; borderline when it happened at all; ` +
       "no verdict for a span in which it never filled. A day it ran low without filling " +
       "counts against the sun, not the battery.",
+    // The battery rule when "full" is the battery's own charge limit.
+    batteryRuleCeiling: (p: { low: string; share: string }) =>
+      "Counted over days with data: short when the battery reached its charge limit with " +
+      `the sun up and still fell below ${p.low} on at least ${p.share} of them; borderline ` +
+      "when it happened at all; no verdict for a span in which it never reached its limit. " +
+      "A day it ran low without reaching it counts against the sun, not the battery.",
     solarRuleWithFill: (p: { enough: string; fill: string; borderline: string }) =>
       `Enough when production is at least ${p.enough} of consumption and the battery filled ` +
       `on at least ${p.fill} of days; borderline from ${p.borderline} of consumption; short ` +
@@ -451,6 +463,19 @@ export const en = {
     solarRule: (p: { enough: string; borderline: string }) =>
       `Enough when production is at least ${p.enough} of consumption; borderline from ` +
       `${p.borderline} of consumption; short below.`,
+    // The Sun rule of a system that kept its production in.
+    solarRuleNoExport: (p: { fill: string; borderlineFill: string; borderline: string }) =>
+      "With no export, production cannot pass consumption, so the sun is read from the " +
+      `battery: enough when it reached its charge limit with the sun up on at least ${p.fill} ` +
+      `of days; borderline from ${p.borderlineFill} of days, or from ${p.borderline} of ` +
+      "consumption; short below.",
+    // Which "full" the battery and Sun verdicts were read by.
+    fullModeCeiling:
+      "Full means the battery reached its own charge limit: the inverter stopped charging " +
+      "while the sun was up. A limit set below 100% for the summer still counts.",
+    fullModeFixed: (p: { full: string }) =>
+      `Full means a charge of at least ${p.full}. Map battery power and PV power to read the ` +
+      "battery's own limit instead.",
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.

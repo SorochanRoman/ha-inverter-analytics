@@ -281,6 +281,19 @@ puts a coverage figure on every card and not only on the month row: the row is
 as covered as its best-covered sensor, counters included, so one sensor with a
 full month of rows would otherwise vouch for a card read from twelve days.
 
+**A battery filled from the grid is not full.** With battery and PV power
+mapped, "full" is an hour at the battery's own charge limit, and that hour
+needs the sun up. A battery charged from the grid at night is therefore not
+counted as full. That is right for the Sun question, which asks what the sun
+did; for the battery verdict it leaves such days out of the count of full
+days.
+
+**A battery held below its limit looks full.** An inverter in a mode other
+than self-consumption — one that holds the battery for backup and never
+discharges it, for example — can stop charging with the sun up below its real
+limit, and those hours read as ceiling hours. The only guard is that a ceiling
+hour must sit 20 points above the low mark.
+
 **The units guard.** `SensorInfo.unit` is still collected and still unread. A
 kW-reporting sensor mapped to a W role is off by a thousand, and detection could
 refuse it or convert it; neither is written.

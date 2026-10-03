@@ -753,7 +753,11 @@ const wb = {
     },
     neverFull: "The battery never filled in this span, so the nights say nothing about its size.",
     hintNeverFilled: "never filled",
-    hintNoData: "no data"
+    hintNoData: "no data",
+    // Solar reason "no_fill": a no-export system whose sun is read from days
+    // at the charge limit, with no charge data in the span.
+    noFill: "With no export the sun is read from how often the battery reached its limit, and there is no charge data for this span.",
+    hintNoFill: "no charge data"
   },
   // charts/options.ts: axis names, legend entries and series names. A legend
   // finds its series by name, so both sides read the same entry here.
@@ -984,8 +988,15 @@ const wb = {
     // sentence of its own rather than one with a hole in it.
     inverterRule: (r) => `Short when the load reached rated power in more than ${r.shortShare} of hours; borderline on any such hour, or reaching ${r.highShare} of rated in more than ${r.borderlineShare} of hours.`,
     batteryRule: (r) => `Counted over days with data: short when the battery filled to ${r.full} and still fell below ${r.low} on at least ${r.share} of them; borderline when it happened at all; no verdict for a span in which it never filled. A day it ran low without filling counts against the sun, not the battery.`,
+    // The battery rule when "full" is the battery's own charge limit.
+    batteryRuleCeiling: (r) => `Counted over days with data: short when the battery reached its charge limit with the sun up and still fell below ${r.low} on at least ${r.share} of them; borderline when it happened at all; no verdict for a span in which it never reached its limit. A day it ran low without reaching it counts against the sun, not the battery.`,
     solarRuleWithFill: (r) => `Enough when production is at least ${r.enough} of consumption and the battery filled on at least ${r.fill} of days; borderline from ${r.borderline} of consumption; short below.`,
     solarRule: (r) => `Enough when production is at least ${r.enough} of consumption; borderline from ${r.borderline} of consumption; short below.`,
+    // The Sun rule of a system that kept its production in.
+    solarRuleNoExport: (r) => `With no export, production cannot pass consumption, so the sun is read from the battery: enough when it reached its charge limit with the sun up on at least ${r.fill} of days; borderline from ${r.borderlineFill} of days, or from ${r.borderline} of consumption; short below.`,
+    // Which "full" the battery and Sun verdicts were read by.
+    fullModeCeiling: "Full means the battery reached its own charge limit: the inverter stopped charging while the sun was up. A limit set below 100% for the summer still counts.",
+    fullModeFixed: (r) => `Full means a charge of at least ${r.full}. Map battery power and PV power to read the battery's own limit instead.`,
     // What a card is short of before a verdict can be read. Rated power is a
     // number in the options, not an entity, so it is "not set", not "not
     // mapped"; the count lets a language agree with one role or several.
@@ -1165,7 +1176,9 @@ const wb = {
     },
     neverFull: "За цей період батарея жодного разу не зарядилася повністю, тож ночі нічого не кажуть про її ємність.",
     hintNeverFilled: "без повного заряду",
-    hintNoData: "немає даних"
+    hintNoData: "немає даних",
+    noFill: "Без експорту сонце оцінюється за тим, як часто батарея досягала ліміту заряду, а даних про заряд за цей період немає.",
+    hintNoFill: "немає даних заряду"
   },
   charts: {
     locale: "uk",
@@ -1386,8 +1399,12 @@ const wb = {
     // least" and "from" include the mark, "below the low mark" is strict.
     inverterRule: (r) => `Замало, якщо навантаження досягало номінальної потужності в більш ніж ${r.shortShare} годин; на межі — якщо таке траплялося хоча б в одну годину або якщо навантаження сягало ${r.highShare} від номінальної в більш ніж ${r.borderlineShare} годин.`,
     batteryRule: (r) => `Рахується за днями з даними: замало, якщо щонайменше в ${r.share} із них батарея зарядилася до ${r.full} і все одно опустилася нижче ${r.low}; на межі — якщо таке траплялося хоча б раз; без вердикту — для періоду, у якому вона жодного разу не зарядилася повністю. День, коли батарея опустилася нижче цієї позначки, так і не зарядившись повністю, зараховується як недолік сонця, а не батареї.`,
+    batteryRuleCeiling: (r) => `Рахується за днями з даними: замало, якщо щонайменше в ${r.share} із них батарея досягла ліміту заряду, поки світило сонце, і все одно опустилася нижче ${r.low}; на межі — якщо таке траплялося хоча б раз; без вердикту — для періоду, у якому вона жодного разу не досягла ліміту. День, коли батарея опустилася нижче цієї позначки, так і не досягнувши ліміту, зараховується як недолік сонця, а не батареї.`,
     solarRuleWithFill: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання і батарея заряджалася повністю щонайменше в ${r.fill} днів; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
     solarRule: (r) => `Достатньо, якщо генерація становить щонайменше ${r.enough} споживання; на межі — від ${r.borderline} споживання; замало — якщо менше.`,
+    solarRuleNoExport: (r) => `Без експорту генерація не може перевищити споживання, тож сонце оцінюється за батареєю: достатньо, якщо вона досягала ліміту заряду, поки світило сонце, щонайменше в ${r.fill} днів; на межі — від ${r.borderlineFill} днів або від ${r.borderline} споживання; замало — якщо менше.`,
+    fullModeCeiling: "Повний заряд означає, що батарея досягла власного ліміту заряду: інвертор припинив заряджання, поки світило сонце. Ліміт, знижений на літо нижче 100%, теж враховується.",
+    fullModeFixed: (r) => `Повний заряд означає рівень заряду щонайменше ${r.full}. Вкажіть потужність батареї й потужність СЕС, щоб натомість зчитувати власний ліміт батареї.`,
     needsNotSet: (r) => `Потрібне значення ${r.roles}, але для цього інвертора його не задано.`,
     needsNotMapped: (r) => r.n === 1 ? `Потрібне поле ${r.roles}, але для цього інвертора його не вказано.` : `Потрібні поля ${r.roles}, але для цього інвертора їх не вказано.`,
     // The option names as the integration's form shows them in Ukrainian.
@@ -26049,10 +26066,10 @@ function Xg(r, t) {
   }
 }
 function qg(r, t, e) {
-  return t === "battery" && e === "never_full" ? r.verdict.neverFull : r.verdict.noData[t];
+  return t === "battery" && e === "never_full" ? r.verdict.neverFull : t === "solar" && e === "no_fill" ? r.verdict.noFill : r.verdict.noData[t];
 }
 function AP(r, t, e) {
-  return t === "battery" && e === "never_full" ? r.verdict.hintNeverFilled : r.verdict.hintNoData;
+  return t === "battery" && e === "never_full" ? r.verdict.hintNeverFilled : t === "solar" && e === "no_fill" ? r.verdict.hintNoFill : r.verdict.hintNoData;
 }
 function IP(r) {
   const t = r.period.solar;
@@ -26060,13 +26077,16 @@ function IP(r) {
   const e = r.cards.battery;
   return !e.missing.length && !e.thresholds_inverted;
 }
-var LP = Object.defineProperty, PP = Object.getOwnPropertyDescriptor, Hi = (r, t, e, i) => {
-  for (var n = i > 1 ? void 0 : i ? PP(t, e) : t, a = r.length - 1, o; a >= 0; a--)
+function LP(r) {
+  return r.rules.export_limited === !0 ? "no_export" : IP(r) ? "with_fill" : "plain";
+}
+var PP = Object.defineProperty, $P = Object.getOwnPropertyDescriptor, Hi = (r, t, e, i) => {
+  for (var n = i > 1 ? void 0 : i ? $P(t, e) : t, a = r.length - 1, o; a >= 0; a--)
     (o = r[a]) && (n = (i ? o(t, e, n) : o(n)) || n);
-  return i && n && LP(t, e, n), n;
+  return i && n && PP(t, e, n), n;
 };
-const $P = ["inverter", "battery", "solar"], Me = "—";
-function RP(r, t) {
+const RP = ["inverter", "battery", "solar"], Me = "—";
+function OP(r, t) {
   const [e, i] = r.split("-").map(Number);
   return new Date(e, i - 1, 1).toLocaleDateString(t, {
     month: "short",
@@ -26142,10 +26162,13 @@ let Sr = class extends Gt {
   /**
    * The rule the verdict was read by, in the reader's own numbers.
    *
-   * Takes the whole payload and not just the rules because the solar rule is
-   * not the same rule on every installation: the fill clause is printed only
-   * when the span has a fill share, which is when the verdict tested it (see
-   * solarFillTested). With no charge sensor, inverted thresholds, or a charge
+   * Takes the whole payload and not just the rules because neither the
+   * battery nor the solar rule is the same rule on every installation. The
+   * battery rule names the charge limit when "full" was read from it. The
+   * solar rule has three forms (see solarRuleKind): a system that kept its
+   * production in is judged by days at the charge limit; otherwise the fill
+   * clause is printed only when the span has a fill share, which is when the
+   * verdict tested it. With no charge sensor, inverted thresholds, or a charge
    * sensor with no rows in the span, printing the clause would describe a
    * condition the verdict never tested.
    */
@@ -26158,13 +26181,31 @@ let Sr = class extends Gt {
         borderlineShare: a(n.inverter_borderline_share)
       });
     if (r === "battery")
-      return i.sizing.batteryRule({
+      return n.full_mode === "ceiling" ? i.sizing.batteryRuleCeiling({
+        low: a(n.low_pct / 100),
+        share: a(n.battery_short_share)
+      }) : i.sizing.batteryRule({
         full: a(n.full_pct / 100),
         low: a(n.low_pct / 100),
         share: a(n.battery_short_share)
       });
     const o = a(n.solar_enough_share), s = a(n.solar_borderline_share);
-    return IP(t) ? i.sizing.solarRuleWithFill({ enough: o, fill: a(n.solar_fill_share), borderline: s }) : i.sizing.solarRule({ enough: o, borderline: s });
+    switch (LP(t)) {
+      case "no_export":
+        return i.sizing.solarRuleNoExport({
+          fill: a(n.solar_fill_share),
+          borderlineFill: a(n.solar_curtailed_borderline_share),
+          borderline: s
+        });
+      case "with_fill":
+        return i.sizing.solarRuleWithFill({
+          enough: o,
+          fill: a(n.solar_fill_share),
+          borderline: s
+        });
+      case "plain":
+        return i.sizing.solarRule({ enough: o, borderline: s });
+    }
   }
   /**
    * What the card is short of before any verdict can be read, or null.
@@ -26272,7 +26313,7 @@ let Sr = class extends Gt {
         ${r.months.map(
       (n) => L`<tr class=${n.complete ? "" : "partial"}>
             <td>
-              ${RP(n.key, e)}
+              ${OP(n.key, e)}
               ${n.coverage === 0 ? L`<span class="hint">${t.verdict.hintNoData}</span>` : n.complete ? k : L`<span class="hint"
                       >${t.sizing.ofTheMonth({
         share: cr(n.coverage, e)
@@ -26313,7 +26354,7 @@ let Sr = class extends Gt {
       </div>
 
       <section>
-        <div class="cards">${$P.map((n) => this.renderCard(n, t))}</div>
+        <div class="cards">${RP.map((n) => this.renderCard(n, t))}</div>
       </section>
 
       <section>
@@ -26329,6 +26370,9 @@ let Sr = class extends Gt {
         <p class="note">${i("inverter")}</p>
         <p class="note">${i("battery")}</p>
         <p class="note">${i("solar")}</p>
+        <p class="note">
+          ${t.rules.full_mode === "ceiling" ? r.sizing.fullModeCeiling : r.sizing.fullModeFixed({ full: Y(t.rules.full_pct / 100, e) })}
+        </p>
         <p class="note">${r.sizing.hourlyNotMean}</p>
       </section>
     `;
@@ -26423,12 +26467,12 @@ Hi([
 Sr = Hi([
   ke("ia-sizing-tab")
 ], Sr);
-var OP = Object.defineProperty, EP = Object.getOwnPropertyDescriptor, Cr = (r, t, e, i) => {
-  for (var n = i > 1 ? void 0 : i ? EP(t, e) : t, a = r.length - 1, o; a >= 0; a--)
+var EP = Object.defineProperty, kP = Object.getOwnPropertyDescriptor, Cr = (r, t, e, i) => {
+  for (var n = i > 1 ? void 0 : i ? kP(t, e) : t, a = r.length - 1, o; a >= 0; a--)
     (o = r[a]) && (n = (i ? o(t, e, n) : o(n)) || n);
-  return i && n && OP(t, e, n), n;
+  return i && n && EP(t, e, n), n;
 };
-const kP = "/inverter-analytics", Zg = ["load", "battery", "seasonal", "balance", "grid", "sizing"];
+const NP = "/inverter-analytics", Zg = ["load", "battery", "seasonal", "balance", "grid", "sizing"];
 let Ee = class extends Gt {
   constructor() {
     super(...arguments), this.narrow = !1, this.tab = "load", this.range = "30d", this.i18n = new Je(this), this.readLocation = () => {
@@ -26457,7 +26501,7 @@ let Ee = class extends Gt {
    * a filter before leaving the page.
    */
   writeLocation(r = !1) {
-    const t = kb(kP, {
+    const t = kb(NP, {
       tab: this.tab,
       range: this.range,
       entryId: this.entryId

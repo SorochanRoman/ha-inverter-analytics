@@ -31,6 +31,7 @@ export function verdictLabel(m: Messages, verdict: Verdict | null): string {
  */
 export function reasonSentence(m: Messages, card: SizingCardKey, reason: string): string {
   if (card === "battery" && reason === "never_full") return m.verdict.neverFull;
+  if (card === "solar" && reason === "no_fill") return m.verdict.noFill;
   return m.verdict.noData[card];
 }
 
@@ -42,9 +43,9 @@ export function reasonSentence(m: Messages, card: SizingCardKey, reason: string)
  * first is the tab's own rule doing its job, the second is missing data.
  */
 export function reasonHint(m: Messages, card: SizingCardKey, reason: string): string {
-  return card === "battery" && reason === "never_full"
-    ? m.verdict.hintNeverFilled
-    : m.verdict.hintNoData;
+  if (card === "battery" && reason === "never_full") return m.verdict.hintNeverFilled;
+  if (card === "solar" && reason === "no_fill") return m.verdict.hintNoFill;
+  return m.verdict.hintNoData;
 }
 
 /**
@@ -61,4 +62,18 @@ export function solarFillTested(payload: SizingPayload): boolean {
   if (solar) return typeof solar.evidence.fill_share === "number";
   const battery = payload.cards.battery;
   return !battery.missing.length && !battery.thresholds_inverted;
+}
+
+/**
+ * Which of the three Sun rules the verdict was read by.
+ *
+ * A system that kept its production in cannot show production above
+ * consumption, so the backend judges its sun by days at the charge limit
+ * instead; that rule wins whenever `export_limited` is true. An unknown
+ * decision (null) is read as exporting, as the backend reads it. Otherwise the
+ * fill clause is printed only when the fill was tested (see solarFillTested).
+ */
+export function solarRuleKind(payload: SizingPayload): "no_export" | "with_fill" | "plain" {
+  if (payload.rules.export_limited === true) return "no_export";
+  return solarFillTested(payload) ? "with_fill" : "plain";
 }

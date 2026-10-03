@@ -26,6 +26,52 @@ describe("the sizing rules", () => {
     );
   });
 
+  it("reads the ceiling and no-export rules in English", () => {
+    expect(en.sizing.batteryRuleCeiling({ low: "20%", share: "25%" })).toContain("charge limit");
+    expect(
+      en.sizing.solarRuleNoExport({ fill: "80%", borderlineFill: "40%", borderline: "70%" }),
+    ).toContain("no export");
+    expect(en.sizing.batteryRuleCeiling({ low: "20%", share: "25%" })).toBe(
+      "Counted over days with data: short when the battery reached its charge limit with the " +
+        "sun up and still fell below 20% on at least 25% of them; borderline when it happened " +
+        "at all; no verdict for a span in which it never reached its limit. A day it ran low " +
+        "without reaching it counts against the sun, not the battery.",
+    );
+    expect(
+      en.sizing.solarRuleNoExport({ fill: "80%", borderlineFill: "40%", borderline: "70%" }),
+    ).toBe(
+      "With no export, production cannot pass consumption, so the sun is read from the " +
+        "battery: enough when it reached its charge limit with the sun up on at least 80% of " +
+        "days; borderline from 40% of days, or from 70% of consumption; short below.",
+    );
+    expect(en.sizing.fullModeCeiling).toBe(
+      "Full means the battery reached its own charge limit: the inverter stopped charging " +
+        "while the sun was up. A limit set below 100% for the summer still counts.",
+    );
+    expect(en.sizing.fullModeFixed({ full: "95%" })).toBe(
+      "Full means a charge of at least 95%. Map battery power and PV power to read the " +
+        "battery's own limit instead.",
+    );
+  });
+
+  it("keep the ceiling and no-export thresholds in Ukrainian", () => {
+    const battery = uk.sizing.batteryRuleCeiling({ low: "20%", share: "25%" });
+    expect(battery).toContain("ліміту заряду");
+    expect(battery).toContain("щонайменше в 25%");
+    expect(battery).toContain("нижче 20%");
+    const solar = uk.sizing.solarRuleNoExport({
+      fill: "80%",
+      borderlineFill: "40%",
+      borderline: "70%",
+    });
+    expect(solar).toMatch(/^Без експорту/);
+    expect(solar).toContain("щонайменше в 80% днів");
+    expect(solar).toContain("від 40% днів");
+    expect(solar).toContain("від 70% споживання");
+    expect(uk.sizing.fullModeFixed({ full: "95%" })).toContain("щонайменше 95%");
+    expect(uk.sizing.fullModeCeiling).toContain("ліміту заряду");
+  });
+
   it("keep every threshold in Ukrainian, with the code's strict and inclusive bounds", () => {
     const inverter = uk.sizing.inverterRule({
       shortShare: "1%",

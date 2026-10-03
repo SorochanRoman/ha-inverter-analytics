@@ -435,8 +435,16 @@ export interface SizingPayload {
     solar_enough_share: number;
     solar_borderline_share: number;
     solar_fill_share: number;
+    solar_curtailed_borderline_share: number;
     low_pct: number;
     full_pct: number;
+    // "ceiling" when battery and PV power are mapped with the charge, so a
+    // full battery is the one that stopped charging with the sun up;
+    // otherwise "fixed", the full mark from the options.
+    full_mode: "ceiling" | "fixed";
+    // Whether the system kept its production in; null when the solar
+    // counters are not mapped, or when no source could tell.
+    export_limited: boolean | null;
   };
   cards: Record<SizingCardKey, SizingCard>;
   entities: Record<string, string>;

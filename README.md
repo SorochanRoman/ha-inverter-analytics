@@ -110,8 +110,10 @@ beyond pointing the integration at the ones you already have.
   Every month is judged from hourly statistics — the peak and the floor of
   each hour, not the mean — so last winter is read the same way as last week.
   A day the battery ran low after filling counts against the battery; a day
-  it ran low without filling counts against the sun. There is no combined
-  score: which part is short is the whole point.
+  it ran low without filling counts against the sun. With battery and PV
+  power mapped, full is recognised from the battery's own charge limit, and
+  for a system with no export the sun is read from the days it reached that
+  limit. There is no combined score: which part is short is the whole point.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to

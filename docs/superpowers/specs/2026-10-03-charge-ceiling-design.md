@@ -116,9 +116,12 @@ All strings in `en.ts` and `uk.ts`; types in `types.ts`.
 
 `async_sizing_analytics` additionally reads hourly extremes for
 `battery_power` and `pv_power` when both are mapped with `battery_soc`, and
-for `grid_power` when it is mapped and `grid_export_total` is not. Missing
-statistics for any of them falls back as §3 and §4 say; the card never
-fails because a helper sensor is absent.
+for `grid_power` whenever it is mapped, so that an export counter that is
+absent or has no rows can fall back to it as §4 orders. The export decision
+is read only when the PV and consumption counters are mapped, because it
+feeds only the Sun card; without them `rules.export_limited` is null.
+Missing statistics for any of them falls back as §3 and §4 say; the card
+never fails because a helper sensor is absent.
 
 ## 8. Known gaps
 
