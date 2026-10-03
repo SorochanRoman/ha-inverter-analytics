@@ -172,10 +172,15 @@ never fails because a helper sensor is absent.
   leaves such days out of the count of full days.
 - An inverter in a mode other than self-consumption (for example one that
   holds the battery for backup and never discharges it) can produce ceiling
-  hours below its real limit. The 20-point margin above the low mark is the
-  only guard.
+  hours below its real limit, and so can a time-of-use slot or SoC hold that
+  keeps the battery idle above the low mark with the sun up. The 20-point
+  margin above the low mark is the only guard, and it is measured from the
+  configured low mark, not from the inverter's real cutoff.
+- A day counts in ceiling mode only with an hour all three sensors saw.
+- Export from grid power is read from hourly means, with 1 % of exporting
+  hours tolerated.
 
-Both go into `docs/known-gaps.md`.
+All go into `docs/known-gaps.md`.
 
 ## 9. Tests
 
