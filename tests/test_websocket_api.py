@@ -896,3 +896,198 @@ async def test_sizing_withholds_the_battery_card_when_full_is_below_low(
         "no_statistics": [],
         "thresholds_inverted": True,
     }
+
+
+async def _sizing_with_rows(
+    hass, hass_ws_client, *, entities, inverted, rows, states, numbers=None
+):
+    """Ask for sizing over the last day with these statistics rows behind every sensor."""
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Capped battery",
+        data={
+            "entities": {role: [entity_id] for role, entity_id in entities.items()},
+            "numbers": {"rated_power": 8000.0, **(numbers or {})},
+            "inverted": inverted,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    for entity_id, state_class in states.items():
+        hass.states.async_set(entity_id, "1", {"state_class": state_class} if state_class else {})
+
+    end = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    at = end - timedelta(hours=2)
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value={
+            entity_id: [{"start": at, **values}] for entity_id, values in rows.items() if values
+        },
+    ):
+        await client.send_json_auto_id(
+            {
+                "type": "inverter_analytics/sizing",
+                "entry_id": entry.entry_id,
+                "start": (end - timedelta(days=1)).isoformat(),
+                "end": end.isoformat(),
+            }
+        )
+        response = await client.receive_json()
+    assert response["success"]
+    return response["result"]
+
+
+_CEILING_ENTITIES = {
+    "battery_soc": "sensor.soc",
+    "battery_power": "sensor.battery_power",
+    "pv_power": "sensor.pv_power",
+    "pv_energy_total": "sensor.pv_energy",
+    "load_energy_total": "sensor.load_energy",
+}
+_CEILING_ROWS = {
+    # Standing at 85% with the sun up: full by its own limit, short of the 95% mark.
+    "sensor.soc": {"mean": 85.0, "min": 85.0, "max": 85.0},
+    "sensor.battery_power": {"mean": 0.0, "min": -20.0, "max": 30.0},
+    "sensor.pv_power": {"mean": 2500.0, "min": 1800.0, "max": 3200.0},
+    "sensor.pv_energy": {"change": 4.0},
+    "sensor.load_energy": {"change": 3.0},
+}
+
+
+async def test_sizing_reads_full_by_the_charge_ceiling_and_export_by_signed_grid_power(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """An inverted grid sensor reading +800 W at its peak was exporting 800 W."""
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={**_CEILING_ENTITIES, "grid_power": "sensor.grid_power"},
+        inverted=["grid_power"],
+        rows={**_CEILING_ROWS, "sensor.grid_power": {"mean": 300.0, "min": 5.0, "max": 800.0}},
+        states={},
+    )
+    assert result["rules"]["full_mode"] == "ceiling"
+    assert result["rules"]["export_limited"] is False
+    assert result["rules"]["ceiling_missing"] == result["rules"]["ceiling_no_rows"] == []
+    assert result["period"]["battery"]["evidence"]["days_full"] == 1
+    assert result["period"]["solar"]["evidence"]["fill_share"] == 1.0
+
+
+async def test_sizing_falls_back_to_the_fixed_mark_without_battery_power_rows(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={**_CEILING_ENTITIES, "grid_power": "sensor.grid_power"},
+        inverted=[],
+        rows={
+            **_CEILING_ROWS,
+            "sensor.battery_power": None,
+            "sensor.grid_power": {"mean": 300.0, "min": -5.0, "max": 900.0},
+        },
+        states={},
+    )
+    assert result["rules"]["full_mode"] == "fixed"
+    assert result["rules"]["export_limited"] is True
+    assert result["period"]["battery"]["reason"] == "never_full"
+    assert result["rules"]["ceiling_missing"] == []
+    assert result["rules"]["ceiling_no_rows"] == ["battery_power"]
+    # Production covers the load, but without export that is not enough: the
+    # battery never reached the mark, so the share alone makes it borderline.
+    assert result["period"]["solar"]["verdict"] == "borderline"
+
+
+async def test_sizing_reads_export_from_the_counter_without_naming_it_on_the_solar_card(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The export counter is optional: keeping no statistics must not mark the card unread."""
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={
+            "pv_energy_total": "sensor.pv_energy",
+            "load_energy_total": "sensor.load_energy",
+            "grid_export_total": "sensor.grid_export",
+        },
+        inverted=[],
+        rows={
+            "sensor.pv_energy": {"change": 4.0},
+            "sensor.load_energy": {"change": 3.0},
+            "sensor.grid_export": {"change": 0.02},
+        },
+        states={
+            "sensor.pv_energy": "total_increasing",
+            "sensor.load_energy": "total_increasing",
+            "sensor.grid_export": None,
+        },
+    )
+    assert result["rules"]["full_mode"] == "fixed"
+    assert result["rules"]["export_limited"] is True
+    assert result["cards"]["solar"] == {"missing": [], "no_statistics": []}
+    assert result["rules"]["ceiling_missing"] == ["battery_power", "pv_power"]
+    assert result["rules"]["ceiling_no_rows"] == []
+    # No charge sensor, so no fill share: the no-export rule cannot be read.
+    assert result["period"]["solar"]["reason"] == "no_fill"
+
+
+async def test_sizing_ignores_crossed_marks_in_ceiling_mode(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The full mark is unused at the ceiling, so a crossed pair is no error there."""
+    crossed = {"battery_low_pct": 30.0, "battery_full_pct": 20.0}
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities=_CEILING_ENTITIES,
+        inverted=[],
+        rows=_CEILING_ROWS,
+        states={},
+        numbers=crossed,
+    )
+    assert result["cards"]["battery"]["thresholds_inverted"] is False
+    assert result["period"]["battery"]["evidence"]["days_full"] == 1
+
+
+async def test_sizing_withholds_crossed_marks_when_ceiling_mode_falls_back(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities=_CEILING_ENTITIES,
+        inverted=[],
+        rows={**_CEILING_ROWS, "sensor.pv_power": None},
+        states={},
+        numbers={"battery_low_pct": 30.0, "battery_full_pct": 20.0},
+    )
+    assert result["rules"]["full_mode"] == "fixed"
+    assert result["cards"]["battery"]["thresholds_inverted"] is True
+    assert result["period"]["battery"] is None
+
+
+async def test_sizing_falls_back_to_grid_power_when_the_export_counter_is_empty(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={
+            "pv_energy_total": "sensor.pv_energy",
+            "load_energy_total": "sensor.load_energy",
+            "grid_export_total": "sensor.grid_export",
+            "grid_power": "sensor.grid_power",
+        },
+        inverted=[],
+        rows={
+            "sensor.pv_energy": {"change": 4.0},
+            "sensor.load_energy": {"change": 3.0},
+            "sensor.grid_export": None,
+            "sensor.grid_power": {"mean": 300.0, "min": -5.0, "max": 900.0},
+        },
+        states={},
+    )
+    assert result["rules"]["export_limited"] is True

@@ -416,6 +416,10 @@ export interface SizingCard {
   thresholds_inverted?: boolean;
 }
 
+/** Which "full" the sizing verdicts were read by: the battery's own charge
+ * limit, or the fixed full mark from the options. */
+export type FullMode = "ceiling" | "fixed";
+
 export interface SizingPayload {
   period: Record<SizingCardKey, VerdictBlock | null>;
   months: SizingMonth[];
@@ -428,8 +432,21 @@ export interface SizingPayload {
     solar_enough_share: number;
     solar_borderline_share: number;
     solar_fill_share: number;
+    solar_curtailed_borderline_share: number;
     low_pct: number;
     full_pct: number;
+    // "ceiling" when battery and PV power are mapped with the charge, so a
+    // full battery is the one that stopped charging with the sun up;
+    // otherwise "fixed", the full mark from the options.
+    full_mode: FullMode;
+    // Whether the system kept its production in; null when the solar
+    // counters are not mapped, or when no source could tell.
+    export_limited: boolean | null;
+    // Why "full" is the fixed mark: the roles among battery_power and
+    // pv_power that are not mapped, and the mapped ones that returned no
+    // rows for the window. Both empty in ceiling mode.
+    ceiling_missing: string[];
+    ceiling_no_rows: string[];
   };
   cards: Record<SizingCardKey, SizingCard>;
   entities: Record<string, string>;

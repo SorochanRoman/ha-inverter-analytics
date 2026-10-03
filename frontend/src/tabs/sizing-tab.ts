@@ -20,7 +20,13 @@ import type {
   SizingPayload,
   VerdictBlock,
 } from "../types";
-import { reasonHint, reasonSentence, solarFillTested, verdictLabel } from "../verdict";
+import {
+  fullModeNote,
+  reasonHint,
+  reasonSentence,
+  solarRuleKind,
+  verdictLabel,
+} from "../verdict";
 
 const CARDS: SizingCardKey[] = ["inverter", "battery", "solar"];
 
@@ -155,10 +161,13 @@ export class IaSizingTab extends LitElement {
   /**
    * The rule the verdict was read by, in the reader's own numbers.
    *
-   * Takes the whole payload and not just the rules because the solar rule is
-   * not the same rule on every installation: the fill clause is printed only
-   * when the span has a fill share, which is when the verdict tested it (see
-   * solarFillTested). With no charge sensor, inverted thresholds, or a charge
+   * Takes the whole payload and not just the rules because neither the
+   * battery nor the solar rule is the same rule on every installation. The
+   * battery rule names the charge limit when "full" was read from it. The
+   * solar rule has three forms (see solarRuleKind): a system that kept its
+   * production in is judged by days at the charge limit; otherwise the fill
+   * clause is printed only when the span has a fill share, which is when the
+   * verdict tested it. With no charge sensor, inverted thresholds, or a charge
    * sensor with no rows in the span, printing the clause would describe a
    * condition the verdict never tested.
    */
@@ -174,6 +183,12 @@ export class IaSizingTab extends LitElement {
       });
     }
     if (card === "battery") {
+      if (rules.full_mode === "ceiling") {
+        return m.sizing.batteryRuleCeiling({
+          low: pct(rules.low_pct / 100),
+          share: pct(rules.battery_short_share),
+        });
+      }
       return m.sizing.batteryRule({
         full: pct(rules.full_pct / 100),
         low: pct(rules.low_pct / 100),
@@ -182,9 +197,29 @@ export class IaSizingTab extends LitElement {
     }
     const enough = pct(rules.solar_enough_share);
     const borderline = pct(rules.solar_borderline_share);
-    return solarFillTested(payload)
-      ? m.sizing.solarRuleWithFill({ enough, fill: pct(rules.solar_fill_share), borderline })
-      : m.sizing.solarRule({ enough, borderline });
+    switch (solarRuleKind(payload)) {
+      case "no_export":
+        return m.sizing.solarRuleNoExport({
+          fill: pct(rules.solar_fill_share),
+          borderlineFill: pct(rules.solar_curtailed_borderline_share),
+          borderline,
+        });
+      case "no_export_fixed":
+        return m.sizing.solarRuleNoExportFixed({
+          full: pct(rules.full_pct / 100),
+          fill: pct(rules.solar_fill_share),
+          borderlineFill: pct(rules.solar_curtailed_borderline_share),
+          borderline,
+        });
+      case "with_fill":
+        return m.sizing.solarRuleWithFill({
+          enough,
+          fill: pct(rules.solar_fill_share),
+          borderline,
+        });
+      case "plain":
+        return m.sizing.solarRule({ enough, borderline });
+    }
   }
 
   /**
@@ -259,10 +294,14 @@ export class IaSizingTab extends LitElement {
       // Everything the payload could name has been ruled out above, so this
       // is a sensor that was mapped and has since been deleted. It still gets
       // a sentence: an empty card reads as a bug.
-      body = html`<p class="note">${reasonSentence(m, card, "no_data")}</p>`;
+      body = html`<p class="note">
+        ${reasonSentence(m, card, "no_data", payload.rules.full_mode)}
+      </p>`;
     } else if (block.verdict === null) {
       body = html`
-        <p class="note">${reasonSentence(m, card, block.reason ?? "no_data")}</p>
+        <p class="note">
+          ${reasonSentence(m, card, block.reason ?? "no_data", payload.rules.full_mode)}
+        </p>
         ${this.renderCoverageNote(block, payload)}
       `;
     } else {
@@ -308,7 +347,9 @@ export class IaSizingTab extends LitElement {
           ? // Why there is no verdict: a month the battery never filled is the
             // rule working, a month with no statistics is missing data, and
             // "No verdict" alone reads the same for both.
-            html`<span class="hint">${reasonHint(m, card, block.reason ?? "no_data")}</span>`
+            html`<span class="hint"
+              >${reasonHint(m, card, block.reason ?? "no_data", payload.rules.full_mode)}</span
+            >`
           : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
         ${thin
           ? html`<span class="hint"
@@ -369,6 +410,7 @@ export class IaSizingTab extends LitElement {
         part: m.sizing.parts[card],
         rule: this.ruleSentence(card, payload, locale),
       });
+    const fullNote = fullModeNote(m, payload, formatPercent(payload.rules.full_pct / 100, locale));
     return html`
       <div class="status">
         <span class="badge">${m.balance.hourlyStatistics}</span>
@@ -406,6 +448,7 @@ export class IaSizingTab extends LitElement {
         <p class="note">${ruleLine("inverter")}</p>
         <p class="note">${ruleLine("battery")}</p>
         <p class="note">${ruleLine("solar")}</p>
+        ${fullNote ? html`<p class="note">${fullNote}</p>` : nothing}
         <p class="note">${m.sizing.hourlyNotMean}</p>
       </section>
     `;

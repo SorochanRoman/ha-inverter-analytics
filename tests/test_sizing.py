@@ -9,9 +9,14 @@ from custom_components.inverter_analytics.analytics.sizing import (
     BORDERLINE,
     ENOUGH,
     SHORT,
+    SOLAR_CURTAILED_BORDERLINE_SHARE,
+    Ceiling,
     battery_evidence,
     battery_verdict,
     build_sizing_payload,
+    ceiling_hours,
+    charge_ceiling,
+    export_limited,
     inverter_evidence,
     inverter_verdict,
     local_day,
@@ -170,6 +175,116 @@ def test_days_follow_the_local_clock_across_the_spring_change():
     evidence = battery_evidence(rows, KYIV, low_pct=20.0, full_pct=95.0)
     assert evidence["days_with_data"] == 2
     assert evidence["days_full_and_low"] == 1
+
+
+def test_a_ceiling_hour_is_sun_up_battery_still_charge_flat_and_high():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
+
+
+def test_each_condition_alone_breaks_a_ceiling_hour():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    args = {"low_pct": 20.0, "idle_w": 50.0}
+    assert not ceiling_hours(soc, power, [hour(12, mean=99.0, low=0.0, high=200.0)], **args)
+    assert not ceiling_hours(soc, [hour(12, mean=301.0, low=250.0, high=350.0)], pv, **args)
+    assert not ceiling_hours([hour(12, mean=85.0, low=83.5, high=85.0)], power, pv, **args)
+    assert not ceiling_hours([hour(12, mean=39.0, low=39.0, high=39.5)], power, pv, **args)
+
+
+def test_charge_and_discharge_in_one_hour_is_not_standing_still():
+    # Half an hour each way averages the power to zero; the charge moving gives it away.
+    soc = [hour(12, mean=85.0, low=83.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-1500.0, high=1500.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert not ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0)
+
+
+def test_an_hour_missing_from_one_sensor_is_not_a_ceiling_hour():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0, low=-20.0, high=30.0)]
+    assert not ceiling_hours(soc, power, [], low_pct=20.0, idle_w=50.0)
+
+
+def test_a_trickle_at_the_limit_is_still_a_ceiling_hour():
+    # A BMS balancing at 100% draws a few hundred watts; the flat charge says it is full.
+    soc = [hour(12, mean=100.0, low=100.0, high=100.0)]
+    power = [hour(12, mean=250.0, low=0.0, high=900.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
+
+
+def test_a_ceiling_hour_exactly_on_every_limit_counts():
+    soc = [hour(12, mean=40.5, low=40.0, high=41.0)]
+    power = [hour(12, mean=-300.0, low=-900.0, high=50.0)]
+    pv = [hour(12, mean=100.0, low=50.0, high=150.0)]
+    assert ceiling_hours(soc, power, pv, low_pct=20.0, idle_w=50.0) == {BASE + timedelta(hours=12)}
+
+
+def test_an_hour_missing_from_the_battery_power_is_not_a_ceiling_hour():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    pv = [hour(12, mean=2500.0, low=1800.0, high=3200.0)]
+    assert not ceiling_hours(soc, [], pv, low_pct=20.0, idle_w=50.0)
+
+
+def observed_everywhere(rows, hours=()) -> Ceiling:
+    return Ceiling(frozenset(hours), frozenset(row.start for row in rows))
+
+
+def test_a_battery_capped_at_85_counts_as_full_by_its_ceiling():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(30, mean=30.0, low=15.0, high=50.0)]
+    ceiling = observed_everywhere(soc, {BASE + timedelta(hours=12)})
+    evidence = battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=ceiling)
+    assert evidence["days_full"] == 1
+    assert evidence["days_with_data"] == 2
+
+
+def test_the_observed_hours_are_those_all_three_sensors_saw():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(13, mean=85.0, low=85.0, high=85.0)]
+    power = [hour(12, mean=0.0), hour(13, mean=0.0)]
+    pv = [hour(12, mean=2500.0)]
+    ceiling = charge_ceiling(soc, power, pv, low_pct=20.0, idle_w=50.0)
+    assert ceiling.hours == ceiling.observed == frozenset({BASE + timedelta(hours=12)})
+
+
+def test_in_ceiling_mode_a_day_without_an_observed_hour_is_not_counted():
+    # Day two has charge rows only: unmeasured, not a day the battery failed to fill.
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0), hour(36, mean=30.0, low=15.0, high=50.0)]
+    ceiling = Ceiling(frozenset(), frozenset({BASE + timedelta(hours=12)}))
+    evidence = battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=ceiling)
+    assert evidence["days_with_data"] == 1
+    assert evidence["days_low_without_full"] == 0
+    assert evidence["lowest_pct"] == 85.0
+
+
+def test_in_ceiling_mode_a_late_fill_to_the_full_mark_counts():
+    # Touched 100% at 14:40 as the sun faded: never an hour standing at the limit.
+    soc = [hour(14, mean=97.0, low=93.0, high=100.0)]
+    evidence = battery_evidence(
+        soc, UTC, low_pct=20.0, full_pct=95.0, ceiling=observed_everywhere(soc)
+    )
+    assert evidence["days_full"] == 1
+    capped = [hour(14, mean=84.0, low=80.0, high=85.0)]
+    evidence = battery_evidence(
+        capped, UTC, low_pct=20.0, full_pct=95.0, ceiling=observed_everywhere(capped)
+    )
+    assert evidence["days_full"] == 0, "a summer cap below the mark needs a ceiling hour"
+
+
+def test_in_ceiling_mode_crossed_marks_drop_the_late_fill_clause():
+    soc = [hour(14, mean=97.0, low=93.0, high=100.0)]
+    evidence = battery_evidence(
+        soc, UTC, low_pct=30.0, full_pct=20.0, ceiling=observed_everywhere(soc)
+    )
+    assert evidence["days_full"] == 0
+
+
+def test_without_a_ceiling_the_fixed_mark_still_applies():
+    soc = [hour(12, mean=85.0, low=85.0, high=85.0)]
+    assert battery_evidence(soc, UTC, low_pct=20.0, full_pct=95.0)["days_full"] == 0
 
 
 def solar(share: float, fill: float | None = None, load_kwh: float = 100.0):
@@ -477,3 +592,189 @@ def test_a_mapped_pv_counter_with_no_rows_withholds_the_solar_verdict():
     for block in (payload["period"]["solar"], payload["months"][0]["solar"]):
         assert block["verdict"] is None, "no production statistics is not zero production"
         assert block["reason"] == "no_data"
+
+
+def energy_series(total: float) -> EnergySeries:
+    return EnergySeries((EnergyRow(BASE, total),))
+
+
+def test_export_is_limited_by_the_counter():
+    args = {"pv_kwh": 1000.0, "grid": None, "zero_w": 10.0}
+    assert export_limited(export=energy_series(5.0), **args) is True
+    assert export_limited(export=energy_series(10.0), **args) is True, "1% exactly is limited"
+    assert export_limited(export=energy_series(50.0), **args) is False
+
+
+def test_export_is_limited_by_grid_power_when_no_counter():
+    never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
+    out = [hour(12, mean=-300.0, low=-800.0, high=900.0)]
+    assert export_limited(pv_kwh=1000.0, export=None, grid=never_out, zero_w=10.0) is True
+    assert export_limited(pv_kwh=1000.0, export=None, grid=out, zero_w=10.0) is False
+
+
+def test_a_second_of_overshoot_is_not_export():
+    # A zero-export inverter regulating against a CT overshoots when a load switches off.
+    overshoot = [hour(h, mean=200.0, low=-300.0, high=900.0) for h in range(100)]
+    assert export_limited(pv_kwh=1000.0, export=None, grid=overshoot, zero_w=10.0) is True
+
+
+def test_export_by_grid_power_tolerates_one_percent_of_exporting_hours():
+    def grid(exporting: int) -> list[HourlyRow]:
+        return [
+            hour(h, mean=-200.0 if h < exporting else 200.0, low=-900.0, high=900.0)
+            for h in range(100)
+        ]
+
+    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(1), zero_w=10.0) is True
+    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(2), zero_w=10.0) is False
+
+
+def test_an_export_counter_with_no_rows_falls_back_to_grid_power():
+    never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
+    empty = EnergySeries(())
+    assert export_limited(pv_kwh=1000.0, export=empty, grid=never_out, zero_w=10.0) is True
+    assert export_limited(pv_kwh=1000.0, export=empty, grid=[], zero_w=10.0) is None
+
+
+def test_export_is_unknown_without_either():
+    assert export_limited(pv_kwh=1000.0, export=None, grid=None, zero_w=10.0) is None
+
+
+def no_export(share: float, fill: float | None):
+    return {
+        "production_share": share,
+        "fill_share": fill,
+        "pv_kwh": 1.0,
+        "load_kwh": 1.0,
+        "self_sufficiency": None,
+    }
+
+
+def test_the_no_export_sun_rule():
+    assert solar_verdict(no_export(0.95, 0.85), export_limited=True)["verdict"] == ENOUGH
+    assert solar_verdict(no_export(0.5, 0.45), export_limited=True)["verdict"] == BORDERLINE
+    assert solar_verdict(no_export(0.75, 0.1), export_limited=True)["verdict"] == BORDERLINE
+    assert solar_verdict(no_export(0.5, 0.1), export_limited=True)["verdict"] == SHORT
+
+
+def test_the_no_export_rule_needs_a_fill_share():
+    block = solar_verdict(no_export(0.95, None), export_limited=True)
+    assert block["verdict"] is None and block["reason"] == "no_fill"
+
+
+def test_the_no_export_rule_sets_no_note():
+    assert "note" not in solar_verdict(no_export(1.1, 0.5), export_limited=True)
+
+
+def test_with_export_the_sun_rule_is_unchanged():
+    assert solar_verdict(no_export(0.95, 0.85))["verdict"] == BORDERLINE
+    assert solar_verdict(no_export(1.1, 0.85), export_limited=False)["verdict"] == ENOUGH
+
+
+def _capped_battery_payload(**kwargs):
+    """Two days of a battery capped at 80%, with the sun covering half the load."""
+    window = _window(2)
+    days = [soc_day(0, low=40.0, high=80.0), soc_day(1, low=40.0, high=80.0)]
+    return build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=HourlySeries(tuple(days[0] + days[1])),
+        energy={
+            "pv_energy_total": _energy(0.5, window.start, 48),
+            "load_energy_total": _energy(1.0, window.start, 48),
+        },
+        low_pct=20.0,
+        full_pct=95.0,
+        **kwargs,
+    ), Ceiling(
+        frozenset(day[14].start for day in days),
+        frozenset(row.start for day in days for row in day),
+    )
+
+
+def test_a_month_without_the_helper_sensors_is_unmeasured_in_ceiling_mode():
+    """Battery and PV power added on April 1st: March's charge rows judge nothing."""
+    start = datetime(2026, 3, 30, tzinfo=KYIV).astimezone(UTC)
+    window = Window(start, start + timedelta(days=4))
+    soc = []
+    for h in range(96):
+        moment = start + timedelta(hours=h)
+        flat = moment.astimezone(KYIV).hour == 14
+        soc.append(HourlyRow(moment, 80.0, 80.0 if flat else 55.0, 80.0 if flat else 65.0))
+    april = [row.start for row in soc if row.start.astimezone(KYIV).month == 4]
+    power = [HourlyRow(moment, 0.0, -20.0, 20.0) for moment in april]
+    pv = [HourlyRow(moment, 2500.0, 1800.0, 3200.0) for moment in april]
+    ceiling = charge_ceiling(soc, power, pv, low_pct=20.0, idle_w=50.0)
+    payload = build_sizing_payload(
+        window=window,
+        tz=KYIV,
+        rated_power=RATED,
+        load=None,
+        soc=HourlySeries(tuple(soc)),
+        energy={
+            "pv_energy_total": _energy(0.5, start, 96),
+            "load_energy_total": _energy(1.0, start, 96),
+        },
+        low_pct=20.0,
+        full_pct=95.0,
+        ceiling=ceiling,
+        export_limited=True,
+    )
+    march, april_month = payload["months"]
+    assert march["key"] == "2026-03"
+    assert march["battery"]["reason"] == "no_data", "unmeasured, not never full"
+    assert march["battery"]["coverage"] == 0.0
+    assert march["solar"]["evidence"]["fill_share"] is None, "no fill of 0 for March"
+    assert april_month["battery"]["evidence"]["days_full"] == 2
+    assert payload["period"]["battery"]["evidence"]["days_with_data"] == 2
+    assert payload["period"]["solar"]["evidence"]["fill_share"] == 1.0
+
+
+def test_the_rules_say_why_ceiling_mode_was_not_used():
+    payload, _ = _capped_battery_payload(
+        ceiling_missing=["pv_power"], ceiling_no_rows=["battery_power"]
+    )
+    assert payload["rules"]["ceiling_missing"] == ["pv_power"]
+    assert payload["rules"]["ceiling_no_rows"] == ["battery_power"]
+    payload, ceiling = _capped_battery_payload()
+    payload, _ = _capped_battery_payload(ceiling=ceiling)
+    assert payload["rules"]["ceiling_missing"] == payload["rules"]["ceiling_no_rows"] == []
+
+
+def test_the_payload_reads_full_by_the_ceiling_and_the_sun_by_the_no_export_rule():
+    _, ceiling = _capped_battery_payload()
+    payload, _ = _capped_battery_payload(ceiling=ceiling, export_limited=True)
+    rules = payload["rules"]
+    assert rules["full_mode"] == "ceiling"
+    assert rules["export_limited"] is True
+    assert rules["solar_curtailed_borderline_share"] == SOLAR_CURTAILED_BORDERLINE_SHARE == 0.4
+    for block in (payload["period"], payload["months"][0]):
+        assert block["battery"]["verdict"] == ENOUGH, "capped at 80% is full by its limit"
+        assert block["solar"]["evidence"]["fill_share"] == 1.0
+        assert block["solar"]["verdict"] == ENOUGH, "half the load, and the battery at its limit"
+
+
+def test_an_empty_ceiling_is_a_battery_that_never_reached_its_limit():
+    _, ceiling = _capped_battery_payload()
+    payload, _ = _capped_battery_payload(ceiling=Ceiling(frozenset(), ceiling.observed))
+    assert payload["rules"]["full_mode"] == "ceiling"
+    assert payload["period"]["battery"]["reason"] == "never_full"
+
+
+def test_without_a_ceiling_or_export_decision_the_payload_reads_as_before():
+    payload, _ = _capped_battery_payload()
+    rules = payload["rules"]
+    assert rules["full_mode"] == "fixed"
+    assert rules["export_limited"] is None
+    assert payload["period"]["battery"]["reason"] == "never_full"
+    assert payload["period"]["solar"]["verdict"] == SHORT
+
+
+def test_an_export_counter_without_measured_pv_cannot_decide():
+    """A share of no production is no share: the counter steps aside for grid power."""
+    never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
+    args = {"export": energy_series(5.0), "zero_w": 10.0}
+    assert export_limited(pv_kwh=0.0, grid=None, **args) is None
+    assert export_limited(pv_kwh=0.0, grid=never_out, **args) is True

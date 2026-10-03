@@ -94,3 +94,7 @@ quoted from the user's installation, and `code` fragments are not translated.
 | cut by the period (outage at the window's edge) | обрізане періодом |
 | too short to judge | закоротке для оцінки |
 | Configure (HA button that opens the options, in en.json) | «Налаштувати» |
+| charge limit (the battery's own ceiling) / reached its limit | ліміт заряду / досягла ліміту |
+| with the sun up | поки світило сонце |
+| no export (a system that keeps production in) | без експорту |
+| no charge data (sizing month cell) | немає даних заряду |

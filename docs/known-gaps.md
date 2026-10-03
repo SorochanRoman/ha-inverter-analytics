@@ -260,6 +260,44 @@ puts a coverage figure on every card and not only on the month row: the row is
 as covered as its best-covered sensor, counters included, so one sensor with a
 full month of rows would otherwise vouch for a card read from twelve days.
 
+**A battery filled from the grid is not full.** With battery and PV power
+mapped, "full" is an hour at the battery's own charge limit, and that hour
+needs the sun up. A battery charged from the grid at night is therefore not
+counted as full. That is right for the Sun question, which asks what the sun
+did; for the battery verdict it leaves such days out of the count of full
+days.
+
+**A battery held below its limit looks full.** An inverter in a mode other
+than self-consumption — one that holds the battery for backup and never
+discharges it, for example — can stop charging with the sun up below its real
+limit, and those hours read as ceiling hours. The same goes for a time-of-use
+slot or a SoC hold that keeps the battery idle above the low mark while the sun
+is up: those hours can be false ceiling hours, and the day reads as full. The
+only guard is that a ceiling hour must sit 20 points above the low mark, and
+that floor is measured from the configured low mark (`battery_low_pct`), not
+from the inverter's real discharge cutoff, which the integration cannot read.
+An inverter whose cutoff sits well above the configured mark is guarded less
+than the 20 points suggest.
+
+**Ceiling mode needs all three sensors in the same hour.** A day counts in
+ceiling mode only when the charge, battery power and PV power all have a row in
+one of its hours. A month before battery power or PV power was added, or a
+recorder gap in one of them, reads as no data for the battery rather than as a
+battery that never filled; the battery card's coverage counts only those
+hours.
+
+**Export from grid power is read from hourly means.** Without an export
+counter, an hour exported when its signed mean fell below the grid zero band,
+and up to 1% of such hours still reads as a system that does not export. A
+system that exports a little in most hours, below the zero band on average, is
+read as not exporting.
+
+**A slow charge on a large battery can look like a limit.** A ceiling hour
+allows up to 300 W of battery power so that a balancing trickle at the limit
+still counts, and relies on the charge staying within one point. On a pack of
+about 30 kWh, 300 W moves the charge by about one point an hour, so a slow
+charge below the limit can pass as a ceiling hour.
+
 **The units guard.** Detection does not read a sensor's unit. A kW-reporting
 sensor mapped to a W role is off by a thousand, and detection could refuse it
 or convert it; neither is written.
