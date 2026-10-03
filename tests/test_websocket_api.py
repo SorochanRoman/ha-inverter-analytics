@@ -1100,3 +1100,27 @@ async def test_sizing_withholds_crossed_marks_when_ceiling_mode_falls_back(
     assert result["rules"]["full_mode"] == "fixed"
     assert result["cards"]["battery"]["thresholds_inverted"] is True
     assert result["period"]["battery"] is None
+
+
+async def test_sizing_falls_back_to_grid_power_when_the_export_counter_is_empty(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={
+            "pv_energy_total": "sensor.pv_energy",
+            "load_energy_total": "sensor.load_energy",
+            "grid_export_total": "sensor.grid_export",
+            "grid_power": "sensor.grid_power",
+        },
+        inverted=[],
+        rows={
+            "sensor.pv_energy": {"change": 4.0},
+            "sensor.load_energy": {"change": 3.0},
+            "sensor.grid_export": None,
+            "sensor.grid_power": {"mean": 300.0, "min": -5.0, "max": 900.0},
+        },
+        states={},
+    )
+    assert result["rules"]["export_limited"] is True

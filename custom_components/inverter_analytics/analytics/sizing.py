@@ -238,12 +238,12 @@ def export_limited(
 ) -> bool | None:
     """Whether the system kept its production in, decided once for the window.
 
-    Read from the first source that has rows: the export counter, against
-    `EXPORT_LIMITED_SHARE` of production; then grid power, signed so that
-    negative is export, against the zero band; otherwise None — unknown,
-    which the Sun rule reads as exporting.
+    Read from the first source that can answer: the export counter, against
+    `EXPORT_LIMITED_SHARE` of production, when it has rows and production was
+    measured; then grid power, signed so that negative is export, against the
+    zero band; otherwise None — unknown, which the Sun rule reads as exporting.
     """
-    if export is not None and export.rows:
+    if export is not None and export.rows and pv_kwh > 0:
         return export.total <= EXPORT_LIMITED_SHARE * pv_kwh
     if grid:
         return all(row.min >= -zero_w for row in grid)
@@ -607,9 +607,9 @@ async def async_sizing_analytics(
 
     judged_load = load_id if has_rated else None
     read_soc = soc_id if ceiling_mode or not marks_crossed else None
-    # Grid power is only the fallback for the export counter, and export only
-    # feeds the Sun card.
-    grid_id = config.entity_id("grid_power") if has_solar and not export_id else None
+    # Grid power is the fallback for an export counter that is absent or
+    # empty, and export only feeds the Sun card.
+    grid_id = config.entity_id("grid_power") if has_solar else None
     helpers = (battery_id, pv_id) if ceiling_mode else ()
     extremes = await async_hourly_extremes_many(
         hass,

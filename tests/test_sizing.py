@@ -646,3 +646,11 @@ def test_without_a_ceiling_or_export_decision_the_payload_reads_as_before():
     assert rules["export_limited"] is None
     assert payload["period"]["battery"]["reason"] == "never_full"
     assert payload["period"]["solar"]["verdict"] == SHORT
+
+
+def test_an_export_counter_without_measured_pv_cannot_decide():
+    """A share of no production is no share: the counter steps aside for grid power."""
+    never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
+    args = {"export": energy_series(5.0), "zero_w": 10.0}
+    assert export_limited(pv_kwh=0.0, grid=None, **args) is None
+    assert export_limited(pv_kwh=0.0, grid=never_out, **args) is True
