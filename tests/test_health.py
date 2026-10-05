@@ -20,7 +20,9 @@ from custom_components.inverter_analytics.analytics.health import (
     efficiency_by_month,
     inverter_by_month,
     solar_energy_by_month,
+    withhold_partial_months,
 )
+from custom_components.inverter_analytics.analytics.seasonality import INCOMPLETE_COVERAGE
 from custom_components.inverter_analytics.analytics.sizing import Ceiling
 from custom_components.inverter_analytics.analytics.source import (
     EnergyRow,
@@ -444,6 +446,31 @@ def test_the_inverter_counts_hours_near_and_at_rated_per_month():
     assert inverter_by_month([], 8000.0, KYIV) == {}
 
 
+# --- partial months --------------------------------------------------------
+
+
+def test_a_month_below_the_coverage_share_is_partial_and_keeps_its_counts():
+    # January in Kyiv is 744 hours; INCOMPLETE_COVERAGE of it is 446.4.
+    start = datetime(2026, 1, 1, tzinfo=KYIV).astimezone(UTC)
+    enough = [start + timedelta(hours=index) for index in range(447)]
+    months = {"2026-01": {"value": 5.0, "reason": None, "unconstrained_hours": 12}}
+    assert INCOMPLETE_COVERAGE == 0.6
+    kept = withhold_partial_months(months, enough, {"2026-01": 744.0}, KYIV)
+    assert kept == months
+    withheld = withhold_partial_months(months, enough[:-1], {"2026-01": 744.0}, KYIV)
+    assert withheld == {
+        "2026-01": {"value": None, "reason": "partial_month", "unconstrained_hours": 12}
+    }
+
+
+def test_coverage_counts_distinct_hours():
+    start = datetime(2026, 1, 1, tzinfo=KYIV).astimezone(UTC)
+    twice = [start + timedelta(hours=index % 300) for index in range(600)]
+    months = {"2026-01": {"value": 5.0, "reason": None}}
+    result = withhold_partial_months(months, twice, {"2026-01": 744.0}, KYIV)
+    assert result["2026-01"]["reason"] == "partial_month"
+
+
 # --- payload ---------------------------------------------------------------
 
 NOW = datetime(2026, 3, 15, 12, tzinfo=UTC)
@@ -532,25 +559,60 @@ def test_a_signal_with_missing_roles_has_no_months():
     assert signal["comparison"]["recent_months"] == 0
 
 
+def local_hours(year: int, month: int, *, from_day: int = 1) -> list[datetime]:
+    """Every hour of a local month from a day on, in UTC."""
+    start = datetime(year, month, from_day, tzinfo=KYIV).astimezone(UTC)
+    following = datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=KYIV).astimezone(UTC)
+    return [start + timedelta(hours=index) for index in range(int((following - start) / HOUR))]
+
+
+HOUR = timedelta(hours=1)
+
+
 def test_first_month_is_the_first_with_any_figure():
-    early = datetime(2024, 6, 10, 10, tzinfo=UTC)
-    later = datetime(2025, 2, 10, 10, tzinfo=UTC)
-    load = HourlySeries((load_hour(later, 7000.0),))
-    # A withheld best hour in an earlier month is not a figure.
-    pv_power = HourlySeries((HourlyRow(early - timedelta(days=60), 1500.0, 0.0, 3000.0),))
-    soc = HourlySeries((HourlyRow(early - timedelta(days=60), 85.0, 85.0, 85.0),))
-    battery = HourlySeries((HourlyRow(early - timedelta(days=60), 0.0, 0.0, 0.0),))
-    result = payload(
-        load=load,
-        pv=EnergySeries((EnergyRow(early, 2.0),)),
-        pv_power=pv_power,
-        soc=soc,
-        battery_power=battery,
-    )
+    # A withheld best hour in an earlier month is not a figure: April's hours
+    # are all seen, sunny and at the ceiling, so it is curtailed.
+    april = local_hours(2024, 4)
+    pv_power = HourlySeries(tuple(HourlyRow(start, 1500.0, 0.0, 3000.0) for start in april))
+    soc = HourlySeries(tuple(HourlyRow(start, 85.0, 85.0, 85.0) for start in april))
+    battery = HourlySeries(tuple(HourlyRow(start, 0.0, 0.0, 0.0) for start in april))
+    load = HourlySeries(tuple(load_hour(start, 7000.0) for start in local_hours(2025, 2)))
+    pv = EnergySeries(tuple(EnergyRow(start, 2.0) for start in local_hours(2024, 6)))
+    result = payload(load=load, pv=pv, pv_power=pv_power, soc=soc, battery_power=battery)
     assert result["signals"]["best_hour"]["months"]["2024-04"]["reason"] == "curtailed"
     assert result["first_month"] == "2024-06"
     assert result["best_hour_mode"] == "unconstrained"
-    assert result["signals"]["inverter"]["months"]["2025-02"]["value"] == 1
+    assert result["signals"]["inverter"]["months"]["2025-02"]["value"] == 28 * 24
+
+
+def test_the_current_month_is_partial_for_sums_and_peaks_but_not_for_capacity():
+    # NOW is the 15th: half of March has statistics, set against the whole of March.
+    hours = [start for start in local_hours(2026, 2) + local_hours(2026, 3) if start < NOW]
+    pv = EnergySeries(tuple(EnergyRow(start, 1.0) for start in hours))
+    pv_power = HourlySeries(tuple(HourlyRow(start, 1500.0, 0.0, 3000.0) for start in hours))
+    load = HourlySeries(tuple(load_hour(start, 7000.0) for start in hours))
+    soc = HourlySeries(tuple(HourlyRow(start, 50.0, 45.0, 50.0) for start in hours))
+    charge = EnergySeries(tuple(EnergyRow(start, 0.0) for start in hours))
+    discharge = EnergySeries(tuple(EnergyRow(start, 0.5) for start in hours))
+    result = payload(
+        pv=pv, pv_power=pv_power, load=load, soc=soc, charge=charge, discharge=discharge
+    )
+    signals = result["signals"]
+    for name in ("solar_energy", "best_hour", "inverter"):
+        assert signals[name]["months"]["2026-03"]["value"] is None, name
+        assert signals[name]["months"]["2026-03"]["reason"] == "partial_month", name
+        assert signals[name]["months"]["2026-02"]["reason"] is None, name
+        assert signals[name]["comparison"]["recent_months"] == 1, name
+    assert signals["capacity"]["months"]["2026-03"]["reason"] is None
+    assert signals["capacity"]["months"]["2026-03"]["value"] == pytest.approx(10.0)
+
+
+def test_a_history_that_starts_mid_month_has_a_partial_first_month():
+    hours = local_hours(2026, 1, from_day=20) + local_hours(2026, 2)
+    pv = EnergySeries(tuple(EnergyRow(start, 1.0) for start in hours))
+    months = payload(pv=pv)["signals"]["solar_energy"]["months"]
+    assert months["2026-01"] == {"value": None, "reason": "partial_month"}
+    assert months["2026-02"] == {"value": pytest.approx(28 * 24), "reason": None}
 
 
 def test_an_empty_history_has_no_first_month_and_does_not_cover_now():

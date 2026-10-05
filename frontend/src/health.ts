@@ -296,6 +296,8 @@ export function healthReason(
       return reasons.drift({ points: plain(EFFICIENCY_MAX_DRIFT_PCT, locale) });
     case "too_little_throughput":
       return reasons.too_little_throughput({ min: formatEnergy(EFFICIENCY_MIN_KWH, locale) });
+    case "partial_month":
+      return reasons.partial_month;
     case "curtailed":
       return reasons.curtailed({
         n: month?.unconstrained_hours ?? 0,

@@ -345,6 +345,15 @@ describe("the reasons", () => {
     expect(healthReason(en, "soc_partial", undefined, "en")).toBe(en.health.reasons.soc_partial);
   });
 
+  it("says a part of a month is not set beside a whole one", () => {
+    expect(healthReason(en, "partial_month", undefined, "en")).toBe(
+      "Only part of this month has statistics, and a part is not compared with a whole month.",
+    );
+    expect(healthReason(uk, "partial_month", undefined, "uk")).toBe(
+      uk.health.reasons.partial_month,
+    );
+  });
+
   it("counts zero when the month did not say", () => {
     expect(healthReason(en, "too_few_clean_hours", undefined, "en")).toContain("Only 0");
   });

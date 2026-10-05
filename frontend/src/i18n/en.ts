@@ -597,6 +597,8 @@ export const en = {
       too_little_throughput: (p: { min: string }) =>
         `Less than ${p.min} went into the battery this month — too little to read an ` +
         "efficiency from.",
+      partial_month:
+        "Only part of this month has statistics, and a part is not compared with a whole month.",
       curtailed: (p: { n: number; minHours: number }) =>
         `${plural("en", p.n, {
           one: `Only ${p.n} hour of sun`,

@@ -158,8 +158,21 @@ Months are the Seasonality tab's months, in the installation's zone, built
 by `months_touched` over the whole window and keyed `YYYY-MM`. A month with
 no rows for a signal is present in the table and empty, so that a gap in
 the record looks like a gap and not like a good or a bad month. Coverage is
-not drawn per month here: each signal already withholds itself when its
-month lacks what it needs, and the reasons carry the count.
+not drawn per month here, but it decides whether a month has a figure.
+Solar energy and inverter hours are sums and the best hour is a maximum, so
+a month with a third of its days reads as a worse month and pulls the
+twelve-against-twelve mean down with it. For these three signals a month is
+withheld with the reason `partial_month` when the signal's own distinct
+hourly rows in it are fewer than `INCOMPLETE_COVERAGE` (0.6, the Seasonality
+tab's constant, imported) of the month's hours. The month's length is the
+whole calendar month from `months_touched` — for the current month too,
+not the part that has elapsed, because it is set beside a whole month a
+year earlier. So today's month and the first month of a sensor's history are
+usually withheld. A withheld month has no value, so it drops out of the
+year-earlier difference and of the twelve-against-twelve figure on its own.
+Capacity and efficiency are ratios and are not withheld for coverage: a
+share of half a month is still a share, and each withholds itself when its
+month lacks what it needs, with the reasons carrying the count.
 
 ## 7. Availability
 
@@ -205,6 +218,10 @@ The best hour is tested to skip ceiling hours, to be withheld as
 `curtailed` at 9 unconstrained hours and read at 10, and to fall back to
 every hour without the three sensors; the export caption is tested to
 follow `export_limited`.
+
+`partial_month` is tested at the coverage edge and on distinct hours, for a
+`now` in the middle of a month (solar energy, the best hour and the inverter
+withheld, capacity not) and for a sensor history that starts mid-month.
 
 Year alignment is tested with two years of months where the same month
 differs, and with a February present in one year and absent in the other.

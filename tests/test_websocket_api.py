@@ -1,6 +1,6 @@
 """Tests for the WebSocket API."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant, State
@@ -1123,10 +1123,19 @@ async def test_health_command_takes_no_window_and_reads_five_years_back(
     client = await hass_ws_client(hass)
     freezer.move_to("2026-06-15 09:20:00+00:00")
     now = dt_util.utcnow()
-    hour = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+    last = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+    # Every hour from the start of May in Kyiv (21:00 UTC on 30 April) to now:
+    # a whole May, and the half of June that has elapsed.
+    first = datetime(2026, 4, 30, 21, tzinfo=UTC)
+    hours = [
+        first + timedelta(hours=index)
+        for index in range(int((last - first) / timedelta(hours=1)) + 1)
+    ]
     rows = {
-        "sensor.load_power": [{"start": hour, "mean": 3000.0, "min": 500.0, "max": 7000.0}],
-        "sensor.pv_energy": [{"start": hour, "change": 2.5}],
+        "sensor.load_power": [
+            {"start": start, "mean": 3000.0, "min": 500.0, "max": 7000.0} for start in hours
+        ],
+        "sensor.pv_energy": [{"start": start, "change": 2.5} for start in hours],
     }
     with patch(
         "custom_components.inverter_analytics.analytics.source.statistics_during_period",
@@ -1145,10 +1154,13 @@ async def test_health_command_takes_no_window_and_reads_five_years_back(
     assert result["timezone"] == "Europe/Kyiv"
     assert result["months"][0] == "2021-06"
     assert result["months"][-1] == "2026-06"
-    assert result["first_month"] == "2026-06"
+    assert result["first_month"] == "2026-05"
     assert result["covers_now"] is True
-    assert result["signals"]["inverter"]["months"]["2026-06"]["value"] == 1
-    assert result["signals"]["solar_energy"]["months"]["2026-06"]["value"] == 2.5
+    assert result["signals"]["inverter"]["months"]["2026-05"]["value"] == 31 * 24
+    assert result["signals"]["solar_energy"]["months"]["2026-05"]["value"] == 2.5 * 31 * 24
+    # Half of June is not set beside a whole June a year earlier.
+    assert result["signals"]["inverter"]["months"]["2026-06"]["reason"] == "partial_month"
+    assert result["signals"]["solar_energy"]["months"]["2026-06"]["value"] is None
     assert result["signals"]["capacity"]["missing"] == [
         "battery_soc",
         "battery_discharge_total",

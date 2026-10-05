@@ -1087,6 +1087,7 @@ const kb = {
       soc_partial: "The state of charge covers only part of the hours the counters do, so the check that the battery ended where it began would not cover the same span.",
       drift: (e) => `The charge ended more than ${e.points} points from where it began, so part of what came out went in another month, or the reverse.`,
       too_little_throughput: (e) => `Less than ${e.min} went into the battery this month — too little to read an efficiency from.`,
+      partial_month: "Only part of this month has statistics, and a part is not compared with a whole month.",
       curtailed: (e) => `${At("en", e.n, {
         one: `Only ${e.n} hour of sun`,
         other: `Only ${e.n} hours of sun`
@@ -1571,6 +1572,7 @@ const kb = {
       soc_partial: "Рівень заряду покриває лише частину годин, які покривають лічильники, тож перевірка, чи батарея закінчила там, де почала, охопила б інший проміжок.",
       drift: (e) => `Заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, тож частина того, що вийшло, увійшла в іншому місяці, або навпаки.`,
       too_little_throughput: (e) => `За місяць у батарею надійшло менше ніж ${e.min} — замало, щоб читати з цього ККД.`,
+      partial_month: "Статистика є лише за частину цього місяця, а частину не порівнюють із цілим місяцем.",
       curtailed: (e) => `${At("uk", e.n, {
         one: `Лише ${e.n} сонячна година`,
         few: `Лише ${e.n} сонячні години`,
@@ -25818,6 +25820,8 @@ function Z$(e, t, r, n) {
       return i.drift({ points: Ms(tb, n) });
     case "too_little_throughput":
       return i.too_little_throughput({ min: Pt(eb, n) });
+    case "partial_month":
+      return i.partial_month;
     case "curtailed":
       return i.curtailed({
         n: r?.unconstrained_hours ?? 0,

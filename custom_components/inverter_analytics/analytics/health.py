@@ -25,7 +25,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT, DEFAULT_GRID_ZERO_W
 from ..roles import EntryConfig
 from .battery import EFFICIENCY_MAX_DRIFT_PCT, EFFICIENCY_MIN_KWH
-from .seasonality import month_key, months_touched
+from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
 from .sizing import (
     CEILING_PV_MIN_W,
     Ceiling,
@@ -64,6 +64,7 @@ SOC_PARTIAL = "soc_partial"
 DRIFT = "drift"
 TOO_LITTLE_THROUGHPUT = "too_little_throughput"
 CURTAILED = "curtailed"
+PARTIAL_MONTH = "partial_month"
 
 SIGNALS = ("capacity", "efficiency", "solar_energy", "best_hour", "inverter")
 
@@ -76,6 +77,7 @@ _COMPARE_DECIMALS = 6
 # Statistics that end within this of now are read as current.
 _COVERS_NOW_SLACK = timedelta(hours=2)
 _DAYS_PER_YEAR = 365
+_SECONDS_PER_HOUR = 3600
 
 
 def _month(start: datetime, tz: tzinfo) -> str:
@@ -316,6 +318,39 @@ def inverter_by_month(
     return months
 
 
+def withhold_partial_months(
+    months: Mapping[str, Mapping[str, Any]],
+    starts: Iterable[datetime],
+    month_hours: Mapping[str, float],
+    tz: tzinfo,
+) -> dict[str, dict[str, Any]]:
+    """Withhold, as partial_month, each month the signal's own rows cover too little of.
+
+    For the signals that are sums or maxima — solar energy, inverter hours and
+    the best hour — a month with a third of its days is not comparable with a
+    whole one: it reads as a worse month, and it pulls the twelve-month mean
+    down with it. Coverage is the number of distinct hourly rows in the month
+    over the month's hours; below the Seasonality tab's INCOMPLETE_COVERAGE the
+    figure is withheld, its other fields kept. month_hours is the length of the
+    whole calendar month, the current one included: the current month is set
+    beside a whole month a year earlier, so it is measured against a whole
+    month, not against the part that has elapsed. A month absent from
+    month_hours is left as it is. Ratios — capacity and efficiency — do not go
+    through here: a share of half a month is still a share.
+    """
+    seen: dict[str, set[datetime]] = defaultdict(set)
+    for start in starts:
+        seen[_month(start, tz)].add(start)
+    result: dict[str, dict[str, Any]] = {}
+    for key, month in months.items():
+        hours = month_hours.get(key)
+        if hours and len(seen.get(key, ())) < INCOMPLETE_COVERAGE * hours:
+            result[key] = {**month, "value": None, "reason": PARTIAL_MONTH}
+        else:
+            result[key] = dict(month)
+    return result
+
+
 def _first_month(keys: Sequence[str], signals: Mapping[str, Mapping[str, Any]]) -> str | None:
     """The first month in which any signal has a figure, not merely a reason."""
     for key in keys:
@@ -355,7 +390,11 @@ def build_health_payload(
     hour look unconstrained.
     """
     window = Window(now - timedelta(days=HEALTH_MAX_YEARS * _DAYS_PER_YEAR), now)
-    keys = sorted(months_touched(window, tz))
+    # Whole calendar months, the current one too: see withhold_partial_months.
+    month_hours = {
+        key: seconds / _SECONDS_PER_HOUR for key, seconds in months_touched(window, tz).items()
+    }
+    keys = sorted(month_hours)
 
     ceiling = None
     if soc and soc.rows and battery_power and battery_power.rows and pv_power and pv_power.rows:
@@ -374,11 +413,23 @@ def build_health_payload(
         soc_rows = soc.rows if soc is not None else None
         computed["efficiency"] = efficiency_by_month(charge, discharge, soc_rows, tz)
     if wanted("solar_energy") and pv is not None:
-        computed["solar_energy"] = solar_energy_by_month(pv, tz)
+        computed["solar_energy"] = withhold_partial_months(
+            solar_energy_by_month(pv, tz), (row.start for row in pv.rows), month_hours, tz
+        )
     if wanted("best_hour") and pv_power is not None:
-        computed["best_hour"] = best_hour_by_month(pv_power.rows, tz, ceiling=ceiling)
+        computed["best_hour"] = withhold_partial_months(
+            best_hour_by_month(pv_power.rows, tz, ceiling=ceiling),
+            (row.start for row in pv_power.rows),
+            month_hours,
+            tz,
+        )
     if wanted("inverter") and load is not None:
-        computed["inverter"] = inverter_by_month(load.rows, rated_power, tz)
+        computed["inverter"] = withhold_partial_months(
+            inverter_by_month(load.rows, rated_power, tz),
+            (row.start for row in load.rows),
+            month_hours,
+            tz,
+        )
 
     signals = {
         name: {
