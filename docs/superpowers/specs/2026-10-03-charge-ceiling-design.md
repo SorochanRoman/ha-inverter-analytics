@@ -91,6 +91,13 @@ the reader to map a sensor that is already mapped:
 
 In ceiling mode both are empty.
 
+Mapped `pv_power_string` entities stand in for an unmapped `pv_power`: PV
+power is then their hourly sum over the hours every string has a row for
+(`pv_total_hourly` in `analytics/pv.py`). The ceiling reads hourly means only,
+and the mean of a sum is exact. `ceiling_missing` does not list `pv_power`
+while strings are mapped, and `ceiling_no_rows` lists it when the summed
+series has no hours — one string without rows is enough.
+
 ## 4. Export
 
 `export_limited: bool | None` for the whole window, put in `rules`:

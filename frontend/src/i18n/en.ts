@@ -659,6 +659,12 @@ export const en = {
         "month's highest hourly peak of PV power — close to a clear-sky figure. Hours the " +
         `system could not take are left out, and a month needs ${p.minHours} other hours of ` +
         `sun at or above ${p.minPower}.`,
+      // Appended to solar when no total PV power is mapped.
+      solarDerived:
+        "This system has no total PV power sensor, so PV power is the sum of its strings. " +
+        "An hour counts only when every string has statistics for it, and its peak is " +
+        "summed from the strings' own peaks: they need not peak at the same moment, so " +
+        "the best hour can read a little above the array's true peak.",
       inverter: (p: { share: string }) =>
         "Inverter load counts the hours whose peak reached the current rated power, and those " +
         `whose peak reached ${p.share} of it; every year is counted against today's rating. ` +

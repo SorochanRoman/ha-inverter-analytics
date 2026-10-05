@@ -30,6 +30,7 @@ from ..const import (
 from ..roles import EntryConfig
 from .balance import MIN_DENOMINATOR_KWH
 from .load import HIGH_LOAD_SHARE
+from .pv import pv_hourly, pv_power_ids
 from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
 from .source import (
     EnergySeries,
@@ -650,10 +651,11 @@ async def async_sizing_analytics(
     import_id = config.entity_id("grid_import_total")
     export_id = config.entity_id("grid_export_total")
     battery_id = config.entity_id("battery_power")
-    pv_id = config.entity_id("pv_power")
+    # The total, or the strings standing in for it when none is mapped.
+    pv_ids = pv_power_ids(config)
     # Ceiling mode reads "full" as the battery's own limit, which needs the
     # charge, the battery's power and the sun's together.
-    ceiling_mode = bool(soc_id and battery_id and pv_id)
+    ceiling_mode = bool(soc_id and battery_id and pv_ids)
     has_solar = all(solar_ids.values())
     # rated_power is a required role, so a missing or zero one means a
     # corrupted entry — but read as a threshold it would put every hour "at
@@ -682,7 +684,7 @@ async def async_sizing_analytics(
     # Grid power is the fallback for an export counter that is absent or
     # empty, and export only feeds the Sun card.
     grid_id = config.entity_id("grid_power") if has_solar else None
-    helpers = (battery_id, pv_id) if ceiling_mode else ()
+    helpers = (battery_id, *pv_ids) if ceiling_mode else ()
     extremes = await async_hourly_extremes_many(
         hass,
         [entity_id for entity_id in (judged_load, read_soc, *helpers, grid_id) if entity_id],
@@ -698,26 +700,27 @@ async def async_sizing_analytics(
         energy_by_id = await async_energy_many(hass, list(energy_ids.values()), window)
         energy = {role: energy_by_id[entity_id] for role, entity_id in energy_ids.items()}
 
+    helper_series = {
+        "battery_power": extremes.get(battery_id) if battery_id else None,
+        "pv_power": pv_hourly(config, extremes),
+    }
     ceiling = (
         _ceiling(
             config,
             extremes.get(soc_id),
-            extremes.get(battery_id),
-            extremes.get(pv_id),
+            helper_series["battery_power"],
+            helper_series["pv_power"],
             low_pct=low_pct,
         )
         if ceiling_mode
         else None
     )
-    # Why the fixed mark is read, so the tab never asks for a mapped sensor.
-    helper_ids = {"battery_power": battery_id, "pv_power": pv_id}
-    ceiling_missing = [role for role in _CEILING_HELPERS if not helper_ids[role]]
+    # Why the fixed mark is read, so the tab never asks for a mapped sensor —
+    # and mapped strings are a mapped PV power.
+    helper_mapped = {"battery_power": bool(battery_id), "pv_power": bool(pv_ids)}
+    ceiling_missing = [role for role in _CEILING_HELPERS if not helper_mapped[role]]
     ceiling_no_rows = (
-        [
-            role
-            for role in _CEILING_HELPERS
-            if not ((series := extremes.get(helper_ids[role])) and series.rows)
-        ]
+        [role for role in _CEILING_HELPERS if not ((series := helper_series[role]) and series.rows)]
         if ceiling_mode
         else []
     )

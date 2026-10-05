@@ -108,6 +108,15 @@ the gate must check the same span the counters sum.
 
 Needs `pv_energy_total`; adds `pv_power` for the peak.
 
+When `pv_power` is not mapped but `pv_power_string` is, the strings stand in
+for it here and in the ceiling below: their hourly rows are summed by
+`pv_total_hourly` (`analytics/pv.py`) — mean of means, min of mins, max of
+maxes — over the hours every string has a row for, and `best_hour.missing`
+does not list `pv_power`. The sum of the maxima is the hour's peak only if the
+strings peaked at the same instant, so it can read slightly above the array's
+true peak. The payload's `pv_power_derived: bool` says the total was derived,
+and the best-hour definition at the foot of the tab says what that means.
+
 Per month: energy from the counter, and the **best hour** — the highest
 hourly maximum of the PV power. The energy carries the weather, and the
 table says so in its footer; the best hour of a month is close to a

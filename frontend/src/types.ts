@@ -524,5 +524,7 @@ export interface HealthPayload {
   best_hour_mode: "unconstrained" | "all";
   /** The battery_capacity option: a reference line, never multiplied in. */
   nameplate_kwh: number | null;
+  /** PV power is the sum of the strings because no total is mapped. */
+  pv_power_derived: boolean;
   signals: Record<HealthSignalKey, HealthSignal>;
 }

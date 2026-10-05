@@ -417,6 +417,52 @@ async def test_seasonality_command_returns_months_in_the_installation_zone(
     assert result["has_pv"] is False
 
 
+async def test_seasonality_draws_the_pv_line_from_the_strings_without_a_pv_total(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 12kW",
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "pv_power_string": ["sensor.pv1", "sensor.pv2"],
+            },
+            "numbers": {"rated_power": 12000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("sensor.load_power", "1500")
+    hass.states.async_set("sensor.pv1", "1200")
+    hass.states.async_set("sensor.pv2", "800")
+    await async_wait_recording_done(hass)
+
+    client = await hass_ws_client(hass)
+    end = dt_util.utcnow() + timedelta(minutes=5)
+    await client.send_json_auto_id(
+        {
+            "type": "inverter_analytics/seasonality",
+            "entry_id": entry.entry_id,
+            "start": (end - timedelta(days=1)).isoformat(),
+            "end": end.isoformat(),
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"], response
+    result = response["result"]
+    assert result["has_pv"] is True
+    pv_means = [month["pv_mean"] for month in result["months"] if month["pv_mean"] is not None]
+    assert pv_means
+    assert all(mean == pytest.approx(2000.0) for mean in pv_means)
+    assert {"pv_s1", "pv_s2"} <= set(result["series"])
+
+
 async def test_balance_command_returns_flows_and_the_covered_span(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
 ) -> None:
@@ -909,7 +955,10 @@ async def _sizing_with_rows(
         domain=DOMAIN,
         title="Capped battery",
         data={
-            "entities": {role: [entity_id] for role, entity_id in entities.items()},
+            "entities": {
+                role: [entity_id] if isinstance(entity_id, str) else list(entity_id)
+                for role, entity_id in entities.items()
+            },
             "numbers": {"rated_power": 8000.0, **(numbers or {})},
             "inverted": inverted,
         },
@@ -976,6 +1025,48 @@ async def test_sizing_reads_full_by_the_charge_ceiling_and_export_by_signed_grid
     assert result["rules"]["ceiling_missing"] == result["rules"]["ceiling_no_rows"] == []
     assert result["period"]["battery"]["evidence"]["days_full"] == 1
     assert result["period"]["solar"]["evidence"]["fill_share"] == 1.0
+
+
+async def test_sizing_reads_the_ceiling_from_the_strings_without_a_pv_total(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """A Deye on Solarman has pv1_power and pv2_power, and no total above them."""
+    entities = {role: entity for role, entity in _CEILING_ENTITIES.items() if role != "pv_power"}
+    rows = {key: value for key, value in _CEILING_ROWS.items() if key != "sensor.pv_power"}
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={**entities, "pv_power_string": ["sensor.pv1", "sensor.pv2"]},
+        inverted=[],
+        rows={
+            **rows,
+            "sensor.pv1": {"mean": 1500.0, "min": 1000.0, "max": 1900.0},
+            "sensor.pv2": {"mean": 1000.0, "min": 800.0, "max": 1300.0},
+        },
+        states={},
+    )
+    assert result["rules"]["full_mode"] == "ceiling"
+    assert result["rules"]["ceiling_missing"] == result["rules"]["ceiling_no_rows"] == []
+    assert result["period"]["battery"]["evidence"]["days_full"] == 1
+
+
+async def test_sizing_names_pv_power_when_one_string_has_no_rows(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Half an array is not the array: no hour where every string has a row."""
+    entities = {role: entity for role, entity in _CEILING_ENTITIES.items() if role != "pv_power"}
+    rows = {key: value for key, value in _CEILING_ROWS.items() if key != "sensor.pv_power"}
+    result = await _sizing_with_rows(
+        hass,
+        hass_ws_client,
+        entities={**entities, "pv_power_string": ["sensor.pv1", "sensor.pv2"]},
+        inverted=[],
+        rows={**rows, "sensor.pv1": {"mean": 1500.0, "min": 1000.0, "max": 1900.0}},
+        states={},
+    )
+    assert result["rules"]["full_mode"] == "fixed"
+    assert result["rules"]["ceiling_missing"] == []
+    assert result["rules"]["ceiling_no_rows"] == ["pv_power"]
 
 
 async def test_sizing_falls_back_to_the_fixed_mark_without_battery_power_rows(
@@ -1167,12 +1258,74 @@ async def test_health_command_takes_no_window_and_reads_five_years_back(
         "battery_charge_total",
     ]
     assert result["signals"]["best_hour"]["missing"] == ["pv_power"]
+    assert result["pv_power_derived"] is False
     assert result["signals"]["efficiency"]["missing"] == [
         "battery_soc",
         "battery_charge_total",
         "battery_discharge_total",
     ]
     assert result["signals"]["efficiency"]["months"] == {}
+
+
+async def test_health_reads_the_best_hour_from_the_strings_without_a_pv_total(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client, freezer
+) -> None:
+    """The array's best hour is the strings' sum, and the payload says it was derived."""
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 12kW",
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "pv_power_string": ["sensor.pv1", "sensor.pv2"],
+            },
+            "numbers": {"rated_power": 12000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    freezer.move_to("2026-06-15 09:20:00+00:00")
+    first = datetime(2026, 4, 30, 21, tzinfo=UTC)
+    hours = [first + timedelta(hours=index) for index in range(31 * 24)]
+    rows = {
+        "sensor.load_power": [
+            {"start": start, "mean": 3000.0, "min": 500.0, "max": 7000.0} for start in hours
+        ],
+        # The first string has no row for one hour, so the second string's
+        # peak in that hour cannot be the array's best hour.
+        "sensor.pv1": [
+            {"start": start, "mean": 2000.0, "min": 0.0, "max": 4000.0}
+            for start in hours
+            if start != hours[100]
+        ],
+        "sensor.pv2": [
+            {
+                "start": start,
+                "mean": 1500.0,
+                "min": 0.0,
+                "max": 9000.0 if start == hours[100] else 3000.0,
+            }
+            for start in hours
+        ],
+    }
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ):
+        await client.send_json_auto_id(
+            {"type": "inverter_analytics/health", "entry_id": entry.entry_id}
+        )
+        response = await client.receive_json()
+
+    assert response["success"], response
+    result = response["result"]
+    assert result["pv_power_derived"] is True
+    assert result["signals"]["best_hour"]["missing"] == []
+    assert result["signals"]["best_hour"]["months"]["2026-05"]["value"] == 7000.0
 
 
 async def test_health_command_caches_for_the_local_day(

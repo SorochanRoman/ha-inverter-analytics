@@ -195,6 +195,18 @@ the defect was only visible on screen.
   `analytics/grid.py` adds the parts on a common timeline, and a gap in any
   phase is a gap in the sum. A later analytic that reads grid power should
   reuse it rather than prefer a total that may not exist.
+- **PV power summed from the strings reads its peak slightly high.** An
+  installation with no total PV power sensor — a Deye on Solarman has only
+  `pv1_power` and `pv2_power` — has PV power summed from its strings wherever
+  it is read (`analytics/pv.py`): Seasonality's PV line through `sum_series`,
+  and Sizing's and Health's hourly statistics through `pv_total_hourly`, which
+  keeps only hours every string has a row for. The hour's mean is exact and so,
+  in practice, is its floor. The hour's peak is the sum of the strings' peaks,
+  which is the array's peak only if they peaked at the same instant; strings on
+  different roof faces need not, so the Health best hour can overstate the true
+  peak a little, never understate it. The ceiling reads hourly means only and is
+  not affected. The Health payload carries `pv_power_derived` and the tab's
+  definition says so. The total, when mapped, always wins.
 
 ## 5. Deliberately deferred
 

@@ -15,7 +15,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from ..roles import EntryConfig
+from ..roles import EntryConfig, part_identities
+from .pv import pv_power_derived, pv_power_ids, pv_series
 from .resample import Interval, Series, coverage, split_local_hours, to_intervals
 from .source import Window, async_series_many, describe_series
 
@@ -207,26 +208,28 @@ async def async_seasonality_analytics(
     if load_id is None:
         raise ValueError("load_power is not configured")
 
-    pv_id = config.entity_id("pv_power")
+    # The total, or the strings summed in its place when none is mapped.
+    pv_ids = pv_power_ids(config)
+    pv_role = "pv_power_string" if pv_power_derived(config) else "pv_power"
     signs = {load_id: config.sign("load_power")}
-    if pv_id:
-        signs[pv_id] = config.sign("pv_power")
+    signs |= {entity_id: config.sign(pv_role) for entity_id in pv_ids}
 
-    results = await async_series_many(hass, [load_id, *([pv_id] if pv_id else [])], window, signs)
+    results = await async_series_many(hass, [load_id, *pv_ids], window, signs)
     load = results[load_id]
-    pv = results[pv_id] if pv_id else None
+    pv = pv_series(config, results)
 
     # Months and hours of the day are wall-clock ideas, so they belong to the
     # installation's zone rather than to UTC or to the browser's.
     zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
 
-    payload = build_seasonality_payload(
-        load.series, pv.series if pv else None, tz=zone, window=window
-    )
+    payload = build_seasonality_payload(load.series, pv, tz=zone, window=window)
 
     series_block = {"load_total": describe_series(load_id, load)}
-    if pv_id and pv:
-        series_block["pv_total"] = describe_series(pv_id, pv)
+    if pv_role == "pv_power_string":
+        for identity, entity_id in zip(part_identities(pv_role, pv_ids), pv_ids, strict=True):
+            series_block[identity.key] = describe_series(entity_id, results[entity_id])
+    elif pv_ids:
+        series_block["pv_total"] = describe_series(pv_ids[0], results[pv_ids[0]])
     payload["series"] = series_block
     payload["precision"] = load.precision.value
     payload["boundary"] = load.boundary.isoformat() if load.boundary else None

@@ -315,12 +315,14 @@ export function healthReason(
 
 /**
  * The four definitions at the foot of the tab, with the constants they rest
- * on. formatEnergy keeps one decimal, which would print the clean-hour charge
- * limit of 0.02 kWh as "0 kWh"; it is formatted to its own two.
+ * on. When PV power is summed from the strings, the solar one says what that
+ * does to the best hour. formatEnergy keeps one decimal, which would print the
+ * clean-hour charge limit of 0.02 kWh as "0 kWh"; it is formatted to its own two.
  */
 export function healthDefinitions(
   m: Messages,
   locale: string,
+  pvPowerDerived = false,
 ): Record<HealthCardKey, string> {
   const d = m.health.definitions;
   return {
@@ -333,10 +335,11 @@ export function healthDefinitions(
       points: plain(EFFICIENCY_MAX_DRIFT_PCT, locale),
       min: formatEnergy(EFFICIENCY_MIN_KWH, locale),
     }),
-    solar: d.solar({
-      minHours: BEST_HOUR_MIN_HOURS,
-      minPower: formatPower(CEILING_PV_MIN_W, locale),
-    }),
+    solar:
+      d.solar({
+        minHours: BEST_HOUR_MIN_HOURS,
+        minPower: formatPower(CEILING_PV_MIN_W, locale),
+      }) + (pvPowerDerived ? ` ${d.solarDerived}` : ""),
     inverter: d.inverter({ share: formatPercent(HIGH_LOAD_SHARE, locale) }),
   };
 }

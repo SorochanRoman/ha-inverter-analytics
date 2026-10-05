@@ -63,6 +63,7 @@ function payload(
     export_limited: false,
     best_hour_mode: "unconstrained",
     nameplate_kwh: null,
+    pv_power_derived: false,
     signals: {
       capacity: signal(),
       efficiency: signal(),
@@ -394,6 +395,14 @@ describe("the definitions", () => {
     expect(d.inverter).toContain("reached 80% of it");
     expect(d.inverter).toContain("current rated power");
     expect(healthDefinitions(uk, "uk").inverter).toContain("поточної номінальної потужності");
+  });
+
+  it("say the best hour may read high when PV power is summed from the strings", () => {
+    expect(healthDefinitions(en, "en").solar).not.toContain("strings");
+    expect(healthDefinitions(en, "en", true).solar).toContain(
+      "summed from the strings' own peaks",
+    );
+    expect(healthDefinitions(uk, "uk", true).solar).toContain("стрінгів");
   });
 
   it("use the locale's decimal mark", () => {

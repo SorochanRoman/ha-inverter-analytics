@@ -50,7 +50,10 @@ Means are unaffected: a duration-weighted mean of hourly means is the mean.
 
 **By month.** Mean load per month across the window, with PV beside it when a
 PV power sensor is mapped. Each bar carries its coverage; incomplete months are
-marked.
+marked. Without a total PV power sensor, mapped `pv_power_string` entities are
+summed with `sum_series` and draw the line instead; a gap in any string is a
+gap in the sum, and the `series` block describes each string under its part
+key (`pv_s1`, `pv_s2`, …) in place of `pv_total`.
 
 **By hour of day.** Mean load for each hour across the whole window, which
 answers "when is the house busy" but deliberately blends seasons.

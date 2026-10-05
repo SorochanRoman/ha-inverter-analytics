@@ -25,6 +25,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT, DEFAULT_GRID_ZERO_W
 from ..roles import EntryConfig
 from .battery import EFFICIENCY_MAX_DRIFT_PCT, EFFICIENCY_MIN_KWH
+from .pv import pv_hourly, pv_power_derived, pv_power_ids
 from .seasonality import month_key, months_touched
 from .sizing import (
     CEILING_PV_MIN_W,
@@ -532,10 +533,18 @@ async def async_health_analytics(hass: HomeAssistant, config: EntryConfig) -> di
     mapped = {
         role: config.entity_id(role) for role in (*_HOURLY_ROLES, *_ENERGY_ROLES, "grid_power")
     }
+    # The total, or the strings standing in for it when none is mapped.
+    pv_ids = pv_power_ids(config)
+
+    def is_mapped(role: str) -> bool:
+        if role == "rated_power":
+            return has_rated
+        if role == "pv_power":
+            return bool(pv_ids)
+        return bool(mapped.get(role))
+
     missing = {
-        name: [
-            role for role in roles if not (has_rated if role == "rated_power" else mapped.get(role))
-        ]
+        name: [role for role in roles if not is_mapped(role)]
         for name, roles in _SIGNAL_ROLES.items()
     }
     if all(missing.values()):
@@ -550,7 +559,12 @@ async def async_health_analytics(hass: HomeAssistant, config: EntryConfig) -> di
     # Grid power only answers export when the export counter is not mapped.
     if not mapped["grid_export_total"]:
         hourly_roles.append("grid_power")
-    hourly_ids = [mapped[role] for role in hourly_roles if mapped[role]]
+    hourly_ids = [
+        entity_id
+        for role in hourly_roles
+        for entity_id in (pv_ids if role == "pv_power" else (mapped[role],))
+        if entity_id
+    ]
     energy_ids = [mapped[role] for role in _ENERGY_ROLES if mapped[role]]
     extremes = await async_hourly_extremes_many(hass, hourly_ids, window)
     energy = await async_energy_many(hass, energy_ids, window)
@@ -565,12 +579,12 @@ async def async_health_analytics(hass: HomeAssistant, config: EntryConfig) -> di
 
     grid_rows = signed_grid(config, hourly("grid_power")) if "grid_power" in hourly_roles else None
     zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
-    return build_health_payload(
+    payload = build_health_payload(
         now=now,
         tz=zone,
         soc=hourly("battery_soc"),
         battery_power=hourly("battery_power"),
-        pv_power=hourly("pv_power"),
+        pv_power=pv_hourly(config, extremes),
         load=hourly("load_power"),
         charge=counter("battery_charge_total"),
         discharge=counter("battery_discharge_total"),
@@ -584,3 +598,7 @@ async def async_health_analytics(hass: HomeAssistant, config: EntryConfig) -> di
         nameplate_kwh=config.number("battery_capacity"),
         missing=missing,
     )
+    # Summed from the strings, the best hour's peak is the sum of their peaks,
+    # which can read a little above the array's true peak; the tab says so.
+    payload["pv_power_derived"] = pv_power_derived(config)
+    return payload

@@ -236,7 +236,7 @@ export class IaHealthTab extends LitElement {
     }
     const payload = this.payload;
     const locale = this.i18n.locale;
-    const definitions = healthDefinitions(m, locale);
+    const definitions = healthDefinitions(m, locale, payload.pv_power_derived);
     return html`
       <div class="status">
         <span class="badge"
