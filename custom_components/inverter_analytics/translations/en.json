@@ -247,7 +247,11 @@
           "battery_low_pct": "Low battery charge",
           "battery_idle_w": "Battery idle power",
           "battery_full_pct": "Full battery charge",
-          "grid_zero_w": "Grid zero power"
+          "grid_zero_w": "Grid zero power",
+          "price_day": "Price of a kWh (day)",
+          "price_night": "Night price of a kWh",
+          "night_start_hour": "Night zone starts at (hour)",
+          "night_end_hour": "Night zone ends at (hour)"
         },
         "data_description": {
           "name": "Shown in the sidebar page when you have more than one inverter.",
@@ -256,7 +260,11 @@
           "battery_low_pct": "The state of charge counted as low. Time below it is reported, and runs below it become dip episodes. What counts as low differs by chemistry — a lithium pack and a lead-acid one are not comparable here. Default 20%.",
           "battery_idle_w": "Battery power below this, in either direction, is treated as resting rather than charging or discharging. Without it a pack drawing a few watts of standby would be reported as working all night. Default 50 W.",
           "battery_full_pct": "The state of charge at which the battery counts as filled for the day, on the Sizing tab. Many battery management systems cap the charge below a hundred, and a battery that reaches 90% every day has been given everything it can hold. Default 95%.",
-          "grid_zero_w": "Used when outages are inferred from power flows, on an inverter with no grid-presence sensor mapped, and to decide whether the installation exports, on the Sizing tab, when no export counter is mapped. Grid power within this many watts of zero counts as no exchange with the grid. A current-transformer reading is never quite zero; how far from it depends on the clamp. Default 10 W."
+          "grid_zero_w": "Used when outages are inferred from power flows, on an inverter with no grid-presence sensor mapped, and to decide whether the installation exports, on the Sizing tab, when no export counter is mapped. Grid power within this many watts of zero counts as no exchange with the grid. A current-transformer reading is never quite zero; how far from it depends on the clamp. Default 10 W.",
+          "price_day": "What a kWh bought from the grid costs, in Home Assistant's currency. On a two-zone tariff, the day price. Used for the Savings card on the Balance tab; without it the card shows no figure.",
+          "price_night": "The night-zone price on a two-zone tariff. Leave empty for a single tariff.",
+          "night_start_hour": "The local hour the night zone begins, 0–23. Default 23.",
+          "night_end_hour": "The first local hour after the night zone, 0–23. Default 7. Equal to the start means no night zone."
         }
       }
     }

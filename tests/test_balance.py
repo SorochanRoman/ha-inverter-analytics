@@ -1,15 +1,23 @@
 """Tests for the energy balance analytics."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from custom_components.inverter_analytics.analytics.balance import build_balance_payload
+from homeassistant.core import HomeAssistant
+
+from custom_components.inverter_analytics.analytics.balance import (
+    async_balance_analytics,
+    build_balance_payload,
+)
 from custom_components.inverter_analytics.analytics.source import (
     EnergyRow,
     EnergySeries,
     Window,
 )
+from custom_components.inverter_analytics.roles import EntryConfig
 
+MODULE = "custom_components.inverter_analytics.analytics.balance"
 KYIV = ZoneInfo("Europe/Kyiv")
 BASE = datetime(2026, 6, 1, tzinfo=UTC)
 
@@ -149,3 +157,52 @@ def test_no_statistics_at_all_reports_no_span_rather_than_a_false_one():
     assert payload["covered_start"] is None
     assert payload["covers_whole_window"] is False
     assert payload["totals"]["pv_energy_total"] == 0.0
+
+
+def _savings_config(**numbers: float) -> EntryConfig:
+    return EntryConfig.from_dict(
+        {
+            "entities": {
+                "load_energy_total": ["sensor.load_energy"],
+                "grid_import_total": ["sensor.grid_import"],
+            },
+            "numbers": {"rated_power": 8000.0, **numbers},
+        }
+    )
+
+
+async def _balance(hass: HomeAssistant, config: EntryConfig) -> dict:
+    counters = {
+        "sensor.load_energy": hours(2.0, 3.0),
+        "sensor.grid_import": hours(0.5, 1.0),
+    }
+    window = Window(BASE, BASE + timedelta(hours=2))
+    with patch(f"{MODULE}.async_energy_many", return_value=counters):
+        return await async_balance_analytics(hass, config, window)
+
+
+async def test_the_balance_payload_prices_what_was_saved(hass: HomeAssistant):
+    hass.config.currency = "UAH"
+    payload = await _balance(hass, _savings_config(price_day=4.32))
+    savings = payload["savings"]
+    assert savings["currency"] == hass.config.currency
+    assert savings["reason"] is None
+    assert savings["total"] == round((2.0 - 0.5 + 3.0 - 1.0) * 4.32, 4)
+
+
+async def test_the_balance_payload_withholds_savings_without_a_price(hass: HomeAssistant):
+    payload = await _balance(hass, _savings_config())
+    assert payload["savings"]["reason"] == "no_price"
+    assert payload["savings"]["total"] is None
+
+
+async def test_an_hour_of_zero_is_midnight_not_the_default(hass: HomeAssistant):
+    # Night from 23:00 to midnight: BASE is 03:00 Kyiv, so both hours are day.
+    # Read as unset, the 0 would fall back to 07:00 and price them as night.
+    hass.config.time_zone = "Europe/Kyiv"
+    payload = await _balance(
+        hass,
+        _savings_config(price_day=4.32, price_night=2.16, night_end_hour=0.0),
+    )
+    assert payload["savings"]["two_zone"] is True
+    assert payload["savings"]["total"] == round((2.0 - 0.5 + 3.0 - 1.0) * 4.32, 4)

@@ -13,7 +13,9 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from ..const import DEFAULT_NIGHT_END_HOUR, DEFAULT_NIGHT_START_HOUR
 from ..roles import BALANCE_FLOW_ROLES, BALANCE_SINK_ROLES, BALANCE_SOURCE_ROLES, EntryConfig
+from .savings import build_savings
 from .source import EnergySeries, Window, async_energy_many
 
 # Below this a ratio is arithmetic noise: a night with 0.02 kWh of production
@@ -108,6 +110,11 @@ def build_balance_payload(
     }
 
 
+def _hour(value: float | None, default: float) -> int:
+    """A configured hour of the day; 0 is midnight, not unset."""
+    return int(default if value is None else value) % 24
+
+
 async def async_balance_analytics(
     hass: HomeAssistant, config: EntryConfig, window: Window
 ) -> dict[str, Any]:
@@ -128,6 +135,18 @@ async def async_balance_analytics(
 
     zone = dt_util.get_time_zone(hass.config.time_zone) or dt_util.UTC
     payload = build_balance_payload(flows, tz=zone, window=window)
+    # From the rows already read: pricing them needs no second recorder query.
+    payload["savings"] = build_savings(
+        flows.get("load_energy_total"),
+        flows.get("grid_import_total"),
+        tz=zone,
+        window=window,
+        currency=hass.config.currency,
+        price_day=config.number("price_day"),
+        price_night=config.number("price_night"),
+        night_start=_hour(config.number("night_start_hour"), DEFAULT_NIGHT_START_HOUR),
+        night_end=_hour(config.number("night_end_hour"), DEFAULT_NIGHT_END_HOUR),
+    )
     payload["entities"] = mapped
     payload["timezone"] = str(zone)
     return payload

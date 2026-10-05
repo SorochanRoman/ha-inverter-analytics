@@ -20,6 +20,8 @@ from .const import (
     DEFAULT_GRID_ZERO_W,
     DEFAULT_IMBALANCE_FLOOR_PCT,
     DEFAULT_IMBALANCE_THRESHOLD_PCT,
+    DEFAULT_NIGHT_END_HOUR,
+    DEFAULT_NIGHT_START_HOUR,
     DOMAIN,
 )
 from .detect import (
@@ -57,6 +59,9 @@ _TUNING_DEFAULTS = {
     "battery_idle_w": DEFAULT_BATTERY_IDLE_W,
     "battery_full_pct": DEFAULT_BATTERY_FULL_PCT,
     "grid_zero_w": DEFAULT_GRID_ZERO_W,
+    # The prices have no default: a made-up price would be a made-up saving.
+    "night_start_hour": DEFAULT_NIGHT_START_HOUR,
+    "night_end_hour": DEFAULT_NIGHT_END_HOUR,
 }
 
 _DEVICE_CLASS_BY_KIND = {

@@ -432,3 +432,24 @@ Written from reviewing the finished code rather than its spec.
   appears only after the next reload, an entry stuck in a setup error never
   flags its entities, and a YAML platform still retrying at start
   (`PlatformNotReady`) would raise the card until the next reload.
+
+## 7. What the savings figure does not account for
+
+The Savings card on the Balance tab prices what the house used and did not buy
+from the grid. Each of these is said on the card or follows from it:
+
+- **Today's prices are applied to the whole period.** There is no tariff
+  history, so a year that spanned a price change is priced as if the current
+  price had held throughout.
+- **It is the system's saving, not the sun's.** A battery charged from the
+  grid at night on a two-zone tariff counts towards it: the charging hours are
+  negative, the hours it gives the energy back are positive, and the
+  difference between the two prices is the saving.
+- **Income from export is not counted.** Energy sold to the grid earns
+  nothing in the figure.
+- **An hour missing from either counter is left out**, not read as zero, so a
+  partly covered period reads low. The card's coverage line says what share of
+  the period both counters cover.
+- **An outage is still valued at the grid price.** During one the house's use
+  is priced as if it would otherwise have been bought, although without the
+  system it would have had no power at all.

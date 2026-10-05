@@ -68,6 +68,12 @@ ROLES: tuple[Role, ...] = (
     Role("battery_idle_w", RoleKind.NUMBER, "W", advanced=True),
     Role("battery_full_pct", RoleKind.NUMBER, "%", advanced=True),
     Role("grid_zero_w", RoleKind.NUMBER, "W", advanced=True),
+    # Prices are per kWh in Home Assistant's currency, which the selector
+    # cannot name, so the unit text says only what the price is per.
+    Role("price_day", RoleKind.NUMBER, "/kWh", advanced=True),
+    Role("price_night", RoleKind.NUMBER, "/kWh", advanced=True),
+    Role("night_start_hour", RoleKind.NUMBER, "h", advanced=True),
+    Role("night_end_hour", RoleKind.NUMBER, "h", advanced=True),
 )
 
 ROLES_BY_KEY: dict[str, Role] = {role.key: role for role in ROLES}

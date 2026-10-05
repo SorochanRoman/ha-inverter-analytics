@@ -184,6 +184,10 @@ def test_the_tuning_numbers_stay_out_of_the_first_run():
         "battery_idle_w",
         "grid_zero_w",
         "battery_full_pct",
+        "price_day",
+        "price_night",
+        "night_start_hour",
+        "night_end_hour",
     }
     assert not any(role.advanced for role in ROLES if role.required)
 
@@ -311,6 +315,14 @@ def test_grid_zero_is_a_tuning_number():
     assert role.kind is RoleKind.NUMBER
     assert role.advanced is True
     assert "grid_zero_w" in tuning_role_keys()
+
+
+def test_the_savings_settings_are_tuning_numbers():
+    for key in ("price_day", "price_night", "night_start_hour", "night_end_hour"):
+        role = ROLES_BY_KEY[key]
+        assert role.kind is RoleKind.NUMBER
+        assert role.advanced is True
+        assert key in tuning_role_keys()
 
 
 def _sizing(config: EntryConfig) -> dict:

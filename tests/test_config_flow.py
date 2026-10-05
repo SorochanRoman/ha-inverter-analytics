@@ -10,7 +10,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 import voluptuous as vol
 
 from custom_components.inverter_analytics.config_flow import pack, unpack
-from custom_components.inverter_analytics.const import DEFAULT_IMBALANCE_FLOOR_PCT, DOMAIN
+from custom_components.inverter_analytics.const import (
+    DEFAULT_IMBALANCE_FLOOR_PCT,
+    DEFAULT_NIGHT_END_HOUR,
+    DEFAULT_NIGHT_START_HOUR,
+    DOMAIN,
+)
 from custom_components.inverter_analytics.detect import CT_CHOICE, Ambiguity, Detection
 from custom_components.inverter_analytics.roles import EntryConfig, feature_availability
 
@@ -724,6 +729,11 @@ async def test_the_options_form_offers_the_name_and_the_thresholds(
     # it is the default; an empty box invites a guess at what it meant.
     assert suggested["battery_low_pct"] == 35.0
     assert suggested["imbalance_floor_pct"] == DEFAULT_IMBALANCE_FLOOR_PCT
+    # The night zone has a default; a price does not, so its box stays empty.
+    assert suggested["night_start_hour"] == DEFAULT_NIGHT_START_HOUR
+    assert suggested["night_end_hour"] == DEFAULT_NIGHT_END_HOUR
+    assert "price_day" not in suggested
+    assert "price_night" not in suggested
     # The mapping is not here any more, and neither is the nameplate.
     assert "load_power" not in suggested
     assert "rated_power" not in suggested

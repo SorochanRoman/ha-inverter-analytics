@@ -41,3 +41,8 @@ DEFAULT_BATTERY_FULL_PCT: Final = 95.0
 # Only for outages inferred from power flows. A current-transformer reading
 # is never quite zero, and how far from zero depends on the clamp.
 DEFAULT_GRID_ZERO_W: Final = 10.0
+
+# The usual two-zone tariff's night: 23:00 to 07:00 local time. The hours only
+# matter once a night price is set; without one every hour is priced alike.
+DEFAULT_NIGHT_START_HOUR: Final = 23.0
+DEFAULT_NIGHT_END_HOUR: Final = 7.0
