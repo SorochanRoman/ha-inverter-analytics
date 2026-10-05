@@ -15,6 +15,7 @@ importantly, withdraw from it the moment the reason is gone.
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
@@ -143,8 +144,16 @@ def _is_gone(hass: HomeAssistant, entity_id: str) -> bool:
     saying otherwise would raise a card every time an inverter loses its
     connection overnight. Both are checked because a template or YAML sensor
     need not be in the registry at all.
+
+    One kind of unavailable is different. An entity whose integration no
+    longer sets it up keeps its registry entry, and Home Assistant restores
+    it as unavailable with `restored: true`. Nothing answers to that name
+    either — the registry is only remembering it — so it counts as gone.
     """
-    return hass.states.get(entity_id) is None and er.async_get(hass).async_get(entity_id) is None
+    state = hass.states.get(entity_id)
+    if state is not None:
+        return state.state == STATE_UNAVAILABLE and state.attributes.get("restored") is True
+    return er.async_get(hass).async_get(entity_id) is None
 
 
 @callback

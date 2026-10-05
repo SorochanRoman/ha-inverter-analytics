@@ -177,6 +177,49 @@ async def test_an_unavailable_sensor_is_not_a_missing_one(
     assert _issue(hass, MISSING_ENTITIES, entry) is None
 
 
+async def test_an_orphaned_entity_is_reported_as_missing(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """Still in the registry, but no integration set it up.
+
+    Home Assistant restores such an entity as unavailable with `restored: true`.
+    A registry-only check would call that a working mapping and say nothing.
+    """
+    hass.states.async_set(
+        LOAD,
+        "800",
+        {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+    )
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "binary_sensor", "gone", "unique", suggested_object_id="grid_status"
+    )
+    hass.states.async_set(
+        "binary_sensor.grid_status",
+        "unavailable",
+        {"restored": True, "friendly_name": "Grid status"},
+    )
+    entry = _entry({"load_power": [LOAD], "grid_connected": ["binary_sensor.grid_status"]})
+    await _setup(hass, entry)
+
+    issue = _issue(hass, MISSING_ENTITIES, entry)
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "binary_sensor.grid_status"
+
+
+async def test_an_unavailable_registered_entity_that_is_not_restored_is_not_missing(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """A registered device that is offline for a while is not orphaned."""
+    registry = er.async_get(hass)
+    registry.async_get_or_create("sensor", "demo", "unique", suggested_object_id="offline_load")
+    hass.states.async_set("sensor.offline_load", "unavailable", {"device_class": "power"})
+    entry = _entry({"load_power": ["sensor.offline_load"]})
+    await _setup(hass, entry)
+
+    assert _issue(hass, MISSING_ENTITIES, entry) is None
+
+
 async def test_a_registered_entity_with_no_state_yet_is_not_missing(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
