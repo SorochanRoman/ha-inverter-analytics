@@ -57,11 +57,11 @@ savings_by_hour(load_rows, import_rows, *, tz, price_day, price_night,
 {
   "currency": "UAH",
   "total": float | None,
-  "per_day": float | None,          # total over the days with any hour
+  "per_day": float | None,          # total × 24 / hours: per 24 hours of data
   "days": [{"day": "YYYY-MM-DD", "value": float}],   # local days
   "hours": int,                     # hours with a value
-  "window_hours": int,              # whole hours in the window
-  "two_zone": bool,
+  "window_hours": int,              # hours wholly inside the window (UTC)
+  "two_zone": bool,                 # night price set and a non-empty zone
   "reason": None | "no_price" | "no_counters" | "no_hours",
 }
 ```
