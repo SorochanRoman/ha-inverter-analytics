@@ -117,7 +117,11 @@ the same constants. A month with fewer than `BEST_HOUR_MIN_HOURS = 10`
 unconstrained hours of PV at or above `CEILING_PV_MIN_W` is withheld with
 the reason `curtailed` and the count. Without those three sensors the best
 hour is read from every hour and the card says it may include hours the
-system could not take.
+system could not take. A month in which the three sensors saw no hour at
+all — before one of them was added, say — is read the same way, from every
+hour with `unconstrained_hours: null`: its hours were never measured, and
+calling it `curtailed` would claim a limit nobody saw. A month with some
+observed hours keeps the rule above.
 
 **Energy without export follows the house.** When the installation does not
 export — the Sizing tab's `export_limited`, imported, decided once over the
@@ -214,7 +218,8 @@ hours including a BMS recalibration hour that inflates the denominator.
 Efficiency is tested for both gates with the Battery tab's constants, and
 for `no_soc`.
 
-The best hour is tested to skip ceiling hours, to be withheld as
+The best hour is tested to read every hour in a month the three sensors
+never saw, to skip ceiling hours, to be withheld as
 `curtailed` at 9 unconstrained hours and read at 10, and to fall back to
 every hour without the three sensors; the export caption is tested to
 follow `export_limited`.

@@ -270,11 +270,13 @@ def best_hour_by_month(
     the limit. A month needs BEST_HOUR_MIN_HOURS candidates of real sun (mean
     at or above CEILING_PV_MIN_W) before its best hour is read; below that it
     is curtailed, with the count. Without one every hour is read, and
-    unconstrained_hours is None because nothing was left out.
+    unconstrained_hours is None because nothing was left out. The same holds
+    for a month in which the three sensors saw no hour at all: calling it
+    curtailed would claim a limit nobody measured.
     """
     months: dict[str, dict[str, Any]] = {}
     for key, rows in sorted(rows_by_month(pv_power, tz).items()):
-        if ceiling is None:
+        if ceiling is None or not any(row.start in ceiling.observed for row in rows):
             months[key] = {
                 "value": max(row.max for row in rows),
                 "reason": None,

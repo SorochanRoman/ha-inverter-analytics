@@ -417,6 +417,20 @@ def test_hours_the_three_sensors_never_saw_are_not_candidates():
     assert month == {"value": None, "reason": "curtailed", "unconstrained_hours": 9}
 
 
+def test_a_month_the_three_sensors_never_saw_reads_every_hour():
+    # The ceiling saw January only; February's hours were never measured, so
+    # nothing says they were constrained, and nothing says they were not.
+    rows, ceiling = sunny_month(BEST_HOUR_MIN_HOURS)
+    february = datetime(2026, 2, 10, 10, tzinfo=UTC)
+    unseen = [
+        HourlyRow(february + timedelta(hours=index), 50.0, 0.0, 2000.0 + index)
+        for index in range(3)
+    ]
+    months = best_hour_by_month(rows + unseen, KYIV, ceiling=ceiling)
+    assert months["2026-02"] == {"value": 2002.0, "reason": None, "unconstrained_hours": None}
+    assert months["2026-01"]["unconstrained_hours"] == BEST_HOUR_MIN_HOURS
+
+
 def test_without_a_ceiling_the_best_hour_reads_every_hour():
     rows, _ = sunny_month(3)
     month = best_hour_by_month(rows, KYIV, ceiling=None)["2026-01"]
