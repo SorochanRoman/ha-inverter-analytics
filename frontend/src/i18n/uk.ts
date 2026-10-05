@@ -30,6 +30,7 @@ export const uk: Messages = {
   },
   panel: {
     language: "Мова",
+    period: "Період",
     couldNotLoad: (p) => `Не вдалося завантажити конфігурацію: ${p.error}`,
     loading: "Завантаження…",
     noInverter:

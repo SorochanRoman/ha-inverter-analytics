@@ -21,8 +21,11 @@ period picker. Its command takes no window: the server reads from
 `HEALTH_MAX_YEARS = 5` years ago to now, from long-term statistics only —
 the hourly mean, minimum and maximum of the numeric sensors, and the
 counters' hourly `change` rows — which is about 8.8k rows per sensor per
-year (one an hour) and is cached for a day. The picker is dimmed while the tab is open,
-and the badge reads "Whole history, from <the first month with data>".
+year (one an hour) and is cached for a day. The picker is dimmed while the
+tab is open, with a quiet note beside it saying the period does not apply
+here (also the group's accessible name — a title alone is not shown over
+disabled buttons in every browser), and the badge reads "Whole history,
+from <the first month with data>".
 
 Raw states are never read here. They reach back only to the recorder's
 retention, and a health signal that stops at ten days is not a health

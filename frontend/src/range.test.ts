@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "./i18n/en";
 import { uk } from "./i18n/uk";
-import { RANGE_KEYS, rangeLabel, resolveRange } from "./range";
+import { RANGE_KEYS, rangeLabel, rangesView, resolveRange } from "./range";
 
 const NOW = new Date("2026-08-29T12:00:00Z");
 
@@ -65,5 +65,21 @@ describe("rangeLabel", () => {
     expect(rangeLabel(en, "7d")).toBe("7 days");
     expect(rangeLabel(uk, "7d")).toBe("7 днів");
     expect(rangeLabel(uk, "month")).toBe("Цей місяць");
+  });
+});
+
+describe("rangesView", () => {
+  it("names the group as the period on a windowed tab, with no note", () => {
+    expect(rangesView(en, "load")).toEqual({ unused: false, label: "Period", note: null });
+    expect(rangesView(uk, "sizing").label).toBe("Період");
+  });
+
+  it("says, in the label and in visible text, that Health does not use the period", () => {
+    expect(rangesView(en, "health")).toEqual({
+      unused: true,
+      label: en.health.periodNotUsed,
+      note: en.health.periodNotUsed,
+    });
+    expect(rangesView(uk, "health").note).toBe(uk.health.periodNotUsed);
   });
 });

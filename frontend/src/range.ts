@@ -7,6 +7,25 @@ export function rangeLabel(m: Messages, key: RangeKey): string {
   return m.ranges[key];
 }
 
+/** Tabs that read the whole history and leave the period picker unused. */
+export const WHOLE_HISTORY_TABS: readonly string[] = ["health"];
+
+/**
+ * How the period buttons present themselves on a tab. On a whole-history tab
+ * the group is named by the reason it does nothing, and the reason is shown
+ * as text beside it too: Firefox shows no title over disabled buttons, so a
+ * tooltip alone would leave the dimmed picker unexplained.
+ */
+export function rangesView(
+  m: Messages,
+  tab: string,
+): { unused: boolean; label: string; note: string | null } {
+  if (WHOLE_HISTORY_TABS.includes(tab)) {
+    return { unused: true, label: m.health.periodNotUsed, note: m.health.periodNotUsed };
+  }
+  return { unused: false, label: m.panel.period, note: null };
+}
+
 const DAY_MS = 24 * 3600 * 1000;
 const MINUTE_MS = 60 * 1000;
 

@@ -7,7 +7,7 @@ import { buildLocation, parseLocation } from "./location";
 import { I18nController } from "./i18n/controller";
 import type { Messages } from "./i18n/en";
 import { LANGS, noteHaLanguage, setLang } from "./i18n/lang";
-import { RANGE_KEYS, rangeLabel, type RangeKey } from "./range";
+import { RANGE_KEYS, rangeLabel, rangesView, type RangeKey } from "./range";
 import { INTEGRATION_URL, listRoles } from "./roles";
 import type { ConfigResult, EntryInfo, FeatureInfo, HomeAssistant } from "./types";
 import "./tabs/balance-tab";
@@ -23,7 +23,6 @@ const BASE_PATH = "/inverter-analytics";
 const TABS = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"] as const;
 
 /** Tabs that read the whole history and take no period. */
-const WHOLE_HISTORY_TABS: readonly string[] = ["health"];
 
 @customElement("inverter-analytics-panel")
 export class InverterAnalyticsPanel extends LitElement {
@@ -232,22 +231,30 @@ export class InverterAnalyticsPanel extends LitElement {
    * The range itself is kept, so the next windowed tab opens on it.
    */
   private renderRanges(m: Messages) {
-    const unused = WHOLE_HISTORY_TABS.includes(this.tab);
-    return html`<div
-      class="ranges ${unused ? "unused" : ""}"
-      role="group"
-      title=${unused ? m.health.periodNotUsed : nothing}
-    >
-      ${RANGE_KEYS.map(
-        (key) => html`<button
-          class=${key === this.range ? "active" : ""}
-          aria-pressed=${key === this.range ? "true" : "false"}
-          aria-disabled=${unused ? "true" : nothing}
-          ?disabled=${unused}
-          @click=${() => this.selectRange(key)}
-        >${rangeLabel(m, key)}</button>`,
-      )}
-    </div>`;
+    const { unused, label, note } = rangesView(m, this.tab);
+    // The note repeats the group's accessible name, so it is hidden from
+    // assistive technology and shown for the eye only.
+    return html`
+      <div
+        class="ranges ${unused ? "unused" : ""}"
+        role="group"
+        aria-label=${label}
+        title=${unused ? label : nothing}
+      >
+        ${RANGE_KEYS.map(
+          (key) => html`<button
+            class=${key === this.range ? "active" : ""}
+            aria-pressed=${key === this.range ? "true" : "false"}
+            aria-disabled=${unused ? "true" : nothing}
+            ?disabled=${unused}
+            @click=${() => this.selectRange(key)}
+          >${rangeLabel(m, key)}</button>`,
+        )}
+      </div>
+      ${note !== null
+        ? html`<span class="ranges-note" aria-hidden="true">${note}</span>`
+        : nothing}
+    `;
   }
 
   /**
@@ -344,6 +351,7 @@ export class InverterAnalyticsPanel extends LitElement {
     .ranges { display: flex; gap: 4px; flex-wrap: wrap; }
     .ranges.unused { opacity: 0.45; }
     .ranges.unused button { cursor: not-allowed; }
+    .ranges-note { font-size: 12px; color: var(--secondary-text-color); }
     button {
       background: var(--card-background-color);
       color: var(--primary-text-color);

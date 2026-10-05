@@ -41,6 +41,8 @@ export const en = {
   },
   panel: {
     language: "Language",
+    // The accessible name of the period buttons' group.
+    period: "Period",
     couldNotLoad: (p: { error: string }) => `Could not load configuration: ${p.error}`,
     loading: "Loading…",
     noInverter:
@@ -573,7 +575,8 @@ export const en = {
     notEnough: (p: { recent: number; previous: number; needed: number }) =>
       `Not enough months to compare: the last 12 have ${p.recent} with a figure and the ` +
       `12 before have ${p.previous}; each side needs ${p.needed}.`,
-    // The title on the dimmed period buttons while the tab is open.
+    // The dimmed period buttons while the tab is open: their group's
+    // accessible name, their title, and a note shown beside them.
     periodNotUsed: "Health reads the whole history; the period does not apply here.",
     // Under an inverter month's figure.
     inverterHint: (p: { atRated: string; measured: string }) =>
