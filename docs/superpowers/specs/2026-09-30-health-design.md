@@ -89,7 +89,11 @@ more than `EFFICIENCY_MAX_DRIFT_PCT` (5) points from where it began — read
 as the mean of the month's last hour against the mean of its first — with
 the reason `drift`, and when less than `EFFICIENCY_MIN_KWH` (1) was charged,
 with the reason `too_little_throughput`. Without a state of charge the drift
-cannot be checked and the figure is withheld with `no_soc`.
+cannot be checked and the figure is withheld with `no_soc`. When the month's
+state of charge does not span its counter hours — fewer than two rows, or a
+first row more than an hour after the first counter hour or a last row more
+than an hour before the last — the figure is withheld with `soc_partial`:
+the gate must check the same span the counters sum.
 
 ### 4.3 Solar production, and the best hour
 

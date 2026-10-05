@@ -78,6 +78,14 @@ def test_a_drop_below_three_points_is_rejected():
     assert one_hour(low=47.1, high=50.0) == []
 
 
+def test_a_charge_change_a_hair_over_the_limit_from_float_noise_is_admitted():
+    assert len(one_hour(charge=0.020000000000095)) == 1
+
+
+def test_a_drop_a_hair_under_three_points_from_float_noise_is_admitted():
+    assert len(one_hour(low=47.000000000000095, high=50.0)) == 1
+
+
 def test_a_zero_discharge_change_is_rejected():
     assert one_hour(discharge=0.0) == []
 
@@ -154,6 +162,46 @@ def test_efficiency_with_soc_only_in_another_month_is_no_soc():
     assert efficiency_by_month(charge, discharge, elsewhere, KYIV)["2026-01"]["reason"] == "no_soc"
 
 
+def test_efficiency_with_a_single_soc_row_is_soc_partial():
+    charge, discharge = month_of_counters()
+    assert efficiency_by_month(charge, discharge, [soc_hour(0)], KYIV)["2026-01"] == {
+        "value": None,
+        "reason": "soc_partial",
+    }
+
+
+def test_efficiency_with_soc_only_at_the_end_of_the_month_is_soc_partial():
+    # Counters cover the whole of January; the charge only its last two days,
+    # and those two days drift by nothing.
+    start = datetime(2026, 1, 1, 0, tzinfo=KYIV).astimezone(UTC)
+    count = 31 * 24
+    rows = tuple(EnergyRow(start + timedelta(hours=index), 0.1) for index in range(count))
+    soc = [
+        HourlyRow(start + timedelta(hours=index), 50.0, 50.0, 50.0)
+        for index in range(count - 48, count)
+    ]
+    months = efficiency_by_month(EnergySeries(rows), EnergySeries(rows), soc, KYIV)
+    assert months["2026-01"]["reason"] == "soc_partial"
+
+
+def test_soc_bracketing_the_counters_within_an_hour_passes_on_to_drift():
+    charge = energy({1: 5.0, 5: 5.0})
+    discharge = energy({1: 4.5, 5: 4.5})
+    # First SoC an hour after the first counter, last an hour before the last.
+    soc = [soc_hour(2, mean=50.0), soc_hour(4, mean=60.0)]
+    assert efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]["reason"] == "drift"
+    soc = [soc_hour(2, mean=50.0), soc_hour(4, mean=50.0)]
+    month = efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]
+    assert month == {"value": pytest.approx(0.9), "reason": None}
+
+
+def test_soc_starting_more_than_an_hour_late_is_soc_partial():
+    charge = energy({1: 5.0, 5: 5.0})
+    discharge = energy({1: 4.5, 5: 4.5})
+    soc = [soc_hour(3), soc_hour(5)]
+    assert efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]["reason"] == "soc_partial"
+
+
 def test_efficiency_drift_above_five_points_is_withheld():
     charge, discharge = month_of_counters()
     soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=55.1)]
@@ -207,7 +255,13 @@ def test_efficiency_plain_figure_per_month():
             EnergyRow(datetime(2026, 2, 10, tzinfo=UTC), 17.0),
         )
     )
-    soc = [soc_hour(0), HourlyRow(datetime(2026, 2, 10, tzinfo=UTC), 60.0, 60.0, 60.0)]
+    february = datetime(2026, 2, 10, tzinfo=UTC)
+    soc = [
+        soc_hour(0),
+        soc_hour(1),
+        HourlyRow(february, 60.0, 60.0, 60.0),
+        HourlyRow(february + timedelta(hours=1), 60.0, 60.0, 60.0),
+    ]
     months = efficiency_by_month(charge, discharge, soc, KYIV)
     assert months == {
         "2026-01": {"value": pytest.approx(0.9), "reason": None},

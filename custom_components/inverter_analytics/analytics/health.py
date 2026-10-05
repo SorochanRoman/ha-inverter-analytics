@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime, tzinfo
+from datetime import datetime, timedelta, tzinfo
 from typing import Any
 
 from .battery import EFFICIENCY_MAX_DRIFT_PCT, EFFICIENCY_MIN_KWH
@@ -39,10 +39,16 @@ BEST_HOUR_MIN_HOURS = 10
 
 TOO_FEW_CLEAN_HOURS = "too_few_clean_hours"
 NO_SOC = "no_soc"
+SOC_PARTIAL = "soc_partial"
 DRIFT = "drift"
 TOO_LITTLE_THROUGHPUT = "too_little_throughput"
 
 _COMPARISON_SPAN = 12
+# How far the state of charge may start after, or end before, the counters.
+_SOC_BRACKET_SLACK = timedelta(hours=1)
+# Clean-hour comparisons are made at this many decimals, so a true 3.0-point
+# drop or a 0.02 kWh change is not put on the wrong side by float noise.
+_COMPARE_DECIMALS = 6
 
 
 def _month(start: datetime, tz: tzinfo) -> str:
@@ -69,7 +75,11 @@ def clean_discharge_hours(
             continue
         drop = row.max - row.min
         out = discharged[row.start]
-        if charged[row.start] <= CLEAN_CHARGE_MAX_KWH and out > 0 and drop >= CLEAN_DROP_MIN_POINTS:
+        if (
+            round(charged[row.start], _COMPARE_DECIMALS) <= CLEAN_CHARGE_MAX_KWH
+            and round(out, _COMPARE_DECIMALS) > 0
+            and round(drop, _COMPARE_DECIMALS) >= CLEAN_DROP_MIN_POINTS
+        ):
             hours.append((row.start, out, drop))
     return hours
 
@@ -105,6 +115,19 @@ def _sums_by_month(series: EnergySeries, tz: tzinfo) -> dict[str, float]:
     return sums
 
 
+def _counter_spans(
+    series: Iterable[EnergySeries], tz: tzinfo
+) -> dict[str, tuple[datetime, datetime]]:
+    """The first and last counter hour of each local month, across the counters."""
+    spans: dict[str, tuple[datetime, datetime]] = {}
+    for counter in series:
+        for row in counter.rows:
+            key = _month(row.start, tz)
+            first, last = spans.get(key, (row.start, row.start))
+            spans[key] = (min(first, row.start), max(last, row.start))
+    return spans
+
+
 def efficiency_by_month(
     charge: EnergySeries,
     discharge: EnergySeries,
@@ -116,10 +139,14 @@ def efficiency_by_month(
     The Battery tab's gate, with its constants: the month's charge must end
     within EFFICIENCY_MAX_DRIFT_PCT of where it began (the mean of its last
     hour against the mean of its first), and at least EFFICIENCY_MIN_KWH must
-    have gone in. Without a state of charge the drift cannot be checked.
+    have gone in. Without a state of charge the drift cannot be checked, and
+    a charge that does not span the month's counter hours (within an hour at
+    either end) is withheld as soc_partial: the gate must check the same span
+    the counters sum.
     """
     charged = _sums_by_month(charge, tz)
     discharged = _sums_by_month(discharge, tz)
+    spans = _counter_spans((charge, discharge), tz)
     soc_by_month: dict[str, list[HourlyRow]] = defaultdict(list)
     for row in soc or ():
         soc_by_month[_month(row.start, tz)].append(row)
@@ -132,6 +159,14 @@ def efficiency_by_month(
             continue
         first = min(rows, key=lambda row: row.start)
         last = max(rows, key=lambda row: row.start)
+        counted_from, counted_to = spans[key]
+        if (
+            len(rows) < 2
+            or first.start > counted_from + _SOC_BRACKET_SLACK
+            or last.start < counted_to - _SOC_BRACKET_SLACK
+        ):
+            months[key] = {"value": None, "reason": SOC_PARTIAL}
+            continue
         if abs(last.mean - first.mean) > EFFICIENCY_MAX_DRIFT_PCT:
             months[key] = {"value": None, "reason": DRIFT}
             continue
