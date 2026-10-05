@@ -12,6 +12,7 @@ from custom_components.inverter_analytics.analytics.health import (
     CLEAN_HOURS_MIN,
     COMPARISON_MIN_MONTHS,
     HEALTH_MAX_YEARS,
+    PARTIAL_MONTH_COVERAGE,
     async_health_analytics,
     best_hour_by_month,
     build_health_payload,
@@ -23,7 +24,6 @@ from custom_components.inverter_analytics.analytics.health import (
     solar_energy_by_month,
     withhold_partial_months,
 )
-from custom_components.inverter_analytics.analytics.seasonality import INCOMPLETE_COVERAGE
 from custom_components.inverter_analytics.analytics.sizing import Ceiling
 from custom_components.inverter_analytics.analytics.source import (
     EnergyRow,
@@ -63,6 +63,7 @@ def test_constants_are_the_specs():
     assert CLEAN_HOURS_MIN == 20
     assert COMPARISON_MIN_MONTHS == 6
     assert BEST_HOUR_MIN_HOURS == 10
+    assert PARTIAL_MONTH_COVERAGE == 0.95
 
 
 # --- clean discharge hours -------------------------------------------------
@@ -499,11 +500,11 @@ def test_the_inverter_counts_hours_near_and_at_rated_per_month():
 
 
 def test_a_month_below_the_coverage_share_is_partial_and_keeps_its_counts():
-    # January in Kyiv is 744 hours; INCOMPLETE_COVERAGE of it is 446.4.
+    # January in Kyiv is 744 hours; PARTIAL_MONTH_COVERAGE of it is 706.8.
     start = datetime(2026, 1, 1, tzinfo=KYIV).astimezone(UTC)
-    enough = [start + timedelta(hours=index) for index in range(447)]
+    enough = [start + timedelta(hours=index) for index in range(707)]
     months = {"2026-01": {"value": 5.0, "reason": None, "unconstrained_hours": 12}}
-    assert INCOMPLETE_COVERAGE == 0.6
+    assert PARTIAL_MONTH_COVERAGE == 0.95
     kept = withhold_partial_months(months, enough, {"2026-01": 744.0}, KYIV)
     assert kept == months
     withheld = withhold_partial_months(months, enough[:-1], {"2026-01": 744.0}, KYIV)
@@ -514,7 +515,7 @@ def test_a_month_below_the_coverage_share_is_partial_and_keeps_its_counts():
 
 def test_coverage_counts_distinct_hours():
     start = datetime(2026, 1, 1, tzinfo=KYIV).astimezone(UTC)
-    twice = [start + timedelta(hours=index % 300) for index in range(600)]
+    twice = [start + timedelta(hours=index % 700) for index in range(1400)]
     months = {"2026-01": {"value": 5.0, "reason": None}}
     result = withhold_partial_months(months, twice, {"2026-01": 744.0}, KYIV)
     assert result["2026-01"]["reason"] == "partial_month"

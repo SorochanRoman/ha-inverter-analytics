@@ -188,8 +188,12 @@ Solar energy and inverter hours are sums and the best hour is a maximum, so
 a month with a third of its days reads as a worse month and pulls the
 twelve-against-twelve mean down with it. For these three signals a month is
 withheld with the reason `partial_month` when the signal's own distinct
-hourly rows in it are fewer than `INCOMPLETE_COVERAGE` (0.6, the Seasonality
-tab's constant, imported) of the month's hours. The month's length is the
+hourly rows in it are fewer than `PARTIAL_MONTH_COVERAGE = 0.95` of the
+month's hours. It is stricter than the Seasonality tab's
+`INCOMPLETE_COVERAGE` (0.6) on purpose: that marks means, which do not
+scale with coverage, while a sum does — a month 60% covered would read up
+to 40% low. A missing 5% stays inside the noise a month's weather already
+carries; more does not. The month's length is the
 whole calendar month from `months_touched` — for the current month too,
 not the part that has elapsed, because it is set beside a whole month a
 year earlier. So today's month and the first month of a sensor's history are

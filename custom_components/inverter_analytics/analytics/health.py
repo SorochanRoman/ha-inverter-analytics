@@ -25,7 +25,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DEFAULT_BATTERY_IDLE_W, DEFAULT_BATTERY_LOW_PCT, DEFAULT_GRID_ZERO_W
 from ..roles import EntryConfig
 from .battery import EFFICIENCY_MAX_DRIFT_PCT, EFFICIENCY_MIN_KWH
-from .seasonality import INCOMPLETE_COVERAGE, month_key, months_touched
+from .seasonality import month_key, months_touched
 from .sizing import (
     CEILING_PV_MIN_W,
     Ceiling,
@@ -57,6 +57,12 @@ CLEAN_HOURS_MIN = 20
 COMPARISON_MIN_MONTHS = 6
 # Unconstrained hours a month needs before its best hour is read.
 BEST_HOUR_MIN_HOURS = 10
+# The share of a month's hours a sum or a peak needs before the month is set
+# beside a whole one. Stricter than Seasonality's INCOMPLETE_COVERAGE (0.6),
+# which marks means, and a mean does not scale with coverage. Energy and
+# hours are sums and do: a month 60% covered reads up to 40% low. A missing
+# 5% stays inside the noise a month's weather already puts in; more does not.
+PARTIAL_MONTH_COVERAGE = 0.95
 
 TOO_FEW_CLEAN_HOURS = "too_few_clean_hours"
 NO_SOC = "no_soc"
@@ -352,8 +358,8 @@ def withhold_partial_months(
     the best hour — a month with a third of its days is not comparable with a
     whole one: it reads as a worse month, and it pulls the twelve-month mean
     down with it. Coverage is the number of distinct hourly rows in the month
-    over the month's hours; below the Seasonality tab's INCOMPLETE_COVERAGE the
-    figure is withheld, its other fields kept. month_hours is the length of the
+    over the month's hours; below PARTIAL_MONTH_COVERAGE the figure is
+    withheld, its other fields kept. month_hours is the length of the
     whole calendar month, the current one included: the current month is set
     beside a whole month a year earlier, so it is measured against a whole
     month, not against the part that has elapsed. A month absent from
@@ -366,7 +372,7 @@ def withhold_partial_months(
     result: dict[str, dict[str, Any]] = {}
     for key, month in months.items():
         hours = month_hours.get(key)
-        if hours and len(seen.get(key, ())) < INCOMPLETE_COVERAGE * hours:
+        if hours and len(seen.get(key, ())) < PARTIAL_MONTH_COVERAGE * hours:
             result[key] = {**month, "value": None, "reason": PARTIAL_MONTH}
         else:
             result[key] = dict(month)
