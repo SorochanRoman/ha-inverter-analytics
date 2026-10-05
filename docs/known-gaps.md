@@ -424,3 +424,11 @@ Written from reviewing the finished code rather than its spec.
 - **`build_parts_summary` computes shares over the aligned timeline**, so they
   sum to one — but they are shares of the time every part had data at once, not
   of the whole window. The section says so; the numbers do not carry it.
+- **An orphaned sensor is read from Home Assistant's restore mark.** A mapped
+  entity restored as unavailable counts as gone once whatever provides it has
+  had its chance: its config entry is loaded, or — for a YAML platform with no
+  config entry — Home Assistant has started. The check runs at start and when
+  this entry reloads, so a real orphan behind an entry still retrying at start
+  appears only after the next reload, an entry stuck in a setup error never
+  flags its entities, and a YAML platform still retrying at start
+  (`PlatformNotReady`) would raise the card until the next reload.

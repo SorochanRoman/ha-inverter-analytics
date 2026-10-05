@@ -54,7 +54,8 @@ beyond pointing the integration at the ones you already have.
   **Settings → Repairs**: one when your installation has sensors this
   inverter is not reading — naming the tab they would feed, and offering to
   map them in place — and one when a mapped sensor no longer exists, which
-  is what a rename looks like from here. Both withdraw themselves the moment
+  is what a rename looks like from here, or that its integration no longer
+  sets up (still remembered by Home Assistant, restored as unavailable). Both withdraw themselves the moment
   the reason is gone. The first is raised only for sensors some analytic is
   actually waiting on: a notification you learn to dismiss unread is
   expensive to have taught you.
@@ -242,10 +243,10 @@ it and will never offer an update. From the directory holding
 
 ```bash
 curl -L -o release.tar.gz \
-  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.9.1.tar.gz
+  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.9.2.tar.gz
 rm -rf custom_components/inverter_analytics
 tar -xzf release.tar.gz --strip-components=2 -C custom_components \
-    ha-inverter-analytics-0.9.1/custom_components/inverter_analytics
+    ha-inverter-analytics-0.9.2/custom_components/inverter_analytics
 rm release.tar.gz
 ```
 

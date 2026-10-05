@@ -167,13 +167,16 @@ def _owner_is_up(hass: HomeAssistant, entry: er.RegistryEntry) -> bool:
     """Whether whatever should provide a registry entity has finished loading.
 
     A config entry must be loaded; one retrying, failed or still setting up
-    may yet provide it. An entity with no config entry belongs to a platform,
-    and a platform that is not among the loaded components is gone.
+    may yet provide it. An entity with no config entry comes from a YAML
+    platform, and those are set up before Home Assistant has started — when
+    this check first runs. Its platform may well be loaded for the others
+    (a template sensor taken out of YAML while other templates remain), so
+    being loaded says nothing: once started, the platform has had its chance.
     """
     if entry.config_entry_id:
         owner = hass.config_entries.async_get_entry(entry.config_entry_id)
         return owner is not None and owner.state is ConfigEntryState.LOADED
-    return entry.platform not in hass.config.components
+    return hass.is_running
 
 
 @callback

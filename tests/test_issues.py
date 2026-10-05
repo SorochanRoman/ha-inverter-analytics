@@ -249,6 +249,33 @@ async def test_a_restored_entity_whose_owner_loaded_without_it_is_missing(
     assert issue.translation_placeholders["entities"] == "binary_sensor.grid_status"
 
 
+async def test_a_restored_yaml_entity_whose_platform_is_loaded_is_missing(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """A template sensor taken out of YAML while other templates remain.
+
+    It has no config entry, and its platform is loaded for the others. YAML
+    platforms are set up before Home Assistant has started, so one still
+    restored by then was not set up at all.
+    """
+    hass.states.async_set(
+        LOAD,
+        "800",
+        {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+    )
+    hass.config.components.add("template")
+    er.async_get(hass).async_get_or_create(
+        "binary_sensor", "template", "unique", suggested_object_id="grid_status"
+    )
+    hass.states.async_set("binary_sensor.grid_status", "unavailable", {"restored": True})
+    entry = _entry({"load_power": [LOAD], "grid_connected": ["binary_sensor.grid_status"]})
+    await _setup(hass, entry)
+
+    issue = _issue(hass, MISSING_ENTITIES, entry)
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "binary_sensor.grid_status"
+
+
 async def test_an_unavailable_registered_entity_that_is_not_restored_is_not_missing(
     recorder_mock, enable_custom_integrations, hass: HomeAssistant
 ) -> None:
