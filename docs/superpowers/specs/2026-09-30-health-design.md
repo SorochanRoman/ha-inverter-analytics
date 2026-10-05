@@ -102,6 +102,26 @@ clear-sky figure and carries much less of it, which is why it is here. A
 falling best hour across the same months of successive years is what
 soiling, shading growth or a failing string look like from here.
 
+**Hours the system could not take are left out.** A hybrid inverter stops
+taking sun when the battery is at its limit and export is limited: PV is
+then cut back to what the house uses, and its maximum in that hour is the
+load, not the array. A summer of such hours would draw as a falling best
+hour while the array is fine. So, when `battery_soc`, `battery_power` and
+`pv_power` are all mapped, the best hour is read only from hours that are
+**not ceiling hours** — the Sizing tab's `charge_ceiling`, imported, with
+the same constants. A month with fewer than `BEST_HOUR_MIN_HOURS = 10`
+unconstrained hours of PV at or above `CEILING_PV_MIN_W` is withheld with
+the reason `curtailed` and the count. Without those three sensors the best
+hour is read from every hour and the card says it may include hours the
+system could not take.
+
+**Energy without export follows the house.** When the installation does not
+export — the Sizing tab's `export_limited`, imported, decided once over the
+whole history — the monthly energy is what was used, not what the array
+could give, and its year-on-year difference measures the household. The
+energy line stays, with that caption under it; the best hour carries the
+health question for such a system.
+
 ### 4.4 Inverter load, year over year
 
 Needs `load_power` and `rated_power`.
@@ -177,6 +197,11 @@ hours including a BMS recalibration hour that inflates the denominator.
 Efficiency is tested for both gates with the Battery tab's constants, and
 for `no_soc`.
 
+The best hour is tested to skip ceiling hours, to be withheld as
+`curtailed` at 9 unconstrained hours and read at 10, and to fall back to
+every hour without the three sensors; the export caption is tested to
+follow `export_limited`.
+
 Year alignment is tested with two years of months where the same month
 differs, and with a February present in one year and absent in the other.
 The twelve-against-twelve figure is tested at five and six months a side.
@@ -188,3 +213,22 @@ Live verification imports three years of hourly statistics for the state of
 charge, the two battery counters, the PV counter and power, and the load,
 with the implied capacity falling a few percent a year and one month of no
 data, and reads the four cards back from the screen with the gap visible.
+
+## 11. Conventions this tab follows
+
+Written after this design, and binding on it:
+
+- **Two languages.** Every string goes into `frontend/src/i18n/en.ts` and
+  `uk.ts`; Ukrainian follows `docs/glossary-uk.md`.
+- **Display decisions are pure functions.** There is no DOM test
+  environment, so what a card or cell shows — a figure, a dash, which
+  reason — is decided by pure functions in a module of its own (as
+  `frontend/src/reserve.ts` does for the Grid tab) and tested there; the tab
+  only renders their result.
+- **The payload carries what the panel reads.** No field is added for
+  symmetry with other tabs.
+- **Imported, not copied.** `charge_ceiling`, `export_limited`,
+  `inverter_evidence`, `rows_by_month` and `withheld` from `sizing.py`; the
+  efficiency gate and its constants from `battery.py`.
+- **Nameplate never multiplied in.** The capacity is a reference line only,
+  as §4.1 says.
