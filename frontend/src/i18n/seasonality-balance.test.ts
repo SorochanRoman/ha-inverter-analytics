@@ -5,10 +5,10 @@ import { uk } from "./uk";
 describe("the seasonality sentences that count months", () => {
   it("say one month and several months in English as before", () => {
     expect(en.seasonality.thinMonths({ n: 1, share: "80%" })).toBe(
-      "One month is covered by less than 80% of its days and is drawn in grey.",
+      "One month is covered by less than 80% of its days and is drawn faded.",
     );
     expect(en.seasonality.thinMonths({ n: 3, share: "80%" })).toBe(
-      "3 months are covered by less than 80% of their days and are drawn in grey.",
+      "3 months are covered by less than 80% of their days and are drawn faded.",
     );
     expect(en.seasonality.absentMonths({ n: 1 })).toBe(
       "One month has no recorded data at all and carries no bar.",

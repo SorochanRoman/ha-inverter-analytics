@@ -24,6 +24,7 @@ import {
   histogramOption,
   hourOfDayOption,
   imbalanceOption,
+  INCOMPLETE_OPACITY,
   monthHourHeatmapOption,
   monthLabel,
   monthlyOption,
@@ -294,12 +295,20 @@ describe("seasonality charts", () => {
     expect(monthLabel("2026-02", "2026-01", "en")).toBe("Feb");
   });
 
-  it("greys an incomplete month rather than dropping it", () => {
-    const option = monthlyOption(months, false, en) as any;
-    const colourOf = option.series[0].itemStyle.color;
-    expect(option.series[0].data).toEqual([3000, 3200]);
-    expect(colourOf({ dataIndex: 0 })).toBe(SERIES.load);
-    expect(colourOf({ dataIndex: 1 })).toBe(SERIES.muted);
+  it("fades an incomplete month in every series rather than dropping it", () => {
+    const option = monthlyOption(
+      months.map((month) => ({ ...month, pv_mean: 1000 })),
+      true,
+      en,
+    ) as any;
+    const [load, pv] = option.series;
+    expect(load.itemStyle.color).toBe(SERIES.load);
+    expect(pv.itemStyle.color).toBe(SERIES.pv);
+    for (const series of [load, pv]) {
+      expect(series.data[0]).toEqual({ value: series === load ? 3000 : 1000 });
+      expect(series.data[1].itemStyle.opacity).toBe(INCOMPLETE_OPACITY);
+    }
+    expect(load.data[1].value).toBe(3200);
   });
 
   it("adds a PV series only when there is PV", () => {

@@ -255,6 +255,27 @@ export function monthLabel(key: string, previous: string | undefined, locale: st
   return previous && previous.slice(0, 4) === String(year) ? name : `${name} ${year}`;
 }
 
+/** How solid an incomplete month's bars are, in every series alike. */
+export const INCOMPLETE_OPACITY = 0.35;
+
+/**
+ * One bar per month. An incomplete month keeps its bar and loses its
+ * solidity: dropping it would leave a hole the reader fills in with a reason
+ * of their own. Fading rather than greying keeps the series apart.
+ */
+function monthBars(
+  months: MonthBucket[],
+  pick: (month: MonthBucket) => number | null,
+): ({ value: number; itemStyle?: { opacity: number } } | null)[] {
+  return months.map((month) => {
+    const value = pick(month);
+    if (value === null) return null;
+    return month.complete
+      ? { value: round(value, 1) }
+      : { value: round(value, 1), itemStyle: { opacity: INCOMPLETE_OPACITY } };
+  });
+}
+
 export function monthlyOption(
   months: MonthBucket[],
   hasPv: boolean,
@@ -269,20 +290,15 @@ export function monthlyOption(
     {
       name: m.charts.load,
       type: "bar",
-      data: months.map((month) => (month.load_mean === null ? null : round(month.load_mean, 1))),
-      // An incomplete month keeps its bar and loses its solidity: dropping it
-      // would leave a hole the reader fills in with a reason of their own.
-      itemStyle: {
-        color: (params: { dataIndex: number }) =>
-          months[params.dataIndex].complete ? SERIES.load : SERIES.muted,
-      },
+      data: monthBars(months, (month) => month.load_mean),
+      itemStyle: { color: SERIES.load },
     },
   ];
   if (hasPv) {
     series.push({
       name: m.charts.pv,
       type: "bar",
-      data: months.map((month) => (month.pv_mean === null ? null : round(month.pv_mean, 1))),
+      data: monthBars(months, (month) => month.pv_mean),
       itemStyle: { color: SERIES.pv },
     });
   }

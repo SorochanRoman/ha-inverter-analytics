@@ -267,13 +267,13 @@ export const en = {
     monthsIn: (p: { timezone: string }) => `Months in ${p.timezone}`,
     meanByMonth: "Mean power by month",
     // A thin month still has a bar; an absent one has none. Counted apart, so
-    // one sentence never says nine months are grey when one of them is.
+    // one sentence never says nine months are faded when one of them is.
     thinMonths: (p: { n: number; share: string }) =>
       plural("en", p.n, {
-        one: `One month is covered by less than ${p.share} of its days and is drawn in grey.`,
+        one: `One month is covered by less than ${p.share} of its days and is drawn faded.`,
         other:
           `${p.n} months are covered by less than ${p.share} of their days and are drawn ` +
-          "in grey.",
+          "faded.",
       }),
     partialNotLower:
       "A month the recorder only saw part of is not a lower month; the figures stand, the " +

@@ -117,7 +117,7 @@ export class IaSeasonalityTab extends LitElement {
     const warning = coverageWarning(payload.coverage, locale);
     // Split deliberately: a month with a thin bar and a month with no bar at
     // all are different problems, and one sentence counting them together said
-    // nine months were "drawn in grey" when one of them was.
+    // nine months were "drawn faded" when one of them was.
     const thin = payload.months.filter((month) => !month.complete && month.load_mean !== null);
     const absent = payload.months.filter((month) => month.load_mean === null);
 
