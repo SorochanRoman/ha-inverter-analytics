@@ -301,7 +301,7 @@ export interface SavingsDay {
 export interface SavingsBlock {
   currency: string;
   total: number | null;
-  /** The total over the days that have data, not over the calendar days. */
+  /** The mean per 24 hours of the hours counted, not per calendar day. */
   per_day: number | null;
   days: SavingsDay[];
   /** Hours both counters cover, against the hours in the window. */

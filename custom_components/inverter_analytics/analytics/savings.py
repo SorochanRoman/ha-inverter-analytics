@@ -8,7 +8,7 @@ hourly counter changes already read; no dependency on Home Assistant.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from .source import EnergySeries, Window
@@ -25,6 +25,22 @@ def _is_night(hour: int, start: int, end: int) -> bool:
     if start < end:
         return start <= hour < end
     return hour >= start or hour < end
+
+
+def _whole_hours(window: Window) -> int:
+    """The hours wholly inside the window: those a statistic can exist for.
+
+    The panel's windows end now, to the minute, so the first and last hours are
+    partial and the last is not compiled yet. Counting them would leave every
+    complete period an hour short of its own window. Worked in UTC, which is
+    exact for every whole-hour time zone.
+    """
+    start = window.start.astimezone(UTC)
+    first = start.replace(minute=0, second=0, microsecond=0)
+    if first < start:
+        first += timedelta(hours=1)
+    last = window.end.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+    return max(int((last - first).total_seconds() // 3600), 0)
 
 
 def savings_by_hour(
@@ -75,8 +91,9 @@ def build_savings(
         "per_day": None,
         "days": [],
         "hours": 0,
-        "window_hours": round(window.seconds / 3600),
-        "two_zone": price_night is not None,
+        "window_hours": _whole_hours(window),
+        # An empty night zone prices every hour at the day price.
+        "two_zone": price_night is not None and night_start != night_end,
         "reason": None,
     }
     if price_day is None:
@@ -100,7 +117,9 @@ def build_savings(
     total = sum(daily.values())
     return block | {
         "total": round(total, 4),
-        "per_day": round(total / len(daily), 4),
+        # The mean per 24 hours of data. Dividing by calendar days would halve
+        # a rolling day, which touches two of them.
+        "per_day": round(total * 24 / len(hourly), 4),
         "days": [{"day": day, "value": round(value, 4)} for day, value in sorted(daily.items())],
         "hours": len(hourly),
     }

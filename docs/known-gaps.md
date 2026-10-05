@@ -436,7 +436,8 @@ Written from reviewing the finished code rather than its spec.
 ## 7. What the savings figure does not account for
 
 The Savings card on the Balance tab prices what the house used and did not buy
-from the grid. Each of these is said on the card or follows from it:
+from the grid. The first five of these are said on the card or follow from
+it; the last three are limits of what the counters themselves can tell:
 
 - **Today's prices are applied to the whole period.** There is no tariff
   history, so a year that spanned a price change is priced as if the current
@@ -453,3 +454,13 @@ from the grid. Each of these is said on the card or follows from it:
 - **An outage is still valued at the grid price.** During one the house's use
   is priced as if it would otherwise have been bought, although without the
   system it would have had no power at all.
+- **Counters are priced as kWh.** Statistics are read without unit
+  conversion, as for the Balance figures, so a counter recorded in Wh would
+  read a thousand times high.
+- **A load counter that covers only the inverter's load port reads low.** On
+  an inverter with no external current transformer, loads wired before the
+  inverter are bought from the grid but never counted as used, so the saving
+  understates what the system did.
+- **An hour is priced by the local hour its start falls in.** That is exact
+  only in whole-hour time zones; in a half-hour zone a statistics hour
+  straddles two local hours and takes the price of the first.

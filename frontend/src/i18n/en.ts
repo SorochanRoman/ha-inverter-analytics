@@ -338,12 +338,13 @@ export const en = {
       "is where counter resets are already accounted for. The current hour is compiled only " +
       "once it ends, so a period running up to now stops at the last completed hour.",
     savingsTitle: "Savings",
-    // per_day is the total over the days that have data, not the calendar days.
-    savingsPerDay: (p: { amount: string }) => `${p.amount} a day on average, over the days counted`,
+    // per_day is the mean per 24 hours of the hours counted, not per calendar day.
+    savingsPerDay: (p: { amount: string }) =>
+      `${p.amount} per 24 hours on average, over the hours counted`,
     savingsSeries: "Saved",
     savingsRunning: "Running total",
     savingsCoverage: (p: { share: string }) =>
-      `Both counters cover ${p.share} of this period; the rest is not counted, so the figure reads low.`,
+      `Both counters cover only ${p.share} of this period; the rest is not counted, so the figure reads low.`,
     savingsNote: (p: { twoZone: boolean }) =>
       "What the house used and did not buy from the grid, at " +
       (p.twoZone ? "the day and night prices" : "the price") +

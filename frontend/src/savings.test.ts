@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { coverageShare, cumulative, formatMoney, savingsBars, savingsState } from "./savings";
+import {
+  coverageShare,
+  cumulative,
+  formatMoney,
+  missingSavingsRoles,
+  savingsBars,
+  savingsState,
+} from "./savings";
 import type { SavingsBlock } from "./types";
 
 const block = (overrides: Partial<SavingsBlock> = {}): SavingsBlock => ({
@@ -16,9 +23,9 @@ const block = (overrides: Partial<SavingsBlock> = {}): SavingsBlock => ({
 describe("savings", () => {
   it("states a figure, a reason, or nothing for an older backend", () => {
     expect(savingsState(block())).toEqual({ kind: "figure" });
-    expect(savingsState(block({ reason: "no_price", total: null }))).toEqual({
-      kind: "withheld", reason: "no_price",
-    });
+    for (const reason of ["no_price", "no_counters", "no_hours"] as const) {
+      expect(savingsState(block({ reason, total: null }))).toEqual({ kind: "withheld", reason });
+    }
     expect(savingsState(undefined)).toBeNull();
   });
 
@@ -45,5 +52,18 @@ describe("savings", () => {
   it("formats money in the locale, and survives an unknown currency", () => {
     expect(formatMoney(1234.4, "UAH", "uk")).toMatch(/1\s?234/);
     expect(formatMoney(5, "NOTACODE", "en")).toBe("5 NOTACODE");
+  });
+
+  it("names the counters the figure is missing", () => {
+    expect(missingSavingsRoles(["pv_energy_total", "load_energy_total"])).toEqual([
+      "grid_import_total",
+    ]);
+    expect(missingSavingsRoles(["grid_import_total"])).toEqual(["load_energy_total"]);
+    expect(missingSavingsRoles([])).toEqual(["load_energy_total", "grid_import_total"]);
+    // Both listed as mapped yet withheld for counters: name both rather than none.
+    expect(missingSavingsRoles(["load_energy_total", "grid_import_total"])).toEqual([
+      "load_energy_total",
+      "grid_import_total",
+    ]);
   });
 });

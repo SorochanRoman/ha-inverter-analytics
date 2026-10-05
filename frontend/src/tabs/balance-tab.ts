@@ -3,18 +3,22 @@ import { customElement, property, state } from "lit/decorators.js";
 import { fetchBalance } from "../api";
 import { dailyFlowsOption, flowBarsOption, flowLabel, savingsOption } from "../charts/options";
 import "../charts/echart";
-import { describeError, formatCoverage, formatEnergy, formatPercent } from "../format";
+import { DASH, describeError, formatCoverage, formatEnergy, formatPercent } from "../format";
 import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
 import { listRoles } from "../roles";
-import { coverageShare, formatMoney, savingsBars, savingsState } from "../savings";
+import {
+  coverageShare,
+  formatMoney,
+  missingSavingsRoles,
+  savingsBars,
+  savingsState,
+} from "../savings";
 import type { BalancePayload, HomeAssistant } from "../types";
 
 const SOURCES = ["pv_energy_total", "grid_import_total", "battery_discharge_total"] as const;
 const SINKS = ["load_energy_total", "grid_export_total", "battery_charge_total"] as const;
 const ALL = [...SOURCES, ...SINKS];
-// The two counters the savings figure is computed from.
-const SAVINGS_ROLES = ["load_energy_total", "grid_import_total"] as const;
 
 @customElement("ia-balance-tab")
 export class IaBalanceTab extends LitElement {
@@ -172,8 +176,7 @@ export class IaBalanceTab extends LitElement {
     if (state.kind === "withheld") {
       let reason: string;
       if (state.reason === "no_counters") {
-        const unmapped = SAVINGS_ROLES.filter((role) => !payload.mapped.includes(role));
-        const missing = unmapped.length ? unmapped : SAVINGS_ROLES;
+        const missing = missingSavingsRoles(payload.mapped);
         reason = m.balance.savingsReasons.no_counters({
           roles: listRoles(m, missing, true),
           n: missing.length,
@@ -188,6 +191,8 @@ export class IaBalanceTab extends LitElement {
     }
 
     const share = coverageShare(block);
+    const money = (value: number | null) =>
+      value === null ? DASH : formatMoney(value, block.currency, locale);
     // A year is read by the month; a day's bar would be a sliver among 365.
     const bars = savingsBars(block.days, this.range === "year");
     return html`<section>
@@ -195,10 +200,10 @@ export class IaBalanceTab extends LitElement {
       <div class="kpi">
         <div class="cell">
           <span class="label">${m.balance.savingsSeries}</span>
-          <span class="value">${formatMoney(block.total ?? 0, block.currency, locale)}</span>
+          <span class="value">${money(block.total)}</span>
           <span class="hint">
             ${m.balance.savingsPerDay({
-              amount: formatMoney(block.per_day ?? 0, block.currency, locale),
+              amount: money(block.per_day),
             })}
           </span>
         </div>

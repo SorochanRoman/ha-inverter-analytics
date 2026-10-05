@@ -12,6 +12,19 @@ export function savingsState(block: SavingsBlock | undefined): SavingsState | nu
   return block.reason ? { kind: "withheld", reason: block.reason } : { kind: "figure" };
 }
 
+/** The two counters the savings figure is computed from. */
+export const SAVINGS_ROLES = ["load_energy_total", "grid_import_total"] as const;
+
+/**
+ * The counters a `no_counters` card names: those not mapped. When the payload
+ * lists both as mapped, both are named rather than none — the backend still
+ * found one of them missing, and an empty sentence would say nothing.
+ */
+export function missingSavingsRoles(mapped: string[]): string[] {
+  const unmapped = SAVINGS_ROLES.filter((role) => !mapped.includes(role));
+  return unmapped.length ? unmapped : [...SAVINGS_ROLES];
+}
+
 /** One bar a day, or with byMonth the days summed into YYYY-MM months. */
 export function savingsBars(
   days: SavingsDay[],

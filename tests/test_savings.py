@@ -147,3 +147,47 @@ def test_two_zone_is_said():
     load = hourly(DAY, [1.0])
     imported = hourly(DAY, [0.0])
     assert build(load, imported, price_night=2.16)["two_zone"] is True
+
+
+def test_window_hours_count_only_the_whole_hours_inside_the_window():
+    # The panel's day is now-24h to now, to the minute: 11:37 to 11:37. The
+    # hours that can have a statistic are 12:00 up to 11:00, twenty-three.
+    start = datetime(2026, 9, 10, 11, 37, tzinfo=KYIV)
+    span = Window(start=start.astimezone(UTC), end=(start + timedelta(days=1)).astimezone(UTC))
+    first = datetime(2026, 9, 10, 12, 0, tzinfo=KYIV)
+    load = hourly(first, [1.0] * 23)
+    imported = hourly(first, [0.0] * 23)
+    block = build(load, imported, window=span)
+    assert block["window_hours"] == 23
+    assert block["hours"] == block["window_hours"]
+
+
+def test_a_window_shorter_than_an_hour_has_no_whole_hours():
+    start = datetime(2026, 9, 10, 11, 10, tzinfo=KYIV).astimezone(UTC)
+    span = Window(start, start + timedelta(minutes=40))
+    block = build(hourly(DAY, [1.0]), hourly(DAY, [0.0]), window=span)
+    assert block["window_hours"] == 0
+
+
+def test_per_day_is_the_mean_over_24_hours_of_data_not_calendar_days():
+    # Twenty-four hours from noon to noon touch two calendar days.
+    noon = DAY + timedelta(hours=12)
+    load = hourly(noon, [1.0] * 24)
+    imported = hourly(noon, [0.0] * 24)
+    block = build(load, imported)
+    assert len(block["days"]) == 2
+    assert block["per_day"] == block["total"]
+
+
+def test_per_day_scales_a_part_day_to_24_hours():
+    load = hourly(DAY, [1.0] * 6)
+    imported = hourly(DAY, [0.0] * 6)
+    block = build(load, imported)
+    assert block["per_day"] == round(6 * 4.32 * 24 / 6, 4)
+
+
+def test_an_empty_night_zone_is_not_two_zone():
+    load = hourly(DAY, [1.0])
+    imported = hourly(DAY, [0.0])
+    block = build(load, imported, price_night=2.16, night_start=7, night_end=7)
+    assert block["two_zone"] is False

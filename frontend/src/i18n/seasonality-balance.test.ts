@@ -45,22 +45,29 @@ describe("the savings card", () => {
     expect(uk.balance.savingsNote({ twoZone: false })).not.toContain("нічною");
   });
 
+  it("agrees the Ukrainian participle with one price or two", () => {
+    expect(uk.balance.savingsNote({ twoZone: true })).toContain("денною та нічною цінами, заданими");
+    expect(uk.balance.savingsNote({ twoZone: false })).toContain("ціною, заданою");
+  });
+
   it("names the missing counters in both languages", () => {
     expect(en.balance.savingsReasons.no_counters({ roles: "X", n: 1 })).toContain("X");
     expect(uk.balance.savingsReasons.no_counters({ roles: "X", n: 2 })).toContain("X");
   });
 
-  it("says the daily figure is over the days counted", () => {
+  it("says the daily figure is per 24 hours of the hours counted", () => {
     expect(en.balance.savingsPerDay({ amount: "40 UAH" })).toBe(
-      "40 UAH a day on average, over the days counted",
+      "40 UAH per 24 hours on average, over the hours counted",
     );
     expect(uk.balance.savingsPerDay({ amount: "40 грн" })).toBe(
-      "у середньому 40 грн на день, за враховані дні",
+      "у середньому 40 грн за добу, за враховані години",
     );
   });
 
   it("states the coverage share", () => {
-    expect(en.balance.savingsCoverage({ share: "50%" })).toContain("50%");
+    expect(en.balance.savingsCoverage({ share: "50%" })).toBe(
+      "Both counters cover only 50% of this period; the rest is not counted, so the figure reads low.",
+    );
     expect(uk.balance.savingsCoverage({ share: "50%" })).toContain("50%");
   });
 });
