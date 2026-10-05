@@ -11,6 +11,7 @@ from custom_components.inverter_analytics.analytics.health import (
     CLEAN_DROP_MIN_POINTS,
     CLEAN_HOURS_MIN,
     COMPARISON_MIN_MONTHS,
+    DRIFT_CORRECTION_MAX_SHARE,
     HEALTH_MAX_YEARS,
     PARTIAL_MONTH_COVERAGE,
     async_health_analytics,
@@ -287,6 +288,25 @@ def test_drift_is_corrected_by_the_months_own_capacity_when_it_fell():
     capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
     month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
     assert month == {"value": pytest.approx(0.769), "reason": None, "drift_corrected": True}
+
+
+def test_a_correction_beyond_a_tenth_of_the_charge_is_not_trusted():
+    """3.1 kWh stored against 2 kWh charged: the drift is the month, not a correction to it."""
+    assert DRIFT_CORRECTION_MAX_SHARE == 0.1
+    charge, discharge = month_of_counters(charged=2.0, discharged=1.0)
+    soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=60.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    assert month == {"value": None, "reason": "drift_uncorrectable"}
+
+
+def test_a_correction_that_leaves_nothing_discharged_is_not_trusted():
+    # Within the bound (3.1 kWh of 100), but 2 kWh out less 3.1 kWh is below zero.
+    charge, discharge = month_of_counters(charged=100.0, discharged=2.0)
+    soc = [soc_hour(0, mean=60.0), soc_hour(5, mean=50.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    assert month == {"value": None, "reason": "drift_uncorrectable"}
 
 
 def test_drift_stays_withheld_without_a_capacity_figure_for_that_month():
@@ -646,10 +666,11 @@ def test_the_payload_has_exactly_the_contract_keys():
 
 def test_the_payload_corrects_efficiency_drift_with_the_capacity_it_measured():
     # Thirty clean discharge hours of 0.31 kWh over 3 points, then one hour of
-    # charging 10 kWh that brings the charge back to 50%: 30 points below the start.
+    # charging 40 kWh that leaves the charge at 50%: 30 points below the start.
+    # The correction, 3.1 kWh, is within a tenth of the 40 kWh charged.
     soc_rows = [HourlyRow(at(i), 80.0 - 3 * i, 78.5 - 3 * i, 81.5 - 3 * i) for i in range(30)]
     soc_rows.append(HourlyRow(at(30), 50.0, 20.0, 50.0))
-    charge = energy({i: 0.0 for i in range(30)} | {30: 10.0})
+    charge = energy({i: 0.0 for i in range(30)} | {30: 40.0})
     discharge = energy({i: 0.31 for i in range(30)} | {30: 0.0})
     result = payload(soc=HourlySeries(tuple(soc_rows)), charge=charge, discharge=discharge)
 
@@ -657,7 +678,7 @@ def test_the_payload_corrects_efficiency_drift_with_the_capacity_it_measured():
     assert capacity == pytest.approx(100 * 9.3 / 90)
     month = result["signals"]["efficiency"]["months"]["2026-01"]
     assert month["drift_corrected"] is True
-    assert month["value"] == pytest.approx((9.3 - 30 * capacity / 100) / 10.0)
+    assert month["value"] == pytest.approx((9.3 - 30 * capacity / 100) / 40.0)
 
 
 def test_the_months_run_from_five_years_back_to_now():

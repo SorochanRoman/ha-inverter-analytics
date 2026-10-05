@@ -612,6 +612,9 @@ export const en = {
         `The charge ended more than ${p.points} points from where it began, so part of ` +
         "what came out went in another month, or the reverse — and there is no capacity " +
         "figure for this month to correct it with.",
+      drift_uncorrectable:
+        "The charge moved too far against what went through the battery for the correction " +
+        "to be trusted.",
       too_little_throughput: (p: { min: string }) =>
         `Less than ${p.min} went into the battery this month — too little to read an ` +
         "efficiency from.",
@@ -666,12 +669,13 @@ export const en = {
         `fell by at least ${p.drop} points. The discharge over the fall is the energy per ` +
         `point; times a hundred, the capacity. A month needs ${p.minHours} such hours. A ` +
         "recalibration by the BMS inside one can only pull a month's figure down.",
-      efficiency: (p: { points: string; min: string }) =>
+      efficiency: (p: { points: string; min: string; share: string }) =>
         "Round-trip efficiency is what came out of the battery over what went in, from the " +
         "counters' monthly sums. When a month's charge ended more than " +
         `${p.points} points from where it began, the difference is corrected with that ` +
-        "month's measured capacity; without one the month has no figure. Nor has a month " +
-        `into which less than ${p.min} went.`,
+        "month's measured capacity; without one, or when the correction would be more " +
+        `than ${p.share} of what went in, the month has no figure. Nor has a month into ` +
+        `which less than ${p.min} went.`,
       solar: (p: { minHours: number; minPower: string }) =>
         "Solar production is the PV counter's energy per month. The best hour is the " +
         "month's highest hourly peak of PV power — close to a clear-sky figure. Hours the " +

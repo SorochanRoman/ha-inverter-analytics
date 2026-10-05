@@ -32,6 +32,7 @@ export const EFFICIENCY_MIN_KWH = 1.0;
 export const CEILING_PV_MIN_W = 100.0;
 export const HIGH_LOAD_SHARE = 0.8;
 export const PARTIAL_MONTH_COVERAGE = 0.95;
+export const DRIFT_CORRECTION_MAX_SHARE = 0.1;
 
 export type HealthCardKey = "capacity" | "efficiency" | "solar" | "inverter";
 
@@ -330,6 +331,8 @@ export function healthReason(
       return reasons.drift({ points: plain(EFFICIENCY_MAX_DRIFT_PCT, locale) });
     case "too_little_throughput":
       return reasons.too_little_throughput({ min: formatEnergy(EFFICIENCY_MIN_KWH, locale) });
+    case "drift_uncorrectable":
+      return reasons.drift_uncorrectable;
     case "partial_month":
       if (month?.coverage === undefined) return reasons.partial_month;
       return reasons.partialCoverage({
@@ -365,6 +368,7 @@ export function healthDefinitions(
     efficiency: d.efficiency({
       points: plain(EFFICIENCY_MAX_DRIFT_PCT, locale),
       min: formatEnergy(EFFICIENCY_MIN_KWH, locale),
+      share: formatPercent(DRIFT_CORRECTION_MAX_SHARE, locale),
     }),
     solar:
       d.solar({

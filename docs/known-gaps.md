@@ -292,7 +292,11 @@ when the state of charge ends more than five points from where it started,
 because the gap between charged and discharged is then mostly stored energy. It
 could instead be corrected using the capacity and the drift — but that compounds
 a user-entered capacity with a percentage reading, and a corrected number that
-looks precise is worse than an absent one that explains itself.
+looks precise is worse than an absent one that explains itself. That holds for
+the Battery tab's period figure. The Health tab does correct a month's drift,
+but only with the capacity it measured that month — never the nameplate — and
+only while the correction stays within `DRIFT_CORRECTION_MAX_SHARE` (10%) of the
+month's charge; beyond that the month reads `drift_uncorrectable`.
 
 **The autonomy rate's denominator.** Each outage's fall to its lowest charge is
 divided by the time from the outage's start to that minimum, not by the seconds

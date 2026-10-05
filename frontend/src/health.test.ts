@@ -380,6 +380,13 @@ describe("the reasons", () => {
     ).toContain("Only 1 hour of sun the system could take in full; the best hour needs 10.");
     expect(healthReason(en, "drift", undefined, "en")).toContain("more than 5 points");
     expect(healthReason(en, "drift", undefined, "en")).toContain("no capacity figure");
+    expect(healthReason(en, "drift_uncorrectable", undefined, "en")).toBe(
+      "The charge moved too far against what went through the battery for the correction " +
+        "to be trusted.",
+    );
+    expect(healthReason(uk, "drift_uncorrectable", undefined, "uk")).toBe(
+      uk.health.reasons.drift_uncorrectable,
+    );
     expect(healthReason(en, "too_little_throughput", undefined, "en")).toContain(
       "Less than 1 kWh",
     );
@@ -453,6 +460,8 @@ describe("the definitions", () => {
     expect(d.capacity).toContain("needs 20 such hours");
     expect(d.efficiency).toContain("more than 5 points");
     expect(d.efficiency).toContain("corrected with that month's measured capacity");
+    expect(d.efficiency).toContain("more than 10% of what went in");
+    expect(healthDefinitions(uk, "uk").efficiency).toContain("більше ніж 10%");
     expect(d.efficiency).toContain("less than 1 kWh");
     expect(d.solar).toContain("needs 10 other hours of sun at or above 100 W");
     expect(d.inverter).toContain("reached 80% of it");

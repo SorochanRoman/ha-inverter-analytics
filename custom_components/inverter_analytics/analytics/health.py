@@ -64,12 +64,16 @@ BEST_HOUR_MIN_HOURS = 10
 # hours are sums and do: a month 60% covered reads up to 40% low. A missing
 # 5% stays inside the noise a month's weather already puts in; more does not.
 PARTIAL_MONTH_COVERAGE = 0.95
+# The largest drift correction trusted, as a share of the month's charge: a
+# bigger one is the month's figure rather than a correction to it.
+DRIFT_CORRECTION_MAX_SHARE = 0.1
 
 TOO_FEW_CLEAN_HOURS = "too_few_clean_hours"
 NO_SOC = "no_soc"
 SOC_PARTIAL = "soc_partial"
 COUNTERS_PARTIAL = "counters_partial"
 DRIFT = "drift"
+DRIFT_UNCORRECTABLE = "drift_uncorrectable"
 TOO_LITTLE_THROUGHPUT = "too_little_throughput"
 CURTAILED = "curtailed"
 PARTIAL_MONTH = "partial_month"
@@ -200,8 +204,10 @@ def efficiency_by_month(
     negative one is energy that came out of what was already there, so it is
     taken away. Such a month carries drift_corrected: True. Five points of a
     31 kWh battery is about 1.5 kWh against hundreds of kWh of throughput, so
-    the correction is small next to what it lets through. A correction that
-    would leave nothing out is no figure, and stays drift.
+    the correction is small next to what it lets through. A correction
+    larger than DRIFT_CORRECTION_MAX_SHARE of the charge, or one that would
+    leave nothing out, is not trusted: drift_uncorrectable, kept apart from
+    drift, which means there was no capacity figure to correct with.
     """
     charged = _sums_by_month(charge, tz)
     discharged = _sums_by_month(discharge, tz)
@@ -249,9 +255,10 @@ def efficiency_by_month(
         if not corrected:
             months[key] = {"value": out / into, "reason": None}
             continue
-        out += drift * measured / 100
-        if out <= 0:
-            months[key] = {"value": None, "reason": DRIFT}
+        stored = drift * measured / 100
+        out += stored
+        if abs(stored) > DRIFT_CORRECTION_MAX_SHARE * into or out <= 0:
+            months[key] = {"value": None, "reason": DRIFT_UNCORRECTABLE}
             continue
         months[key] = {"value": out / into, "reason": None, "drift_corrected": True}
     return months

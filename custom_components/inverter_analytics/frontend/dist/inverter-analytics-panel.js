@@ -1100,6 +1100,7 @@ const Fb = {
       counters_partial: "The charge and discharge counters do not cover the same hours this month, so what went in and what came out are not from the same span.",
       soc_partial: "The state of charge covers only part of the hours the counters do, so the check that the battery ended where it began would not cover the same span.",
       drift: (e) => `The charge ended more than ${e.points} points from where it began, so part of what came out went in another month, or the reverse — and there is no capacity figure for this month to correct it with.`,
+      drift_uncorrectable: "The charge moved too far against what went through the battery for the correction to be trusted.",
       too_little_throughput: (e) => `Less than ${e.min} went into the battery this month — too little to read an efficiency from.`,
       partial_month: "Only part of this month has statistics, and a part is not compared with a whole month.",
       // partial_month when the payload says how much of the month was covered.
@@ -1127,7 +1128,7 @@ const Fb = {
     howRead: "How these are read",
     definitions: {
       capacity: (e) => `Usable capacity comes from clean discharge hours: hours in which the charge counter moved by at most ${e.charge}, the discharge counter moved, and the state of charge fell by at least ${e.drop} points. The discharge over the fall is the energy per point; times a hundred, the capacity. A month needs ${e.minHours} such hours. A recalibration by the BMS inside one can only pull a month's figure down.`,
-      efficiency: (e) => `Round-trip efficiency is what came out of the battery over what went in, from the counters' monthly sums. When a month's charge ended more than ${e.points} points from where it began, the difference is corrected with that month's measured capacity; without one the month has no figure. Nor has a month into which less than ${e.min} went.`,
+      efficiency: (e) => `Round-trip efficiency is what came out of the battery over what went in, from the counters' monthly sums. When a month's charge ended more than ${e.points} points from where it began, the difference is corrected with that month's measured capacity; without one, or when the correction would be more than ${e.share} of what went in, the month has no figure. Nor has a month into which less than ${e.min} went.`,
       solar: (e) => `Solar production is the PV counter's energy per month. The best hour is the month's highest hourly peak of PV power — close to a clear-sky figure. Hours the system could not take are left out, and a month needs ${e.minHours} other hours of sun at or above ${e.minPower}.`,
       // Appended to solar when no total PV power is mapped.
       solarDerived: "This system has no total PV power sensor, so PV power is the sum of its strings. An hour counts only when every string has statistics for it, and its peak is summed from the strings' own peaks: they need not peak at the same moment, so the best hour can read a little above the array's true peak.",
@@ -1600,6 +1601,7 @@ const Fb = {
       counters_partial: "Лічильники заряду й розряду цього місяця покривають різні години, тож те, що надійшло, і те, що вийшло, взято не з того самого проміжку.",
       soc_partial: "Рівень заряду покриває лише частину годин, які покривають лічильники, тож перевірка, чи батарея закінчила там, де почала, охопила б інший проміжок.",
       drift: (e) => `Заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, тож частина того, що вийшло, увійшла в іншому місяці, або навпаки, — а виміряної ємності за цей місяць, щоб це виправити, немає.`,
+      drift_uncorrectable: "Заряд змінився надто сильно порівняно з тим, що пройшло через батарею, щоб поправці можна було довіряти.",
       too_little_throughput: (e) => `За місяць у батарею надійшло менше ніж ${e.min} — замало, щоб читати з цього ККД.`,
       partial_month: "Статистика є лише за частину цього місяця, а частину не порівнюють із цілим місяцем.",
       partialCoverage: (e) => `Статистика є за ${e.share} місяця; місяцю потрібно ${e.needed}, а частину не порівнюють із цілим місяцем.`,
@@ -1624,7 +1626,7 @@ const Fb = {
     howRead: "Як це читати",
     definitions: {
       capacity: (e) => `Корисна ємність береться з чистих годин розряду: годин, коли лічильник заряду змінився щонайбільше на ${e.charge}, лічильник розряду змінився, а рівень заряду упав щонайменше на ${e.drop} в.п. Розряд, поділений на падіння, — це енергія на в.п.; помножена на сто — ємність. Місяцю потрібно ${e.minHours} таких годин. Перекалібрування BMS усередині такої години може лише занизити значення місяця.`,
-      efficiency: (e) => `ККД заряду-розряду — те, що вийшло з батареї, поділене на те, що в неї надійшло, з місячних сум лічильників. Якщо заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, різницю виправлено виміряною ємністю за той самий місяць; без неї місяць не має значення. Як і місяць, у який надійшло менше ніж ${e.min}.`,
+      efficiency: (e) => `ККД заряду-розряду — те, що вийшло з батареї, поділене на те, що в неї надійшло, з місячних сум лічильників. Якщо заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, різницю виправлено виміряною ємністю за той самий місяць; без неї, або якщо поправка становила б більше ніж ${e.share} того, що надійшло, місяць не має значення. Як і місяць, у який надійшло менше ніж ${e.min}.`,
       solar: (e) => `Сонячна генерація — енергія з лічильника СЕС за місяць. Найкраща година — найвищий погодинний пік потужності СЕС за місяць, близький до значення ясного неба. Години, коли система не могла взяти сонце, не враховано, і місяцю потрібно ${e.minHours} інших годин сонця від ${e.minPower}.`,
       solarDerived: "Ця система не має датчика загальної потужності СЕС, тож потужність СЕС — це сума її стрінгів. Година враховується, лише коли статистика є для кожного стрінга, а її пік складено з піків стрінгів: вони не обов'язково досягають піку одночасно, тож найкраща година може бути трохи вищою за справжній пік масиву.",
       inverter: (e) => `Навантаження інвертора — це години, коли пік досягав поточної номінальної потужності, і ті, коли він досягав ${e.share} від неї; за нею ж рахуються й минулі роки. Це про те, як живе будинок, а не про стан обладнання: без сенсора температури чи помилок дані більше нічого не скажуть про сам інвертор.`
@@ -1749,11 +1751,11 @@ function ft(e, t) {
     e / 1e3
   )} ${r.units.kw}` : `${new Intl.NumberFormat(t, { maximumFractionDigits: 0 }).format(e)} ${r.units.w}`;
 }
-function Y(e, t) {
+function U(e, t) {
   return e === null || Number.isNaN(e) ? it : `${new Intl.NumberFormat(t, { maximumFractionDigits: 1 }).format(e * 100)}%`;
 }
 function Xe(e, t) {
-  return e === null || Number.isNaN(e) ? it : e <= 0 ? "0%" : e < 1e-3 ? "<0.1%" : Y(e, t);
+  return e === null || Number.isNaN(e) ? it : e <= 0 ? "0%" : e < 1e-3 ? "<0.1%" : U(e, t);
 }
 const Kb = 10 * 60;
 function Pt(e, t) {
@@ -1795,7 +1797,7 @@ function ll(e, t, r) {
 function Wa(e, t) {
   if (e >= 0.95) return null;
   const { format: r } = co(t);
-  return e <= 0 ? r.noData : e < 0.01 ? r.coversUnderOnePercent : r.coversOnly({ share: Y(e, t) });
+  return e <= 0 ? r.noData : e < 0.01 ? r.coversUnderOnePercent : r.coversOnly({ share: U(e, t) });
 }
 function Qb(e) {
   let t;
@@ -2547,7 +2549,7 @@ function C(e, t, r) {
       for (var a in e)
         e.hasOwnProperty(a) && t.call(r, e[a], a, e);
 }
-function U(e, t, r) {
+function Y(e, t, r) {
   if (!e)
     return [];
   if (!t)
@@ -4445,7 +4447,7 @@ function _d(e) {
     return t || (t = yd(e, -0.1), md.put(e, t)), t;
   } else if (hl(e)) {
     var r = N({}, e);
-    return r.colorStops = U(e.colorStops, function(n) {
+    return r.colorStops = Y(e.colorStops, function(n) {
       return {
         offset: n.offset,
         color: yd(n.color, -0.1)
@@ -4580,7 +4582,7 @@ var ra = [0, 0, 0, 0], F1 = function() {
       }
     else if (hl(r)) {
       var c = N({}, l);
-      c.colorStops = U(r.colorStops, function(d) {
+      c.colorStops = Y(r.colorStops, function(d) {
         return {
           offset: d.offset,
           color: we(d.color)
@@ -4645,7 +4647,7 @@ var ra = [0, 0, 0, 0], F1 = function() {
             type: S ? "linear" : "radial",
             x: sr(_.x, b.x, y),
             y: sr(_.y, b.y, y),
-            colorStops: U(_.colorStops, function(x, M) {
+            colorStops: Y(_.colorStops, function(x, M) {
               var D = b.colorStops[M];
               return {
                 offset: sr(x.offset, D.offset, y),
@@ -4799,7 +4801,7 @@ var ra = [0, 0, 0, 0], F1 = function() {
     return this._tracks[t];
   }, e.prototype.getTracks = function() {
     var t = this;
-    return U(this._trackKeys, function(r) {
+    return Y(this._trackKeys, function(r) {
       return t._tracks[r];
     });
   }, e.prototype.stopTracks = function(t, r) {
@@ -4917,7 +4919,7 @@ var H1 = function(e) {
     pointerup: 1,
     pointermove: 1,
     pointerout: 1
-  }, n = U(e, function(i) {
+  }, n = Y(e, function(i) {
     var a = i.replace("mouse", "pointer");
     return r.hasOwnProperty(a) ? a : i;
   });
@@ -6214,11 +6216,11 @@ function kn(e, t) {
   if (t.dataIndexInside != null)
     return t.dataIndexInside;
   if (t.dataIndex != null)
-    return z(t.dataIndex) ? U(t.dataIndex, function(r) {
+    return z(t.dataIndex) ? Y(t.dataIndex, function(r) {
       return e.indexOfRawIndex(r);
     }) : e.indexOfRawIndex(t.dataIndex);
   if (t.name != null)
-    return z(t.name) ? U(t.name, function(r) {
+    return z(t.name) ? Y(t.name, function(r) {
       return e.indexOfName(r);
     }) : e.indexOfName(t.name);
 }
@@ -9084,7 +9086,7 @@ function Im(e, t, r) {
   });
 }
 function OT(e, t) {
-  return U(e, function(r) {
+  return Y(e, function(r) {
     var n = r[0];
     n = Zs(n, t.x), n = Ks(n, t.x + t.width);
     var i = r[1];
@@ -10249,7 +10251,7 @@ function dC(e) {
   var t = [];
   return C(ct.getClassesByMainType(e), function(r) {
     t = t.concat(r.dependencies || r.prototype.dependencies || []);
-  }), t = U(t, function(r) {
+  }), t = Y(t, function(r) {
     return Ye(r).main;
   }), e !== "dataset" && pt(t, "dataset") <= 0 && t.unshift("dataset"), t;
 }
@@ -10856,7 +10858,7 @@ var DC = [
         return s;
       for (var l = 0, u = i.length; l < u; l++)
         $C(i[l].query, r, n) && o.push(l);
-      return !o.length && a && (o = [-1]), o.length && !RC(o, this._currentMediaIndices) && (s = U(o, function(h) {
+      return !o.length && a && (o = [-1]), o.length && !RC(o, this._currentMediaIndices) && (s = Y(o, function(h) {
         return q(h === -1 ? a.option : i[h].option);
       })), this._currentMediaIndices = o, s;
     }, e;
@@ -11237,7 +11239,7 @@ function UC(e) {
 function zv(e) {
   if (e) {
     var t = Q();
-    return U(e, function(r, n) {
+    return Y(e, function(r, n) {
       r = V(r) ? r : {
         name: r
       };
@@ -11722,14 +11724,14 @@ function sM(e, t, r, n) {
   t.length || Jt(i), V(e) || Jt(i);
   var a = e.type, o = l_.get(a);
   o || Jt(i);
-  var s = U(t, function(u) {
+  var s = Y(t, function(u) {
     return tM(u, o);
   }), l = kt(o.transform({
     upstream: s[0],
     upstreamList: s,
     config: q(e.config)
   }));
-  return U(l, function(u, h) {
+  return Y(l, function(u, h) {
     var c = "";
     V(u) || Jt(c), u.data || Jt(c);
     var f = r_(u.data);
@@ -11793,7 +11795,7 @@ var Kh = (
     return e.prototype.initData = function(t, r, n) {
       this._provider = t, this._chunks = [], this._indices = null, this.getRawIndex = this._getRawIdxIdentity;
       var i = t.getSource(), a = this.defaultDimValueGetter = Fu[i.sourceFormat];
-      this._dimValueGetter = n || a, this._rawExtent = [], n_(i), this._dimensions = U(r, function(o) {
+      this._dimValueGetter = n || a, this._rawExtent = [], n_(i), this._dimensions = Y(r, function(o) {
         return {
           // Only pick these two props. Not leak other properties like orderMeta.
           type: o.type,
@@ -11850,7 +11852,7 @@ var Kh = (
         end: l
       };
     }, e.prototype._initDataFromProvider = function(t, r, n) {
-      for (var i = this._provider, a = this._chunks, o = this._dimensions, s = o.length, l = this._rawExtent, u = U(o, function(m) {
+      for (var i = this._provider, a = this._chunks, o = this._dimensions, s = o.length, l = this._rawExtent, u = Y(o, function(m) {
         return m.property;
       }), h = 0; h < s; h++) {
         var c = o[h];
@@ -12266,7 +12268,7 @@ var Kh = (
         var r = Km(t);
         return r ? [r.getSourceManager()] : [];
       } else
-        return U(yC(t), function(n) {
+        return Y(yC(t), function(n) {
           return n.getSourceManager();
         });
     }, e.prototype._getSourceMetaRawOption = function() {
@@ -12380,7 +12382,7 @@ function pM(e, t, r, n) {
 }
 function gM(e, t, r, n) {
   var i = e.renderMode, a = t.noName, o = t.noValue, s = !t.markerType, l = t.name, u = e.useUTC, h = t.valueFormatter || e.valueFormatter || function(b) {
-    return b = z(b) ? b : [b], U(b, function(S, w) {
+    return b = z(b) ? b : [b], Y(b, function(S, w) {
       return qh(S, z(d) ? d[w] : d, u);
     });
   };
@@ -12417,7 +12419,7 @@ function mM(e, t, r) {
 }
 function _M(e, t, r, n) {
   var i = r ? "10px" : "20px", a = t ? "float:right;margin-left:" + i : "";
-  return e = z(e) ? e : [e], '<span style="' + a + ";" + n + '">' + U(e, function(o) {
+  return e = z(e) ? e : [e], '<span style="' + a + ";" + n + '">' + Y(e, function(o) {
     return jt(o);
   }).join("&nbsp;&nbsp;") + "</span>";
 }
@@ -13220,7 +13222,7 @@ function GM(e) {
 function WM(e) {
   e.useClearVisual && e.data.clearAllVisual();
   var t = e.resetDefines = kt(e.reset(e.model, e.ecModel, e.api, e.payload));
-  return t.length > 1 ? U(t, function(r, n) {
+  return t.length > 1 ? Y(t, function(r, n) {
     return S_(n);
   }) : UM;
 }
@@ -13815,7 +13817,7 @@ function I_(e) {
   var t = e.style, r = t.lineDash && t.lineWidth > 0 && pD(t.lineDash, t.lineWidth), n = t.lineDashOffset;
   if (r) {
     var i = t.strokeNoScale && e.getLineScale ? e.getLineScale() : 1;
-    i && i !== 1 && (r = U(r, function(a) {
+    i && i !== 1 && (r = Y(r, function(a) {
       return a / i;
     }), n /= i);
   }
@@ -14131,7 +14133,7 @@ function O_(e) {
       var t = Math.ceil(e[n]);
       i.push([t, t]);
     } else {
-      var t = U(e[n], function(s) {
+      var t = Y(e[n], function(s) {
         return Math.ceil(s);
       });
       t.length % 2 === 1 ? i.push(t.concat(t)) : i.push(t);
@@ -14145,13 +14147,13 @@ function CD(e) {
     var t = Math.ceil(e);
     return [t, t];
   }
-  var r = U(e, function(n) {
+  var r = Y(e, function(n) {
     return Math.ceil(n);
   });
   return e.length % 2 ? r.concat(r) : r;
 }
 function MD(e) {
-  return U(e, function(t) {
+  return Y(e, function(t) {
     return E_(t);
   });
 }
@@ -14756,7 +14758,7 @@ var ii, Uu, Zo, Ir, Yu, Xu, qu, ua, ha, xp, Tp, Zu, Cp, Ko, Mp, U_, he, Dp, Y_ =
         var d = this, v = this.getModel(), g = c.type, p = c.escapeConnect, y = rl[g], m = y.actionInfo, _ = (m.update || "update").split(":"), b = _.pop(), S = _[0] != null && Ye(_[0]);
         this[Bt] = !0;
         var w = [c], x = !1;
-        c.batch && (x = !0, w = U(c.batch, function(P) {
+        c.batch && (x = !0, w = Y(c.batch, function(P) {
           return P = ht(N({}, P), c), P.batch = null, P;
         }));
         var M = [], D, A = Wh(c), T = lv(c);
@@ -15250,7 +15252,7 @@ function rA(e, t) {
   i.each(function(f, d) {
     var v = n[d];
     u[d] = v[0], l = l.concat(v);
-  }), r.dataDimsOnCoord = l, r.dataDimIndicesOnCoord = U(l, function(f) {
+  }), r.dataDimsOnCoord = l, r.dataDimIndicesOnCoord = Y(l, function(f) {
     return e.getDimensionInfo(f).storeDimIndex;
   }), r.encodeFirstDimNotExtra = u;
   var h = n.label;
@@ -15351,7 +15353,7 @@ function e0(e) {
 function r0(e) {
   return e > 30;
 }
-var fa = V, Lr = U, sA = typeof Int32Array > "u" ? Array : Int32Array, lA = "e\0\0", $p = -1, uA = ["hasItemOption", "_nameList", "_idList", "_invertedIndicesMap", "_dimSummary", "userOutput", "_rawData", "_dimValueGetter", "_nameDimIdx", "_idDimIdx", "_nameRepeatCount"], hA = ["_approximateExtent"], Pp, jo, da, va, ju, pa, Qu, cA = (
+var fa = V, Lr = Y, sA = typeof Int32Array > "u" ? Array : Int32Array, lA = "e\0\0", $p = -1, uA = ["hasItemOption", "_nameList", "_idList", "_invertedIndicesMap", "_dimSummary", "userOutput", "_rawData", "_dimValueGetter", "_nameDimIdx", "_idDimIdx", "_nameRepeatCount"], hA = ["_approximateExtent"], Pp, jo, da, va, ju, pa, Qu, cA = (
   /** @class */
   function() {
     function e(t, r) {
@@ -15871,7 +15873,7 @@ function wA(e, t) {
 }
 function SA(e, t) {
   var r = e.get("coordinateSystem"), n = Rl.get(r), i;
-  return t && t.coordSysDims && (i = U(t.coordSysDims, function(a) {
+  return t && t.coordSysDims && (i = Y(t.coordSysDims, function(a) {
     var o = {
       name: a
     }, s = t.axisMap.get(a);
@@ -15960,7 +15962,7 @@ var MA = 0, uc = (
       this.categories = t.categories || [], this._needCollect = t.needCollect, this._deduplication = t.deduplication, this.uid = ++MA;
     }
     return e.createByAxisModel = function(t) {
-      var r = t.option, n = r.data, i = n && U(n, DA);
+      var r = t.option, n = r.data, i = n && Y(n, DA);
       return new e({
         categories: i,
         needCollect: !i,
@@ -16025,7 +16027,7 @@ var If = (
       n.type = "ordinal";
       var i = n.getSetting("ordinalMeta");
       return i || (i = new uc({})), z(i) && (i = new uc({
-        categories: U(i, function(a) {
+        categories: Y(i, function(a) {
           return V(a) ? a.value : a;
         })
       })), n._ordinalMeta = i, n._extent = n.getSetting("extent") || [0, i.categories.length - 1], n;
@@ -16609,7 +16611,7 @@ function UA(e, t, r, n) {
       }
     }
   }
-  for (var b = Ot(U(u, function(A) {
+  for (var b = Ot(Y(u, function(A) {
     return Ot(A, function(T) {
       return T.value >= n[0] && T.value <= n[1] && !T.notAdd;
     });
@@ -16639,7 +16641,7 @@ var Ep = ir.prototype, Fa = Yi.prototype, YA = At, XA = Math.floor, qA = Math.ce
     }
     return t.prototype.getTicks = function(r) {
       var n = this._originalScale, i = this._extent, a = n.getExtent(), o = Fa.getTicks.call(this, r);
-      return U(o, function(s) {
+      return Y(o, function(s) {
         var l = s.value, u = At(Jo(this.base, l));
         return u = l === i[0] && this._fixMin ? ts(u, a[0]) : u, u = l === i[1] && this._fixMax ? ts(u, a[1]) : u, {
           value: u
@@ -16946,7 +16948,7 @@ function Qe(e) {
 }
 var oo = $t();
 function v0(e, t) {
-  var r = U(t, function(n) {
+  var r = Y(t, function(n) {
     return e.scale.parse(n);
   });
   return e.type === "time" && r.length > 0 && (r.sort(), r.unshift(r[0]), r.push(r[r.length - 1])), r;
@@ -16958,7 +16960,7 @@ function s2(e) {
       return o >= n[0] && o <= n[1];
     });
     return {
-      labels: U(a, function(o) {
+      labels: Y(a, function(o) {
         var s = {
           value: o
         };
@@ -16983,7 +16985,7 @@ function l2(e, t) {
     };
   }
   return e.type === "category" ? h2(e, t) : {
-    ticks: U(e.scale.getTicks(), function(a) {
+    ticks: Y(e.scale.getTicks(), function(a) {
       return a.value;
     })
   };
@@ -17014,7 +17016,7 @@ function h2(e, t) {
     a = b0(e, n, !0);
   else if (n === "auto") {
     var s = p0(e, e.getLabelModel());
-    o = s.labelCategoryInterval, a = U(s.labels, function(l) {
+    o = s.labelCategoryInterval, a = Y(s.labels, function(l) {
       return l.tickValue;
     });
   } else
@@ -17027,7 +17029,7 @@ function h2(e, t) {
 function c2(e) {
   var t = e.scale.getTicks(), r = Xi(e);
   return {
-    labels: U(t, function(n, i) {
+    labels: Y(t, function(n, i) {
       return {
         level: n.level,
         formattedLabel: r(n, i),
@@ -17140,7 +17142,7 @@ var Bp = [0, 1], p2 = (
     }, e.prototype.pointToData = function(t, r) {
     }, e.prototype.getTicksCoords = function(t) {
       t = t || {};
-      var r = t.tickModel || this.getTickModel(), n = l2(this, r), i = n.ticks, a = U(i, function(s) {
+      var r = t.tickModel || this.getTickModel(), n = l2(this, r), i = n.ticks, a = Y(i, function(s) {
         return {
           coord: this.dataToCoord(this.scale.type === "ordinal" ? this.scale.getRawOrdinalNumber(s) : s),
           tickValue: s
@@ -17152,8 +17154,8 @@ var Bp = [0, 1], p2 = (
         return [];
       var t = this.model.getModel("minorTick"), r = t.get("splitNumber");
       r > 0 && r < 100 || (r = 5);
-      var n = this.scale.getMinorTicks(r), i = U(n, function(a) {
-        return U(a, function(o) {
+      var n = this.scale.getMinorTicks(r), i = Y(n, function(a) {
+        return Y(a, function(o) {
           return {
             coord: this.dataToCoord(o),
             tickValue: o
@@ -17606,7 +17608,7 @@ var w2 = (
   }()
 );
 function S0(e, t, r) {
-  var n = e.getBaseAxis(), i = e.getOtherAxis(n), a = S2(i, r), o = n.dim, s = i.dim, l = t.mapDimension(s), u = t.mapDimension(o), h = s === "x" || s === "radius" ? 1 : 0, c = U(e.dimensions, function(v) {
+  var n = e.getBaseAxis(), i = e.getOtherAxis(n), a = S2(i, r), o = n.dim, s = i.dim, l = t.mapDimension(s), u = t.mapDimension(o), h = s === "x" || s === "radius" ? 1 : 0, c = Y(e.dimensions, function(v) {
     return t.mapDimension(v);
   }), f = !1, d = t.getCalculationInfo("stackResultDimension");
   return Ei(
@@ -17998,7 +18000,7 @@ function $2(e, t, r) {
       }
     }
     if (a) {
-      var l = t.getAxis(i), u = U(a.stops, function(_) {
+      var l = t.getAxis(i), u = Y(a.stops, function(_) {
         return {
           coord: l.toGlobalCoord(l.dataToCoord(_.value)),
           color: _.color
@@ -18419,7 +18421,7 @@ function z2(e, t) {
     reset: function(r) {
       var n = r.getData(), i = r.coordinateSystem;
       if (r.pipelineContext, !!i) {
-        var a = U(i.dimensions, function(c) {
+        var a = Y(i.dimensions, function(c) {
           return n.mapDimension(c);
         }).slice(0, 2), o = a.length, s = n.getCalculationInfo("stackResultDimension");
         Ei(n, a[0]) && (a[0] = s), Ei(n, a[1]) && (a[1] = s);
@@ -18736,7 +18738,7 @@ function X2(e, t, r) {
   z(n) || (n = [n, n, n, n]);
   var i = Math.abs(t.r || 0 - t.r0 || 0);
   return {
-    cornerRadius: U(n, function(a) {
+    cornerRadius: Y(n, function(a) {
       return Ke(a, i);
     })
   };
@@ -18873,7 +18875,7 @@ var Z2 = (
       }), a.sort(function(o, s) {
         return s.mappedValue - o.mappedValue;
       }), {
-        ordinalNumbers: U(a, function(o) {
+        ordinalNumbers: Y(a, function(o) {
           return o.ordinalNumber;
         })
       };
@@ -19449,7 +19451,7 @@ var cI = (
     return e.prototype.getAxis = function(t) {
       return this._axes[t];
     }, e.prototype.getAxes = function() {
-      return U(this._dimList, function(t) {
+      return Y(this._dimList, function(t) {
         return this._axes[t];
       }, this);
     }, e.prototype.getAxesByScale = function(t) {
@@ -19920,7 +19922,7 @@ var zr = Math.PI, Vr = (
   axisTickLabel: function(e, t, r, n) {
     var i = _I(r, n, t, e), a = wI(r, n, t, e);
     if (mI(t, a, i), bI(r, n, t, e.tickDirection), t.get(["axisLabel", "hideOverlap"])) {
-      var o = y2(U(a, function(s) {
+      var o = y2(Y(a, function(s) {
         return {
           label: s,
           priority: s.z2,
@@ -20674,7 +20676,7 @@ function _c(e) {
   }
 }
 function k0(e, t) {
-  return e.visual = t, e.type === "color" && (e.parsedVisual = U(t, function(r) {
+  return e.visual = t, e.type === "color" && (e.parsedVisual = Y(t, function(r) {
     var n = we(r);
     return n || [0, 0, 0, 1];
   })), t;
@@ -20765,7 +20767,7 @@ var VI = 256, GI = (
 );
 function WI(e, t, r) {
   var n = e[1] - e[0];
-  t = U(t, function(o) {
+  t = Y(t, function(o) {
     return {
       interval: [(o.interval[0] - e[0]) / n, (o.interval[1] - e[0]) / n]
     };
@@ -21430,7 +21432,7 @@ function H0(e, t) {
       var u = l.getBaseAxis(), h = l.getOtherAxis(u), c = h.dim, f = u.dim, d = c === "x" || c === "radius" ? 1 : 0, v = a.mapDimension(f), g = [];
       g[d] = a.get(v, o), g[1 - d] = a.get(a.getCalculationInfo("stackResultDimension"), o), r = l.dataToPoint(g) || [];
     } else
-      r = l.dataToPoint(a.getValues(U(l.dimensions, function(y) {
+      r = l.dataToPoint(a.getValues(Y(l.dimensions, function(y) {
         return a.mapDimension(y);
       }), o)) || [];
   else if (s) {
@@ -22518,7 +22520,7 @@ var VL = function(e, t) {
           h = !0;
         h && qc(l) && n.push(l.name);
       }), this._availableNames = i;
-      var a = this.get("data") || n, o = Q(), s = U(a, function(l) {
+      var a = this.get("data") || n, o = Q(), s = Y(a, function(l) {
         return (H(l) || _t(l)) && (l = {
           name: l
         }), o.get(l.name) ? null : (o.set(l.name, !0), new Tt(l, this, this.ecModel));
@@ -23977,7 +23979,7 @@ var p$ = (
       this._pieceList = [], g$[this._mode].call(this, this._pieceList), this._resetSelected(r, n);
       var a = this.option.categories;
       this.resetVisual(function(o, s) {
-        i === "categories" ? (o.mappingMethod = "category", o.categories = q(a)) : (o.dataExtent = this.getExtent(), o.mappingMethod = "piecewise", o.pieceList = U(this._pieceList, function(l) {
+        i === "categories" ? (o.mappingMethod = "category", o.categories = q(a)) : (o.dataExtent = this.getExtent(), o.mappingMethod = "piecewise", o.pieceList = Y(this._pieceList, function(l) {
           return l = q(l), s !== "inRange" && (l.visual = null), l;
         }));
       });
@@ -24237,7 +24239,7 @@ var y$ = (
         })), r.add(s);
       }
     }, t.prototype._getViewData = function() {
-      var r = this.visualMapModel, n = U(r.getPieceList(), function(s, l) {
+      var r = this.visualMapModel, n = Y(r.getPieceList(), function(s, l) {
         return {
           piece: s,
           indexInModelPieceList: l
@@ -24811,7 +24813,7 @@ let yr = class extends Ht {
     })}
         <strong>${Pt(Math.abs(e.unaccounted), r)}</strong>
         ${(e.unaccounted >= 0 ? t.balance.unaccountedFor : t.balance.moreOutThanIn)({
-      share: Y(e.unaccounted_share, r)
+      share: U(e.unaccounted_share, r)
     })}
       </p>
       <p class="note">${t.balance.unaccountedNote}</p>
@@ -24822,7 +24824,7 @@ let yr = class extends Ht {
     return e.self_sufficiency === null && e.self_consumption === null ? I`<p class="empty">${t.balance.ratiosNeedCounters}</p>` : I`<div class="kpi">
       ${e.self_sufficiency !== null ? I`<div class="cell">
             <span class="label">${t.common.selfSufficiency}</span>
-            <span class="value">${Y(e.self_sufficiency, r)}</span>
+            <span class="value">${U(e.self_sufficiency, r)}</span>
             <span class="hint">
               ${i("load_energy_total") && i("grid_import_total") ? `(${Pt(n.load_energy_total, r)} − ${Pt(
       n.grid_import_total,
@@ -24832,7 +24834,7 @@ let yr = class extends Ht {
           </div>` : O}
       ${e.self_consumption !== null ? I`<div class="cell">
             <span class="label">${t.balance.selfConsumption}</span>
-            <span class="value">${Y(e.self_consumption, r)}</span>
+            <span class="value">${U(e.self_consumption, r)}</span>
             <span class="hint">
               ${i("pv_energy_total") && i("grid_export_total") ? `(${Pt(n.pv_energy_total, r)} − ${Pt(
       n.grid_export_total,
@@ -25057,7 +25059,7 @@ let ki = class extends Ht {
             <span class="value">${ft(r.mean_charge_w, this.locale)}</span>
             <span class="row">
               <span>${t.ofTheTime}</span
-              ><span>${Y(r.share_charging, this.locale)}</span>
+              ><span>${U(r.share_charging, this.locale)}</span>
             </span>
           </div>
           <div class="card">
@@ -25065,12 +25067,12 @@ let ki = class extends Ht {
             <span class="value">${ft(r.mean_discharge_w, this.locale)}</span>
             <span class="row">
               <span>${t.ofTheTime}</span>
-              <span>${Y(r.share_discharging, this.locale)}</span>
+              <span>${U(r.share_discharging, this.locale)}</span>
             </span>
           </div>
           <div class="card">
             <span class="name">${t.resting}</span>
-            <span class="value">${Y(r.share_idle, this.locale)}</span>
+            <span class="value">${U(r.share_idle, this.locale)}</span>
             <span class="row">
               <span>${t.below}</span><span>${ft(r.idle_w, this.locale)}</span>
             </span>
@@ -25085,7 +25087,7 @@ let ki = class extends Ht {
           ${r.round_trip_efficiency !== null ? I`<div class="card">
                 <span class="name">${t.roundTripEfficiency}</span>
                 <span class="value">
-                  ${Y(r.round_trip_efficiency, this.locale)}
+                  ${U(r.round_trip_efficiency, this.locale)}
                 </span>
                 <span class="row"><span>${t.outOfWhatWentIn}</span></span>
               </div>` : O}
@@ -25166,16 +25168,16 @@ let mr = class extends Ht {
     const t = this.i18n.m, r = this.i18n.locale, n = e.dips_measurable, i = [
       [
         t.battery.meanCharge,
-        Y(wn(e.kpi.mean_soc), r),
+        U(wn(e.kpi.mean_soc), r),
         t.battery.overWholePeriod
       ],
       [
         t.battery.lowestCharge,
-        n ? Y(wn(e.kpi.min_soc), r) : it,
+        n ? U(wn(e.kpi.min_soc), r) : it,
         n ? t.battery.exactDataOnly : t.battery.needsExactData
       ],
       [
-        t.battery.below({ level: Y(wn(e.low_pct), r) }),
+        t.battery.below({ level: U(wn(e.low_pct), r) }),
         n ? Kt(e.kpi.seconds_below_low, r) : it,
         n ? t.battery.exactDataOnly : t.battery.needsExactData
       ],
@@ -25186,7 +25188,7 @@ let mr = class extends Ht {
       ],
       [
         t.battery.meanLowPoint,
-        n ? Y(wn(e.kpi.mean_low_point), r) : it,
+        n ? U(wn(e.kpi.mean_low_point), r) : it,
         n ? t.battery.acrossThoseDips : t.battery.needsExactData
       ]
     ];
@@ -25216,13 +25218,13 @@ let mr = class extends Ht {
       (n) => I`<tr>
             <td>${new Date(n.start).toLocaleString(r)}</td>
             <td>${Kt(n.seconds, r)}</td>
-            <td>${Y(wn(n.lowest), r)}</td>
-            <td>${Y(wn(n.recovered_to), r)}</td>
+            <td>${U(wn(n.lowest), r)}</td>
+            <td>${U(wn(n.recovered_to), r)}</td>
           </tr>`
     )}
       </tbody>
     </table>` : I`<p class="empty">
-        ${t.battery.noEpisodes({ level: Y(wn(e.low_pct), r) })}
+        ${t.battery.noEpisodes({ level: U(wn(e.low_pct), r) })}
       </p>` : I`<p class="empty">${t.battery.dipsNotMeasurable}</p>`;
   }
   render() {
@@ -25461,7 +25463,7 @@ let _r = class extends Ht {
       return I`<p class="empty">
         ${t.grid.noOutages({ duration: Kt(e.measured_seconds, r) })}
       </p>`;
-    const n = (i) => i == null ? it : Y(i / 100, r);
+    const n = (i) => i == null ? it : U(i / 100, r);
     return I`<table>
       <thead>
         <tr>
@@ -25504,7 +25506,7 @@ let _r = class extends Ht {
   }
   /** "> 100 %": the need is past what a full battery holds. */
   overFull() {
-    return I`<span class="low">&gt; ${Y(1, this.i18n.locale)}</span>`;
+    return I`<span class="low">&gt; ${U(1, this.i18n.locale)}</span>`;
   }
   renderHoursLeft(e) {
     const t = E$(e);
@@ -25526,7 +25528,7 @@ let _r = class extends Ht {
         return I`${this.overFull()}
           <span class="hint">${this.i18n.m.grid.moreThanFull}</span>`;
       case "pct":
-        return Y(t.pct / 100, this.i18n.locale);
+        return U(t.pct / 100, this.i18n.locale);
     }
   }
   renderHardest(e) {
@@ -25538,7 +25540,7 @@ let _r = class extends Ht {
       date: new Date(n.start).toLocaleDateString(r)
     });
     return n.kind === "over" ? I`<span class="value">${this.overFull()}</span>
-          <span class="row"><span>${i}</span><span>${t.grid.moreThanFull}</span></span>` : I`<span class="value">${Y(n.pct / 100, r)}</span>
+          <span class="row"><span>${i}</span><span>${t.grid.moreThanFull}</span></span>` : I`<span class="value">${U(n.pct / 100, r)}</span>
           <span class="row"><span>${i}</span></span>`;
   }
   renderReserve(e, t) {
@@ -25555,7 +25557,7 @@ let _r = class extends Ht {
             >${i.kind === "none" ? it : r.grid.coveredOf({ covered: i.covered, judged: i.judged })}</span
           >
           <span class="row"
-            ><span>${r.grid.coveredHint({ level: Y(t / 100, n) })}</span></span
+            ><span>${r.grid.coveredHint({ level: U(t / 100, n) })}</span></span
           >
         </div>
       </div>
@@ -25578,7 +25580,7 @@ let _r = class extends Ht {
       <div class="cards">
         <div class="card">
           <span class="name"
-            >${r.grid.fromFullTo({ level: Y(t / 100, n) })}</span
+            >${r.grid.fromFullTo({ level: U(t / 100, n) })}</span
           >
           <span class="value">${_a(e.hours_from_full, n)}</span>
         </div>
@@ -25588,7 +25590,7 @@ let _r = class extends Ht {
           <span class="row">
             <span>${r.grid.chargeNow}</span>
             <span
-              >${e.soc_now === null ? it : Y(e.soc_now / 100, n)}</span
+              >${e.soc_now === null ? it : U(e.soc_now / 100, n)}</span
             >
           </span>
         </div>
@@ -25739,7 +25741,7 @@ Vn([
 _r = Vn([
   xe("ia-grid-tab")
 ], _r);
-const W$ = 0.02, U$ = 3, eb = 20, Y$ = 6, rb = 10, nb = 5, ib = 1, X$ = 100, q$ = 0.8, Z$ = 0.95, ty = [
+const W$ = 0.02, U$ = 3, eb = 20, Y$ = 6, rb = 10, nb = 5, ib = 1, X$ = 100, q$ = 0.8, Z$ = 0.95, K$ = 0.1, ty = [
   { key: "capacity", signals: ["capacity"] },
   { key: "efficiency", signals: ["efficiency"] },
   { key: "solar", signals: ["solar_energy", "best_hour"] },
@@ -25748,11 +25750,11 @@ const W$ = 0.02, U$ = 3, eb = 20, Y$ = 6, rb = 10, nb = 5, ib = 1, X$ = 100, q$ 
 function Mc(e, t) {
   return e.months[t]?.value ?? null;
 }
-function K$(e) {
+function j$(e) {
   const [t, r] = e.split("-");
   return `${Number(t) - 1}-${r}`;
 }
-function j$(e, t) {
+function Q$(e, t) {
   const r = e.signals[t];
   return [...new Set(e.months.map((i) => Number(i.slice(0, 4))))].sort(
     (i, a) => i - a
@@ -25764,10 +25766,10 @@ function j$(e, t) {
     )
   })).filter((i) => i.values.some((a) => a !== null));
 }
-function Q$(e, t) {
+function J$(e, t) {
   const r = e.signals[t];
   return e.months.slice(-ab).map((n) => {
-    const i = Mc(r, n), a = Mc(r, K$(n));
+    const i = Mc(r, n), a = Mc(r, j$(n));
     let o = null, s = null;
     return i !== null && a !== null && (o = i - a, a !== 0 && (s = o / a)), {
       key: n,
@@ -25779,7 +25781,7 @@ function Q$(e, t) {
     };
   });
 }
-function J$(e) {
+function tP(e) {
   const { recent_mean: t, previous_mean: r, change: n, recent_months: i, previous_months: a } = e.comparison;
   return t === null || r === null || n === null ? {
     kind: "notEnough",
@@ -25794,10 +25796,10 @@ function J$(e) {
     share: r === 0 ? null : n / r
   };
 }
-function tP(e) {
+function eP(e) {
   return e.best_hour_mode === "all" && e.export_limited === !1 ? "exporting" : e.best_hour_mode;
 }
-function eP(e) {
+function rP(e) {
   return e.export_limited === !0 ? "household" : "array";
 }
 function fi(e, t, r) {
@@ -25813,7 +25815,7 @@ function us(e, t, r, n) {
     case "solar_energy":
       return Pt(t, n);
     case "efficiency":
-      return Y(t, n);
+      return U(t, n);
     case "best_hour":
       return ft(t, n);
     case "inverter":
@@ -25837,8 +25839,8 @@ function ey(e, t, r, n) {
 function ry(e, t) {
   return e === null ? it : `${fi(e * 100, 1, t)}%`;
 }
-function rP(e, t, r) {
-  const n = j$(e, t), i = (a) => n.map((o) => ({
+function nP(e, t, r) {
+  const n = Q$(e, t), i = (a) => n.map((o) => ({
     year: o.year,
     values: o.values.map((s) => s === null ? null : s * a)
   }));
@@ -25854,7 +25856,7 @@ function rP(e, t, r) {
       return { lines: n, unit: r.units.h };
   }
 }
-function nP(e, t, r, n) {
+function iP(e, t, r, n) {
   return t !== "capacity" || e.nameplate_kwh === null ? null : {
     value: e.nameplate_kwh,
     name: r.health.nameplate({ value: Pt(e.nameplate_kwh, n) })
@@ -25863,13 +25865,13 @@ function nP(e, t, r, n) {
 function As(e, t) {
   return new Intl.NumberFormat(t, { maximumFractionDigits: 2 }).format(e);
 }
-function iP(e) {
+function aP(e) {
   return Math.floor(e * 1e3) / 1e3;
 }
 function ny(e, t, r) {
   return t !== "efficiency" || r?.drift_corrected !== !0 ? null : e.health.driftCorrected;
 }
-function aP(e, t, r, n) {
+function oP(e, t, r, n) {
   const i = e.health.reasons;
   switch (t) {
     case "too_few_clean_hours":
@@ -25887,10 +25889,12 @@ function aP(e, t, r, n) {
       return i.drift({ points: As(nb, n) });
     case "too_little_throughput":
       return i.too_little_throughput({ min: Pt(ib, n) });
+    case "drift_uncorrectable":
+      return i.drift_uncorrectable;
     case "partial_month":
       return r?.coverage === void 0 ? i.partial_month : i.partialCoverage({
-        share: Xe(iP(r.coverage), n),
-        needed: Y(Z$, n)
+        share: Xe(aP(r.coverage), n),
+        needed: U(Z$, n)
       });
     case "curtailed":
       return i.curtailed({
@@ -25899,7 +25903,7 @@ function aP(e, t, r, n) {
       });
   }
 }
-function oP(e, t, r = !1) {
+function sP(e, t, r = !1) {
   const n = e.health.definitions;
   return {
     capacity: n.capacity({
@@ -25909,19 +25913,20 @@ function oP(e, t, r = !1) {
     }),
     efficiency: n.efficiency({
       points: As(nb, t),
-      min: Pt(ib, t)
+      min: Pt(ib, t),
+      share: U(K$, t)
     }),
     solar: n.solar({
       minHours: rb,
       minPower: ft(X$, t)
     }) + (r ? ` ${n.solarDerived}` : ""),
-    inverter: n.inverter({ share: Y(q$, t) })
+    inverter: n.inverter({ share: U(q$, t) })
   };
 }
-var sP = Object.defineProperty, lP = Object.getOwnPropertyDescriptor, Zi = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? lP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var lP = Object.defineProperty, uP = Object.getOwnPropertyDescriptor, Zi = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? uP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && sP(t, r, i), i;
+  return n && i && lP(t, r, i), i;
 };
 let Ur = class extends Ht {
   constructor() {
@@ -25962,7 +25967,7 @@ let Ur = class extends Ht {
     </p>`;
   }
   renderComparison(e, t) {
-    const r = this.i18n.m, n = this.i18n.locale, i = J$(e.signals[t]);
+    const r = this.i18n.m, n = this.i18n.locale, i = tP(e.signals[t]);
     return i.kind === "notEnough" ? I`<div class="figure">
         <span class="label">${r.health.lastTwelve}</span>
         <p class="note">
@@ -25990,7 +25995,7 @@ let Ur = class extends Ht {
     </div>`;
   }
   renderTable(e, t) {
-    const r = this.i18n.m, n = this.i18n.locale, i = Q$(e, t), a = e.signals[t].months;
+    const r = this.i18n.m, n = this.i18n.locale, i = J$(e, t), a = e.signals[t].months;
     return I`<div class="table-wrap">
       <table>
         <thead>
@@ -26009,7 +26014,7 @@ let Ur = class extends Ht {
               <td>${Ua(o.key, void 0, n)}</td>
               <td>
                 ${us(t, o.value, r, n)}
-                ${o.reason !== null ? I`<span class="hint">${aP(r, o.reason, s, n)}</span>` : O}
+                ${o.reason !== null ? I`<span class="hint">${oP(r, o.reason, s, n)}</span>` : O}
                 ${ny(r, t, s) !== null ? I`<span class="hint">${ny(r, t, s)}</span>` : O}
                 ${t === "inverter" && s?.measured_hours !== void 0 ? I`<span class="hint"
                       >${r.health.inverterHint({
@@ -26030,17 +26035,17 @@ let Ur = class extends Ht {
   /** The captions a signal's chart carries beneath it. */
   renderCaptions(e, t) {
     const r = this.i18n.m;
-    return t === "capacity" && e.nameplate_kwh !== null ? I`<p class="note">${r.health.nameplateNote}</p>` : t === "solar_energy" ? I`<p class="note">${r.health.energyCaption[eP(e)]}</p>` : t === "best_hour" ? I`<p class="note">${r.health.bestHourCaption[tP(e)]}</p>` : O;
+    return t === "capacity" && e.nameplate_kwh !== null ? I`<p class="note">${r.health.nameplateNote}</p>` : t === "solar_energy" ? I`<p class="note">${r.health.energyCaption[rP(e)]}</p>` : t === "best_hour" ? I`<p class="note">${r.health.bestHourCaption[eP(e)]}</p>` : O;
   }
   renderSignal(e, t, r) {
     const n = this.i18n.m, i = this.i18n.locale, a = e.signals[t], o = r ? I`<h3>${n.health.signals[t]}</h3>` : O;
     if (a.missing.length)
       return I`${o}${this.renderMissing(a.missing)}`;
-    const { lines: s, unit: l } = rP(e, t, n);
+    const { lines: s, unit: l } = nP(e, t, n);
     return I`
       ${o} ${this.renderComparison(e, t)}
       <ia-chart
-        .option=${Sw(s, l, n, nP(e, t, n, i))}
+        .option=${Sw(s, l, n, iP(e, t, n, i))}
         height="240px"
       ></ia-chart>
       ${this.renderCaptions(e, t)} ${this.renderTable(e, t)}
@@ -26062,7 +26067,7 @@ let Ur = class extends Ht {
       </div>`;
     if (!this.payload)
       return I`<div class="notice">${e.common.computing}</div>`;
-    const t = this.payload, r = this.i18n.locale, n = oP(e, r, t.pv_power_derived);
+    const t = this.payload, r = this.i18n.locale, n = sP(e, r, t.pv_power_derived);
     return I`
       <div class="status">
         <span class="badge"
@@ -26173,10 +26178,10 @@ Ur = Zi([
 function ob(e, t) {
   return t === void 0 || t <= e ? null : { shown: e, total: t };
 }
-var uP = Object.defineProperty, hP = Object.getOwnPropertyDescriptor, Gl = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? hP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var hP = Object.defineProperty, cP = Object.getOwnPropertyDescriptor, Gl = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? cP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && uP(t, r, i), i;
+  return n && i && hP(t, r, i), i;
 };
 let Ni = class extends Ht {
   constructor() {
@@ -26199,11 +26204,11 @@ let Ni = class extends Ht {
           >
           <span class="row"
             ><span>${t.shareOfLoad}</span
-            ><span>${Y(n.share, this.locale)}</span></span
+            ><span>${U(n.share, this.locale)}</span></span
           >
           <span class="row">
             <span>${t.peakVs({ rating: ft(r, this.locale) })}</span>
-            <span>${Y(n.headroom, this.locale)}</span>
+            <span>${U(n.headroom, this.locale)}</span>
           </span>
           ${i !== void 0 && i < 0.95 ? I`<span class="warn">
                 ${e.common.coversOfPeriod({ share: Xe(i, this.locale) })}
@@ -26220,17 +26225,17 @@ let Ni = class extends Ht {
       <div class="cards">
         <div class="card">
           <span class="name">${t.meanImbalance}</span>
-          <span class="value">${Y(r.mean, this.locale)}</span>
+          <span class="value">${U(r.mean, this.locale)}</span>
         </div>
         <div class="card">
           <span class="name">${t.p95Imbalance}</span>
-          <span class="value">${Y(r.p95, this.locale)}</span>
+          <span class="value">${U(r.p95, this.locale)}</span>
         </div>
         <div class="card">
           <span class="name">
-            ${t.above({ threshold: Y(r.threshold, this.locale) })}
+            ${t.above({ threshold: U(r.threshold, this.locale) })}
           </span>
-          <span class="value">${Y(r.fraction_above, this.locale)}</span>
+          <span class="value">${U(r.fraction_above, this.locale)}</span>
           <span class="row"><span>${t.ofMeasuredTime}</span></span>
         </div>
       </div>
@@ -26265,7 +26270,7 @@ let Ni = class extends Ht {
       (a) => I`<tr>
             <td>${new Date(a.start).toLocaleString(this.locale)}</td>
             <td>${Kt(a.seconds, this.locale)}</td>
-            <td>${Y(a.peak_imbalance, this.locale)}</td>
+            <td>${U(a.peak_imbalance, this.locale)}</td>
             ${a.phases.map((o) => I`<td>${ft(o, this.locale)}</td>`)}
           </tr>`
     )}
@@ -26311,10 +26316,10 @@ Gl([
 Ni = Gl([
   xe("ia-phases-section")
 ], Ni);
-var cP = Object.defineProperty, fP = Object.getOwnPropertyDescriptor, Wl = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? fP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var fP = Object.defineProperty, dP = Object.getOwnPropertyDescriptor, Wl = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? dP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && cP(t, r, i), i;
+  return n && i && fP(t, r, i), i;
 };
 let Bi = class extends Ht {
   constructor() {
@@ -26337,7 +26342,7 @@ let Bi = class extends Ht {
               >
               <span class="row"
                 ><span>${t.shareOfPv}</span
-                ><span>${Y(i.share, this.locale)}</span></span
+                ><span>${U(i.share, this.locale)}</span></span
               >
               ${a !== void 0 && a < 0.95 ? I`<span class="warn">
                     ${e.common.coversOfPeriod({ share: Xe(a, this.locale) })}
@@ -26367,10 +26372,10 @@ Wl([
 Bi = Wl([
   xe("ia-strings-section")
 ], Bi);
-var dP = Object.defineProperty, vP = Object.getOwnPropertyDescriptor, qr = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? vP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var vP = Object.defineProperty, pP = Object.getOwnPropertyDescriptor, qr = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? pP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && dP(t, r, i), i;
+  return n && i && vP(t, r, i), i;
 };
 let Je = class extends Ht {
   constructor() {
@@ -26421,7 +26426,7 @@ let Je = class extends Ht {
     </span>`;
   }
   renderKpi(e) {
-    const t = this.i18n.m, r = this.i18n.locale, n = (a) => a === null ? "" : t.load.shareOfRated({ share: Y(a / e.rated_power, r) }), i = [
+    const t = this.i18n.m, r = this.i18n.locale, n = (a) => a === null ? "" : t.load.shareOfRated({ share: U(a / e.rated_power, r) }), i = [
       [t.load.mean, ft(e.kpi.mean, r), n(e.kpi.mean)],
       [t.load.median, ft(e.kpi.median, r), ""],
       ["P95", ft(e.kpi.p95, r), ""],
@@ -26429,7 +26434,7 @@ let Je = class extends Ht {
       [t.load.sustained15m, ft(e.kpi.max_sustained_15m, r), ""],
       [
         t.load.above80OfRated,
-        Y(e.kpi.fraction_above_80pct, r),
+        U(e.kpi.fraction_above_80pct, r),
         t.load.ofTime
       ]
     ];
@@ -26602,10 +26607,10 @@ qr([
 Je = qr([
   xe("ia-load-tab")
 ], Je);
-var pP = Object.defineProperty, gP = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? gP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var gP = Object.defineProperty, yP = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? yP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && pP(t, r, i), i;
+  return n && i && gP(t, r, i), i;
 };
 let br = class extends Ht {
   constructor() {
@@ -26657,7 +26662,7 @@ let br = class extends Ht {
             <td>${ft(i.load_mean, r)}</td>
             <td>${ft(i.load_peak_hourly, r)}</td>
             ${e.has_pv ? I`<td>${ft(i.pv_mean, r)}</td>` : O}
-            <td>${Y(i.coverage, r)}</td>
+            <td>${U(i.coverage, r)}</td>
           </tr>`
     )}
       </tbody>
@@ -26688,7 +26693,7 @@ let br = class extends Ht {
         ${i.length ? I`<p class="note">
               ${e.seasonality.thinMonths({
       n: i.length,
-      share: Y(t.incomplete_below, r)
+      share: U(t.incomplete_below, r)
     })}
               ${e.seasonality.partialNotLower}
             </p>` : O}
@@ -26790,27 +26795,27 @@ function iy(e, t) {
 function ay(e, t, r, n) {
   return t === "battery" && r === "never_full" ? n === "ceiling" ? e.verdict.neverReachedLimit : e.verdict.neverFull : t === "solar" && r === "no_fill" ? e.verdict.noFill : e.verdict.noData[t];
 }
-function yP(e, t, r, n) {
+function mP(e, t, r, n) {
   return t === "battery" && r === "never_full" ? n === "ceiling" ? e.verdict.hintLimitNotReached : e.verdict.hintNeverFilled : t === "solar" && r === "no_fill" ? e.verdict.hintNoFill : e.verdict.hintNoData;
 }
-function mP(e) {
+function _P(e) {
   const t = e.period.solar;
   if (t) return typeof t.evidence.fill_share == "number";
   const r = e.cards.battery;
   return !r.missing.length && !r.thresholds_inverted;
 }
-function _P(e) {
-  return e.rules.export_limited === !0 ? e.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : mP(e) ? "with_fill" : "plain";
+function bP(e) {
+  return e.rules.export_limited === !0 ? e.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : _P(e) ? "with_fill" : "plain";
 }
-function bP(e, t, r, n) {
+function wP(e, t, r, n) {
   if (t === !0) {
     const a = r.fill_share;
-    return a == null ? it : e.sizing.filledOnDays({ share: Y(a, n) });
+    return a == null ? it : e.sizing.filledOnDays({ share: U(a, n) });
   }
   const i = r.production_share;
-  return i == null ? it : e.sizing.ofLoad({ share: Y(i, n) });
+  return i == null ? it : e.sizing.ofLoad({ share: U(i, n) });
 }
-function wP(e, t, r) {
+function SP(e, t, r) {
   if (t.cards.battery.missing.includes("battery_soc")) return null;
   const n = t.rules;
   if (n.full_mode === "ceiling") return e.sizing.fullModeCeiling;
@@ -26820,13 +26825,13 @@ function wP(e, t, r) {
   const a = n.ceiling_no_rows ?? [];
   return a.length ? e.sizing.fullModeNoRows({ full: r, roles: Rn(e, a, !0), n: a.length }) : e.sizing.fullModePlain({ full: r });
 }
-var SP = Object.defineProperty, xP = Object.getOwnPropertyDescriptor, Wn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? xP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var xP = Object.defineProperty, TP = Object.getOwnPropertyDescriptor, Wn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? TP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && SP(t, r, i), i;
+  return n && i && xP(t, r, i), i;
 };
-const TP = ["inverter", "battery", "solar"];
-function CP(e, t) {
+const CP = ["inverter", "battery", "solar"];
+function MP(e, t) {
   const [r, n] = e.split("-").map(Number);
   return new Date(r, n - 1, 1).toLocaleDateString(t, {
     month: "short",
@@ -26861,14 +26866,14 @@ let wr = class extends Ht {
     return e === "inverter" ? i.sizing.hoursAtRated({ hours: `${a.hours_at_rated ?? 0}` }) : e === "battery" ? i.sizing.daysOf({
       days: `${a.days_full_and_low ?? 0}`,
       total: a.days_with_data ?? 0
-    }) : bP(i, r.rules.export_limited, a, n);
+    }) : wP(i, r.rules.export_limited, a, n);
   }
   renderEvidence(e, t, r, n) {
     const i = this.i18n.m, a = t.evidence, o = (l, u) => i.sizing.countOf({ count: `${l ?? it}`, total: `${u ?? it}` }), s = (l, u) => I`<span class="row"><span>${l}</span><span>${u}</span></span>`;
     return e === "inverter" ? I`
         ${s(i.sizing.hoursReachedRated, o(a.hours_at_rated, a.measured_hours))}
         ${s(
-      i.sizing.hoursAboveOfRated({ share: Y(r.high_load_share, n) }),
+      i.sizing.hoursAboveOfRated({ share: U(r.high_load_share, n) }),
       `${a.hours_above_high ?? it}`
     )}
         ${s(i.sizing.highestPeak, ft(a.peak_w ?? null, n))}
@@ -26878,12 +26883,12 @@ let wr = class extends Ht {
         ${s(i.sizing.daysFilled, `${a.days_full ?? it}`)}
         ${s(
       i.sizing.lowestCharge,
-      a.lowest_pct === null || a.lowest_pct === void 0 ? it : Y(a.lowest_pct / 100, n)
+      a.lowest_pct === null || a.lowest_pct === void 0 ? it : U(a.lowest_pct / 100, n)
     )}
       ` : I`
       ${s(
       i.sizing.productionShare,
-      a.production_share === null || a.production_share === void 0 ? it : Y(a.production_share, n)
+      a.production_share === null || a.production_share === void 0 ? it : U(a.production_share, n)
     )}
       ${s(
       i.sizing.producedConsumed,
@@ -26891,11 +26896,11 @@ let wr = class extends Ht {
     )}
       ${s(
       i.common.selfSufficiency,
-      a.self_sufficiency === null || a.self_sufficiency === void 0 ? it : Y(a.self_sufficiency, n)
+      a.self_sufficiency === null || a.self_sufficiency === void 0 ? it : U(a.self_sufficiency, n)
     )}
       ${s(
       i.sizing.daysBatteryFilled,
-      a.fill_share === null || a.fill_share === void 0 ? it : Y(a.fill_share, n)
+      a.fill_share === null || a.fill_share === void 0 ? it : U(a.fill_share, n)
     )}
     `;
   }
@@ -26913,7 +26918,7 @@ let wr = class extends Ht {
    * condition the verdict never tested.
    */
   ruleSentence(e, t, r) {
-    const n = this.i18n.m, i = t.rules, a = (l) => Y(l, r);
+    const n = this.i18n.m, i = t.rules, a = (l) => U(l, r);
     if (e === "inverter")
       return n.sizing.inverterRule({
         shortShare: a(i.inverter_short_share),
@@ -26930,7 +26935,7 @@ let wr = class extends Ht {
         share: a(i.battery_short_share)
       });
     const o = a(i.solar_enough_share), s = a(i.solar_borderline_share);
-    switch (_P(t)) {
+    switch (bP(t)) {
       case "no_export":
         return n.sizing.solarRuleNoExport({
           fill: a(i.solar_fill_share),
@@ -26976,8 +26981,8 @@ let wr = class extends Ht {
     if (i.thresholds_inverted)
       return I`<p class="note">
         ${r.sizing.thresholdsInverted({
-        full: Y(t.rules.full_pct / 100, n),
-        low: Y(t.rules.low_pct / 100, n)
+        full: U(t.rules.full_pct / 100, n),
+        low: U(t.rules.low_pct / 100, n)
       })}
       </p>`;
     if (i.no_statistics.length) {
@@ -27020,7 +27025,7 @@ let wr = class extends Ht {
         ${this.renderCoverageNote(i, t)}
         ${i.note === "covers_but_battery_not_filling" ? I`<p class="note">
               ${r.sizing.batteryNotFilling({
-      share: Y(i.evidence.fill_share ?? 0, n)
+      share: U(i.evidence.fill_share ?? 0, n)
     })}
             </p>` : O}
         <p class="note">${this.ruleSentence(e, t, n)}</p>
@@ -27045,7 +27050,7 @@ let wr = class extends Ht {
         // rule working, a month with no statistics is missing data, and
         // "No verdict" alone reads the same for both.
         I`<span class="hint"
-              >${yP(t, i, o.reason ?? "no_data", e.rules.full_mode)}</span
+              >${mP(t, i, o.reason ?? "no_data", e.rules.full_mode)}</span
             >`
       ) : I`<span class="hint">${this.cellFigure(i, o, e, r)}</span>`}
         ${s ? I`<span class="hint"
@@ -27066,7 +27071,7 @@ let wr = class extends Ht {
         ${e.months.map(
       (i) => I`<tr class=${i.complete ? "" : "partial"}>
             <td>
-              ${CP(i.key, r)}
+              ${MP(i.key, r)}
               ${i.coverage === 0 ? I`<span class="hint">${t.verdict.hintNoData}</span>` : i.complete ? O : I`<span class="hint"
                       >${t.sizing.ofTheMonth({
         share: Xe(i.coverage, r)
@@ -27091,7 +27096,7 @@ let wr = class extends Ht {
     const t = this.payload, r = this.i18n.locale, n = (a) => e.sizing.ruleLine({
       part: e.sizing.parts[a],
       rule: this.ruleSentence(a, t, r)
-    }), i = wP(e, t, Y(t.rules.full_pct / 100, r));
+    }), i = SP(e, t, U(t.rules.full_pct / 100, r));
     return I`
       <div class="status">
         <span class="badge">${e.balance.hourlyStatistics}</span>
@@ -27107,14 +27112,14 @@ let wr = class extends Ht {
       </div>
 
       <section>
-        <div class="cards">${TP.map((a) => this.renderCard(a, t))}</div>
+        <div class="cards">${CP.map((a) => this.renderCard(a, t))}</div>
       </section>
 
       <section>
         <h2>${e.seasonality.monthByMonth}</h2>
         ${this.renderMonths(t)}
         <p class="note">
-          ${e.sizing.greyMonths({ share: Y(t.incomplete_below, r) })}
+          ${e.sizing.greyMonths({ share: U(t.incomplete_below, r) })}
         </p>
       </section>
 
@@ -27218,12 +27223,12 @@ Wn([
 wr = Wn([
   xe("ia-sizing-tab")
 ], wr);
-var MP = Object.defineProperty, DP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? DP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var DP = Object.defineProperty, AP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? AP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && MP(t, r, i), i;
+  return n && i && DP(t, r, i), i;
 };
-const AP = "/inverter-analytics", oy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
+const IP = "/inverter-analytics", oy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
 let ke = class extends Ht {
   constructor() {
     super(...arguments), this.narrow = !1, this.tab = "load", this.range = "30d", this.i18n = new Ne(this), this.readLocation = () => {
@@ -27252,7 +27257,7 @@ let ke = class extends Ht {
    * a filter before leaving the page.
    */
   writeLocation(e = !1) {
-    const t = nw(AP, {
+    const t = nw(IP, {
       tab: this.tab,
       range: this.range,
       entryId: this.entryId

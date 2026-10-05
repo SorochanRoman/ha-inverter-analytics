@@ -119,10 +119,16 @@ efficiency = (discharged + stored_kwh) / charged
 one is energy that came out of what was there before. Such a month carries
 `drift_corrected: true` with `reason: null`, and the panel marks its figure
 as corrected for the change in the battery's charge; the throughput check still
-applies. Without a capacity figure for that month — or if the correction
-would leave nothing discharged — the reason stays `drift`. Five points of a
-31 kWh battery is about 1.5 kWh, against hundreds of kWh of monthly
-throughput.
+applies. Without a capacity figure for that month the reason stays `drift`.
+The correction is trusted only while `abs(stored_kwh)` is at most
+`DRIFT_CORRECTION_MAX_SHARE = 0.1` of the month's charge, and only if it
+leaves something discharged; otherwise the month is withheld with
+`drift_uncorrectable` — the charge moved too far against the throughput for
+the drift to be a correction rather than the month's figure. Five points of
+a 31 kWh battery is about 1.5 kWh, against hundreds of kWh of monthly
+throughput. The twelve-against-twelve comparison mixes corrected and
+uncorrected months on purpose: each corrected figure is bounded to a small
+share of its month's throughput, so it is as comparable as any other month.
 
 ### 4.3 Solar production, and the best hour
 
