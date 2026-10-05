@@ -116,17 +116,44 @@ describe("year lines", () => {
   });
 
   it("draws a withheld month as a gap", () => {
-    const data = payload(["2025-01"], {
-      efficiency: signal({ months: { "2025-01": { value: null, reason: "drift" } } }),
+    const data = payload(["2025-01", "2025-02"], {
+      efficiency: signal({
+        months: {
+          "2025-01": { value: null, reason: "drift" },
+          "2025-02": { value: 0.9, reason: null },
+        },
+      }),
     });
     expect(yearLines(data, "efficiency")[0].values[0]).toBeNull();
   });
 
-  it("gives every year in the months even when the signal has none", () => {
+  it("leaves out a year with no figure for the signal", () => {
+    const data = payload(monthsBetween("2023-01", "2025-02"), {
+      capacity: signal({
+        months: {
+          "2023-05": { value: null, reason: "too_few_clean_hours", clean_hours: 3 },
+          "2025-02": { value: 9.8, reason: null, clean_hours: 25 },
+        },
+      }),
+    });
+    expect(yearLines(data, "capacity").map((line) => line.year)).toEqual([2025]);
+  });
+
+  it("keeps a year with a single figure", () => {
+    const data = payload(monthsBetween("2024-06", "2025-02"), {
+      solar_energy: signal({
+        months: {
+          "2024-12": { value: 40, reason: null },
+          "2025-01": { value: 55, reason: null },
+        },
+      }),
+    });
+    expect(yearLines(data, "solar_energy").map((line) => line.year)).toEqual([2024, 2025]);
+  });
+
+  it("draws no line at all when the signal has no figure", () => {
     const data = payload(monthsBetween("2024-11", "2025-02"));
-    const lines = yearLines(data, "inverter");
-    expect(lines.map((line) => line.year)).toEqual([2024, 2025]);
-    expect(lines.every((line) => line.values.every((value) => value === null))).toBe(true);
+    expect(yearLines(data, "inverter")).toEqual([]);
   });
 });
 

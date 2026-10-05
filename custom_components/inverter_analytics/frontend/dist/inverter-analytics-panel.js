@@ -25729,7 +25729,7 @@ function U$(e, t) {
       { length: rb },
       (a, o) => Tc(r, `${i}-${String(o + 1).padStart(2, "0")}`)
     )
-  }));
+  })).filter((i) => i.values.some((a) => a !== null));
 }
 function Y$(e, t) {
   const r = e.signals[t];

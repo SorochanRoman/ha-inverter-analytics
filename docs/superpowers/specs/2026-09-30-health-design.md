@@ -193,6 +193,7 @@ there is nothing more the data can say about the inverter itself.
 
 Every signal is drawn as one line per year over the twelve months of the
 year, so that the same month of different years stands in one vertical.
+A year with no figure for the signal draws no line and is not in the legend.
 Under each chart, a table of the last twelve months with the same month a
 year earlier beside it and the difference, in the signal's unit and as a
 share.

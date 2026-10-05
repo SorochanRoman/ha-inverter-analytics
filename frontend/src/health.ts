@@ -84,19 +84,23 @@ function yearEarlier(key: string): string {
 /**
  * One line per calendar year in the payload's months, so the same month of
  * different years stands in one vertical. A month the signal does not have,
- * or withholds, is null: a gap in the record must look like a gap.
+ * or withholds, is null: a gap in the record must look like a gap. A year
+ * with no figure at all for the signal is left out, so the legend does not
+ * name years the record holds nothing for.
  */
 export function yearLines(payload: HealthPayload, signal: HealthSignalKey): YearLine[] {
   const data = payload.signals[signal];
   const years = [...new Set(payload.months.map((key) => Number(key.slice(0, 4))))].sort(
     (a, b) => a - b,
   );
-  return years.map((year) => ({
-    year,
-    values: Array.from({ length: MONTHS_IN_YEAR }, (_, index) =>
-      valueOf(data, `${year}-${String(index + 1).padStart(2, "0")}`),
-    ),
-  }));
+  return years
+    .map((year) => ({
+      year,
+      values: Array.from({ length: MONTHS_IN_YEAR }, (_, index) =>
+        valueOf(data, `${year}-${String(index + 1).padStart(2, "0")}`),
+      ),
+    }))
+    .filter((line) => line.values.some((value) => value !== null));
 }
 
 /**
