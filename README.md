@@ -11,7 +11,8 @@ beyond pointing the integration at the ones you already have.
   highest sustained 15-minute load, share of time above 80% of rated
   power), a histogram of how much time the inverter spends at each power
   level, a load duration curve, a breakdown across rated-power bands, and
-  a table of overload episodes. The period picker (24 h / 7 days /
+  a table of overload episodes (the twenty longest, in time order, with
+  the full count under it). The period picker (24 h / 7 days /
   30 days / this month / year) and the inverter selector live in the same
   header, and the selected tab, period and inverter are kept in the URL,
   so a reload or a shared link lands where you left off.
@@ -19,13 +20,15 @@ beyond pointing the integration at the ones you already have.
   tab gains a Phases section: mean, P95, peak, share of load and headroom
   against the per-phase limit for each phase, the distribution of the
   imbalance between them, how much time it spent above a threshold, and
-  the sustained episodes with each phase's power at the worst moment.
+  the sustained episodes with each phase's power at the worst moment (the
+  twenty longest, with the full count).
   Imbalance is measured only while total load is above a floor — at
   standby power a few watts of difference is a large percentage and means
   nothing — and the page says how much time that excluded.
 - **PV string comparison.** With more than one string mapped, each one's
   mean, peak and share of production side by side. A string consistently
   below its neighbour points at shading, orientation or a fault.
+  Without a total PV power sensor, PV power is summed from the strings.
 - **Sensor detection.** The wizard looks at what is already in your
   installation, offers the inverters it recognises, and fills the mapping
   in for you — including phases in the right order and PV strings. Where
@@ -125,7 +128,9 @@ beyond pointing the integration at the ones you already have.
   nameplate capacity is drawn as a reference line and never multiplied in,
   and a system that does not export is told that its energy measures the
   household, not the array. The current month is usually among the withheld
-  ones: part of a month is not set beside a whole one.
+  ones: part of a month is not set beside a whole one. A month whose charge
+  ended far from where it began has its efficiency corrected with that
+  month's measured capacity, and is marked as corrected.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to

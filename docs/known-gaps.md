@@ -115,6 +115,18 @@ the defect was only visible on screen.
    comparison drew two unlabelled colours — while a unit test asserted
    `legend.data` was present and passed. Every option builder is now checked
    against the set of keys the registered components can render.
+19. **Axis names cut off.** ECharts' `containLabel` makes room for tick labels,
+    not axis names: "% of time" lost its top above a 24 px grid, and an x-axis
+    name at the end of its axis ran off the right edge. The grid now starts
+    40 px down (64 px under a legend) and x-axis names sit centred under the
+    labels, checked for every option builder.
+20. **The Health legend named 2021–2023 for a history that starts in 2024.**
+    A year with no figure for the signal is no longer drawn.
+21. **"104% of load" under a Sun verdict on a no-export system**, whose verdict
+    was read from the days the battery filled. The month cell now shows that
+    share.
+22. **Empty reserve cards in a period without outages.** They are hidden; the
+    autonomy sentence already says there were none.
 
 ## 3. Still unverified
 
