@@ -1089,7 +1089,7 @@ const kb = {
       no_soc: "No state of charge this month, so there is no telling whether the battery ended where it began.",
       counters_partial: "The charge and discharge counters do not cover the same hours this month, so what went in and what came out are not from the same span.",
       soc_partial: "The state of charge covers only part of the hours the counters do, so the check that the battery ended where it began would not cover the same span.",
-      drift: (e) => `The charge ended more than ${e.points} points from where it began, so part of what came out went in another month, or the reverse.`,
+      drift: (e) => `The charge ended more than ${e.points} points from where it began, so part of what came out went in another month, or the reverse — and there is no capacity figure for this month to correct it with.`,
       too_little_throughput: (e) => `Less than ${e.min} went into the battery this month — too little to read an efficiency from.`,
       partial_month: "Only part of this month has statistics, and a part is not compared with a whole month.",
       curtailed: (e) => `${At("en", e.n, {
@@ -1115,7 +1115,7 @@ const kb = {
     howRead: "How these are read",
     definitions: {
       capacity: (e) => `Usable capacity comes from clean discharge hours: hours in which the charge counter moved by at most ${e.charge}, the discharge counter moved, and the state of charge fell by at least ${e.drop} points. The discharge over the fall is the energy per point; times a hundred, the capacity. A month needs ${e.minHours} such hours. A recalibration by the BMS inside one can only pull a month's figure down.`,
-      efficiency: (e) => `Round-trip efficiency is what came out of the battery over what went in, from the counters' monthly sums. A month has no figure when its charge ended more than ${e.points} points from where it began, or when less than ${e.min} went in.`,
+      efficiency: (e) => `Round-trip efficiency is what came out of the battery over what went in, from the counters' monthly sums. When a month's charge ended more than ${e.points} points from where it began, the difference is corrected with that month's measured capacity; without one the month has no figure. Nor has a month into which less than ${e.min} went.`,
       solar: (e) => `Solar production is the PV counter's energy per month. The best hour is the month's highest hourly peak of PV power — close to a clear-sky figure. Hours the system could not take are left out, and a month needs ${e.minHours} other hours of sun at or above ${e.minPower}.`,
       // Appended to solar when no total PV power is mapped.
       solarDerived: "This system has no total PV power sensor, so PV power is the sum of its strings. An hour counts only when every string has statistics for it, and its peak is summed from the strings' own peaks: they need not peak at the same moment, so the best hour can read a little above the array's true peak.",
@@ -1579,7 +1579,7 @@ const kb = {
       no_soc: "За цей місяць немає рівня заряду, тож не видно, чи батарея закінчила там, де почала.",
       counters_partial: "Лічильники заряду й розряду цього місяця покривають різні години, тож те, що надійшло, і те, що вийшло, взято не з того самого проміжку.",
       soc_partial: "Рівень заряду покриває лише частину годин, які покривають лічильники, тож перевірка, чи батарея закінчила там, де почала, охопила б інший проміжок.",
-      drift: (e) => `Заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, тож частина того, що вийшло, увійшла в іншому місяці, або навпаки.`,
+      drift: (e) => `Заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, тож частина того, що вийшло, увійшла в іншому місяці, або навпаки, — а виміряної ємності за цей місяць, щоб це виправити, немає.`,
       too_little_throughput: (e) => `За місяць у батарею надійшло менше ніж ${e.min} — замало, щоб читати з цього ККД.`,
       partial_month: "Статистика є лише за частину цього місяця, а частину не порівнюють із цілим місяцем.",
       curtailed: (e) => `${At("uk", e.n, {
@@ -1603,7 +1603,7 @@ const kb = {
     howRead: "Як це читати",
     definitions: {
       capacity: (e) => `Корисна ємність береться з чистих годин розряду: годин, коли лічильник заряду змінився щонайбільше на ${e.charge}, лічильник розряду змінився, а рівень заряду упав щонайменше на ${e.drop} в.п. Розряд, поділений на падіння, — це енергія на в.п.; помножена на сто — ємність. Місяцю потрібно ${e.minHours} таких годин. Перекалібрування BMS усередині такої години може лише занизити значення місяця.`,
-      efficiency: (e) => `ККД заряду-розряду — те, що вийшло з батареї, поділене на те, що в неї надійшло, з місячних сум лічильників. Місяць не має значення, якщо заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, або якщо надійшло менше ніж ${e.min}.`,
+      efficiency: (e) => `ККД заряду-розряду — те, що вийшло з батареї, поділене на те, що в неї надійшло, з місячних сум лічильників. Якщо заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, різницю виправлено виміряною ємністю за той самий місяць; без неї місяць не має значення. Як і місяць, у який надійшло менше ніж ${e.min}.`,
       solar: (e) => `Сонячна генерація — енергія з лічильника СЕС за місяць. Найкраща година — найвищий погодинний пік потужності СЕС за місяць, близький до значення ясного неба. Години, коли система не могла взяти сонце, не враховано, і місяцю потрібно ${e.minHours} інших годин сонця від ${e.minPower}.`,
       solarDerived: "Ця система не має датчика загальної потужності СЕС, тож потужність СЕС — це сума її стрінгів. Година враховується, лише коли статистика є для кожного стрінга, а її пік складено з піків стрінгів: вони не обов'язково досягають піку одночасно, тож найкраща година може бути трохи вищою за справжній пік масиву.",
       inverter: (e) => `Навантаження інвертора — це години, коли пік досягав поточної номінальної потужності, і ті, коли він досягав ${e.share} від неї; за нею ж рахуються й минулі роки. Це про те, як живе будинок, а не про стан обладнання: без сенсора температури чи помилок дані більше нічого не скажуть про сам інвертор.`

@@ -104,6 +104,25 @@ first row more than an hour after the first counter hour or a last row more
 than an hour before the last — the figure is withheld with `soc_partial`:
 the gate must check the same span the counters sum.
 
+**Drift corrected where the battery's size is known.** A month whose drift
+exceeds `EFFICIENCY_MAX_DRIFT_PCT` is not withheld when §4.1 has a capacity
+figure for the same month — the battery's own measurement, never the
+nameplate. The energy the drift represents is taken into account instead:
+
+```
+stored_kwh = drift_points * capacity_kwh / 100
+efficiency = (discharged + stored_kwh) / charged
+```
+
+`drift_points` is the last hour's mean minus the first's, so a positive drift
+— the charge ended higher — is energy that went in and stayed, and a negative
+one is energy that came out of what was there before. Such a month carries
+`drift_corrected: true` with `reason: null`; the throughput check still
+applies. Without a capacity figure for that month — or if the correction
+would leave nothing discharged — the reason stays `drift`. Five points of a
+31 kWh battery is about 1.5 kWh, against hundreds of kWh of monthly
+throughput.
+
 ### 4.3 Solar production, and the best hour
 
 Needs `pv_energy_total`; adds `pv_power` for the peak.

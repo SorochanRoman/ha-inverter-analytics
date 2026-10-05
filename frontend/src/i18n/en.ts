@@ -599,7 +599,8 @@ export const en = {
         "that the battery ended where it began would not cover the same span.",
       drift: (p: { points: string }) =>
         `The charge ended more than ${p.points} points from where it began, so part of ` +
-        "what came out went in another month, or the reverse.",
+        "what came out went in another month, or the reverse — and there is no capacity " +
+        "figure for this month to correct it with.",
       too_little_throughput: (p: { min: string }) =>
         `Less than ${p.min} went into the battery this month — too little to read an ` +
         "efficiency from.",
@@ -652,8 +653,10 @@ export const en = {
         "recalibration by the BMS inside one can only pull a month's figure down.",
       efficiency: (p: { points: string; min: string }) =>
         "Round-trip efficiency is what came out of the battery over what went in, from the " +
-        "counters' monthly sums. A month has no figure when its charge ended more than " +
-        `${p.points} points from where it began, or when less than ${p.min} went in.`,
+        "counters' monthly sums. When a month's charge ended more than " +
+        `${p.points} points from where it began, the difference is corrected with that ` +
+        "month's measured capacity; without one the month has no figure. Nor has a month " +
+        `into which less than ${p.min} went.`,
       solar: (p: { minHours: number; minPower: string }) =>
         "Solar production is the PV counter's energy per month. The best hour is the " +
         "month's highest hourly peak of PV power — close to a clear-sky figure. Hours the " +

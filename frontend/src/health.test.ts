@@ -351,6 +351,7 @@ describe("the reasons", () => {
       healthReason(en, "curtailed", { value: null, reason: null, unconstrained_hours: 1 }, "en"),
     ).toContain("Only 1 hour of sun the system could take in full; the best hour needs 10.");
     expect(healthReason(en, "drift", undefined, "en")).toContain("more than 5 points");
+    expect(healthReason(en, "drift", undefined, "en")).toContain("no capacity figure");
     expect(healthReason(en, "too_little_throughput", undefined, "en")).toContain(
       "Less than 1 kWh",
     );
@@ -390,6 +391,7 @@ describe("the definitions", () => {
     expect(d.capacity).toContain("at least 3 points");
     expect(d.capacity).toContain("needs 20 such hours");
     expect(d.efficiency).toContain("more than 5 points");
+    expect(d.efficiency).toContain("corrected with that month's measured capacity");
     expect(d.efficiency).toContain("less than 1 kWh");
     expect(d.solar).toContain("needs 10 other hours of sun at or above 100 W");
     expect(d.inverter).toContain("reached 80% of it");

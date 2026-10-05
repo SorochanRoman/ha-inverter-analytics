@@ -270,6 +270,52 @@ def test_drift_is_checked_before_throughput():
     assert efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]["reason"] == "drift"
 
 
+def test_drift_is_corrected_by_the_months_own_capacity_when_it_rose():
+    """The charge ended ten points higher: that energy stayed in the battery."""
+    charge, discharge = month_of_counters(charged=100.0, discharged=80.0)
+    soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=60.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    # 10 points of 31 kWh is 3.1 kWh stored: (80 + 3.1) / 100.
+    assert month == {"value": pytest.approx(0.831), "reason": None, "drift_corrected": True}
+
+
+def test_drift_is_corrected_by_the_months_own_capacity_when_it_fell():
+    """The charge ended ten points lower: that energy came out of what was already there."""
+    charge, discharge = month_of_counters(charged=100.0, discharged=80.0)
+    soc = [soc_hour(0, mean=60.0), soc_hour(5, mean=50.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    assert month == {"value": pytest.approx(0.769), "reason": None, "drift_corrected": True}
+
+
+def test_drift_stays_withheld_without_a_capacity_figure_for_that_month():
+    charge, discharge = month_of_counters(charged=100.0, discharged=80.0)
+    soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=60.0)]
+    withheld = {"value": None, "reason": "drift"}
+    other_month = {"2025-12": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    no_figure = {"2026-01": {"value": None, "reason": "too_few_clean_hours", "clean_hours": 3}}
+    for capacity in (None, {}, other_month, no_figure):
+        month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+        assert month == withheld
+
+
+def test_a_drift_within_the_limit_is_not_corrected():
+    charge, discharge = month_of_counters(charged=100.0, discharged=80.0)
+    soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=54.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    assert month == {"value": pytest.approx(0.8), "reason": None}
+
+
+def test_a_corrected_month_still_needs_its_throughput():
+    charge, discharge = month_of_counters(charged=0.5, discharged=0.4)
+    soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=60.0)]
+    capacity = {"2026-01": {"value": 31.0, "reason": None, "clean_hours": 40}}
+    month = efficiency_by_month(charge, discharge, soc, KYIV, capacity=capacity)["2026-01"]
+    assert month["reason"] == "too_little_throughput"
+
+
 def test_efficiency_with_too_little_charged_is_withheld():
     charge, discharge = month_of_counters(charged=0.9, discharged=0.8)
     soc = [soc_hour(0), soc_hour(5)]
@@ -590,6 +636,22 @@ def test_the_payload_has_exactly_the_contract_keys():
             "recent_months",
             "previous_months",
         }
+
+
+def test_the_payload_corrects_efficiency_drift_with_the_capacity_it_measured():
+    # Thirty clean discharge hours of 0.31 kWh over 3 points, then one hour of
+    # charging 10 kWh that brings the charge back to 50%: 30 points below the start.
+    soc_rows = [HourlyRow(at(i), 80.0 - 3 * i, 78.5 - 3 * i, 81.5 - 3 * i) for i in range(30)]
+    soc_rows.append(HourlyRow(at(30), 50.0, 20.0, 50.0))
+    charge = energy({i: 0.0 for i in range(30)} | {30: 10.0})
+    discharge = energy({i: 0.31 for i in range(30)} | {30: 0.0})
+    result = payload(soc=HourlySeries(tuple(soc_rows)), charge=charge, discharge=discharge)
+
+    capacity = result["signals"]["capacity"]["months"]["2026-01"]["value"]
+    assert capacity == pytest.approx(100 * 9.3 / 90)
+    month = result["signals"]["efficiency"]["months"]["2026-01"]
+    assert month["drift_corrected"] is True
+    assert month["value"] == pytest.approx((9.3 - 30 * capacity / 100) / 10.0)
 
 
 def test_the_months_run_from_five_years_back_to_now():

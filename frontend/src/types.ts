@@ -495,6 +495,8 @@ export interface HealthMonth {
   reason: HealthReason | null;
   /** capacity: the clean discharge hours the month had. */
   clean_hours?: number;
+  /** efficiency: the drift was corrected with the month's measured capacity. */
+  drift_corrected?: boolean;
   /** best_hour: sunny hours the system could take; null when nothing was left out. */
   unconstrained_hours?: number | null;
   /** inverter */

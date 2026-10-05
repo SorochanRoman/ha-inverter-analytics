@@ -176,6 +176,8 @@ def efficiency_by_month(
     discharge: EnergySeries,
     soc: Sequence[HourlyRow] | None,
     tz: tzinfo,
+    *,
+    capacity: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Round-trip efficiency per local month that has counter rows.
 
@@ -189,6 +191,17 @@ def efficiency_by_month(
     A charge that does not span the month's counter hours (within an hour at
     either end) is withheld as soc_partial: the gate must check the same span
     the counters sum.
+
+    A drift beyond the limit is corrected rather than withheld when `capacity`
+    — capacity_by_month's months — has a figure for the same month: the
+    battery's own measurement, never the nameplate. A positive drift (the
+    charge ended higher) is energy that went in and stayed, worth
+    drift_points * capacity / 100 kWh, so it is added to what came out; a
+    negative one is energy that came out of what was already there, so it is
+    taken away. Such a month carries drift_corrected: True. Five points of a
+    31 kWh battery is about 1.5 kWh against hundreds of kWh of throughput, so
+    the correction is small next to what it lets through. A correction that
+    would leave nothing out is no figure, and stays drift.
     """
     charged = _sums_by_month(charge, tz)
     discharged = _sums_by_month(discharge, tz)
@@ -223,14 +236,24 @@ def efficiency_by_month(
         ):
             months[key] = {"value": None, "reason": SOC_PARTIAL}
             continue
-        if abs(last.mean - first.mean) > EFFICIENCY_MAX_DRIFT_PCT:
+        drift = last.mean - first.mean
+        measured = (capacity or {}).get(key, {}).get("value")
+        corrected = abs(drift) > EFFICIENCY_MAX_DRIFT_PCT
+        if corrected and measured is None:
             months[key] = {"value": None, "reason": DRIFT}
             continue
         into, out = charged.get(key, 0.0), discharged.get(key, 0.0)
         if into < EFFICIENCY_MIN_KWH or out <= 0:
             months[key] = {"value": None, "reason": TOO_LITTLE_THROUGHPUT}
             continue
-        months[key] = {"value": out / into, "reason": None}
+        if not corrected:
+            months[key] = {"value": out / into, "reason": None}
+            continue
+        out += drift * measured / 100
+        if out <= 0:
+            months[key] = {"value": None, "reason": DRIFT}
+            continue
+        months[key] = {"value": out / into, "reason": None, "drift_corrected": True}
     return months
 
 
@@ -458,7 +481,9 @@ def build_health_payload(
         computed["capacity"] = capacity_by_month(hours, tz)
     if wanted("efficiency") and charge is not None and discharge is not None:
         soc_rows = soc.rows if soc is not None else None
-        computed["efficiency"] = efficiency_by_month(charge, discharge, soc_rows, tz)
+        computed["efficiency"] = efficiency_by_month(
+            charge, discharge, soc_rows, tz, capacity=computed["capacity"]
+        )
     if wanted("solar_energy") and pv is not None:
         computed["solar_energy"] = withhold_partial_months(
             solar_energy_by_month(pv, tz), (row.start for row in pv.rows), month_hours, tz

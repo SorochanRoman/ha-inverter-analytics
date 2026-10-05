@@ -248,6 +248,16 @@ the discharge counter's energy over the fall in a state of charge the BMS
 estimates and recalibrates. It is a trend to watch, not a measurement of the
 cells, and the nameplate beside it is a reference line, never a target.
 
+**Battery efficiency is only as good as the battery's counters.** Health's
+round-trip efficiency is the discharge counter over the charge counter, month by
+month. Many inverters' lifetime battery counters are their own estimates rather
+than metered energy, sometimes measured on the DC side, so the ratio can read
+near or even above 100% — the Deye SUN-12K checked live showed about 100% in most
+months, 100.6% in June — which no real round trip achieves. Nothing here corrects
+for that: the figure is a trend to watch within one installation, not a
+measurement of the cells, and a month's drift correction (from the month's own
+measured capacity, never the nameplate) does not change it.
+
 **Health judges past years by today's rating.** The inverter signal counts
 each month's hours against the rated power configured now; the option has no
 history. After an inverter swap, every earlier year moves — more or fewer hours
