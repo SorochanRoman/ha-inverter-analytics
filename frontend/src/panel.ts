@@ -13,13 +13,17 @@ import type { ConfigResult, EntryInfo, FeatureInfo, HomeAssistant } from "./type
 import "./tabs/balance-tab";
 import "./tabs/battery-tab";
 import "./tabs/grid-tab";
+import "./tabs/health-tab";
 import "./tabs/load-tab";
 import "./tabs/seasonality-tab";
 import "./tabs/sizing-tab";
 
 const BASE_PATH = "/inverter-analytics";
 
-const TABS = ["load", "battery", "seasonal", "balance", "grid", "sizing"] as const;
+const TABS = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"] as const;
+
+/** Tabs that read the whole history and take no period. */
+const WHOLE_HISTORY_TABS: readonly string[] = ["health"];
 
 @customElement("inverter-analytics-panel")
 export class InverterAnalyticsPanel extends LitElement {
@@ -198,15 +202,7 @@ export class InverterAnalyticsPanel extends LitElement {
             >${lang.toUpperCase()}</button>`,
           )}
         </div>
-        <div class="ranges">
-          ${RANGE_KEYS.map(
-            (key) => html`<button
-              class=${key === this.range ? "active" : ""}
-              aria-pressed=${key === this.range ? "true" : "false"}
-              @click=${() => this.selectRange(key)}
-            >${rangeLabel(m, key)}</button>`,
-          )}
-        </div>
+        ${this.renderRanges(m)}
       </div>
 
       <nav class="tabs">
@@ -227,6 +223,31 @@ export class InverterAnalyticsPanel extends LitElement {
         ${this.renderTab()}
       </main>
     `;
+  }
+
+  /**
+   * The period buttons. On a tab that reads the whole history they stay in
+   * place, dimmed and disabled, rather than vanishing: the header would jump
+   * on every visit, and a picker that silently does nothing would be worse.
+   * The range itself is kept, so the next windowed tab opens on it.
+   */
+  private renderRanges(m: Messages) {
+    const unused = WHOLE_HISTORY_TABS.includes(this.tab);
+    return html`<div
+      class="ranges ${unused ? "unused" : ""}"
+      role="group"
+      title=${unused ? m.health.periodNotUsed : nothing}
+    >
+      ${RANGE_KEYS.map(
+        (key) => html`<button
+          class=${key === this.range ? "active" : ""}
+          aria-pressed=${key === this.range ? "true" : "false"}
+          aria-disabled=${unused ? "true" : nothing}
+          ?disabled=${unused}
+          @click=${() => this.selectRange(key)}
+        >${rangeLabel(m, key)}</button>`,
+      )}
+    </div>`;
   }
 
   /**
@@ -302,6 +323,9 @@ export class InverterAnalyticsPanel extends LitElement {
               .range=${this.range}
             ></ia-sizing-tab>`
           : nothing}
+        ${this.tab === "health"
+          ? html`<ia-health-tab .hass=${this.hass} .entryId=${this.entryId}></ia-health-tab>`
+          : nothing}
     `;
   }
 
@@ -318,6 +342,8 @@ export class InverterAnalyticsPanel extends LitElement {
     h1 { font-size: 20px; margin: 0; font-weight: 500; }
     .langs { display: flex; gap: 4px; margin-left: auto; }
     .ranges { display: flex; gap: 4px; flex-wrap: wrap; }
+    .ranges.unused { opacity: 0.45; }
+    .ranges.unused button { cursor: not-allowed; }
     button {
       background: var(--card-background-color);
       color: var(--primary-text-color);

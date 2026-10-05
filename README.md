@@ -114,6 +114,17 @@ beyond pointing the integration at the ones you already have.
   power mapped, full is recognised from the battery's own charge limit, and
   for a system with no export the sun is read from the days it reached that
   limit. There is no combined score: which part is short is the whole point.
+- **A Health tab.** Is the system what it was? The battery's usable capacity
+  read from clean discharge hours, its round-trip efficiency, solar energy
+  and the best hour the array managed, and the hours the inverter spent near
+  its rated power — month by month, one line per year so a winter is set
+  beside a winter, with a table of the last twelve months against the same
+  months a year earlier. It uses no period: it reads five years of Home
+  Assistant's hourly statistics, so the picker is dimmed while it is open.
+  There are no verdicts. A month that cannot be read honestly says why, the
+  nameplate capacity is drawn as a reference line and never multiplied in,
+  and a system that does not export is told that its energy measures the
+  household, not the array.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
@@ -161,8 +172,9 @@ and this is deliberate rather than incidental:
 
 ## Not built yet
 
-All six tabs are built. Seasonality cannot compare the same month across two years,
-because a single query is capped at 400 days. The Balance tab shows no
+All seven tabs are built. Seasonality cannot compare the same month across two
+years, because a single query is capped at 400 days; the Health tab does, from
+statistics alone. The Balance tab shows no
 costs: tariffs are a domain of their own, and a wrong number about money
 is worse than no number. Detection covers the naming scheme of the
 StephanJoubert Solarman integration, read off a live instance; other

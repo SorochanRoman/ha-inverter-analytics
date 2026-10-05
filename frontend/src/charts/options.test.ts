@@ -575,8 +575,24 @@ describe("year lines", () => {
     expect((yearLinesOption([], "h", en) as any).series).toEqual([]);
   });
 
+  it("draws a reference as a flat dashed line with its own legend entry", () => {
+    const option = yearLinesOption(lines, en.units.kwh, en, {
+      value: 10.24,
+      name: "Nameplate 10.2 kWh",
+    }) as any;
+    expect(option.series).toHaveLength(4);
+    expect(option.legend.data).toEqual(["2023", "2024", "2025", "Nameplate 10.2 kWh"]);
+    const reference = option.series[3];
+    expect(reference.data).toEqual(Array(12).fill(10.24));
+    expect(reference.lineStyle.type).toBe("dashed");
+    expect(reference.lineStyle.color).toBe(YEAR_LINES.reference);
+    expect(reference.showSymbol).toBe(false);
+    // Without one, the years alone.
+    expect((yearLinesOption(lines, en.units.kwh, en, null) as any).series).toHaveLength(3);
+  });
+
   it("uses only keys a registered component can render", () => {
-    const option = yearLinesOption(lines, en.units.kwh, en);
+    const option = yearLinesOption(lines, en.units.kwh, en, { value: 10, name: "N" });
     const unsupported = Object.keys(option)
       .filter((key) => option[key] !== undefined)
       .filter((key) => !SUPPORTED_OPTION_KEYS.has(key));

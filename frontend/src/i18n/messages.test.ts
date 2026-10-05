@@ -35,6 +35,7 @@ const NUMERIC_PARAMS = new Set([
   "recent",
   "previous",
   "minHours",
+  "needed",
 ]);
 
 // Counts that land on every plural branch either language has: 1 and 21 are

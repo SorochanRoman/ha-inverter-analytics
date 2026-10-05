@@ -124,6 +124,11 @@ the defect was only visible on screen.
   months — one clearly enough, one clearly short, one in which the battery
   never fills — and reads the three cards and the monthly strip back,
   including the grey partial month at each end and the *never filled* reason.
+- **The Health tab, all of it.** Built and unit-tested; not yet read from a
+  live instance. The live run imports three years of hourly statistics for the
+  state of charge, the two battery counters, the PV counter and power, and the
+  load, with the implied capacity falling a few percent a year and one month
+  left empty, and reads the four cards back with the gap visible as a gap.
 - **The Grid tab, all of it.** Nothing in the outage work has been seen in a
   live Home Assistant; it rests on unit tests over hand-built series. The live
   run has to build a template `binary_sensor.grid_connected` from the
@@ -213,9 +218,23 @@ means the backend sending values that can be translated — counts and keys
 rather than phrases — and the translation files composing them; nothing
 else needs that yet, so it waits.
 
-**Year-on-year comparison.** Windows are capped at 400 days, so the same month
-in two different years cannot both be in view. Lifting the cap is a separate
-decision about how much one query may ask of the recorder.
+**Year-on-year comparison on the windowed tabs.** Windows are capped at 400
+days, so on every tab with a period the same month in two different years
+cannot both be in view. The Health tab compares across years without lifting
+the cap: it reads long-term statistics only, which the cap does not guard.
+Lifting the cap for raw states is a separate decision about how much one query
+may ask of the recorder.
+
+**Health reads statistics and nothing else.** The tab takes no period and reads
+five years of hourly long-term statistics, never raw states, because raw states
+reach back only to the recorder's retention. So a sensor without a
+`state_class` contributes nothing to it at all — no statistics are kept for it —
+even when the windowed tabs read it happily from raw states. Its card then shows
+months without a figure rather than an error. And the battery capacity it draws
+is the battery management system's estimate seen through clean discharge hours:
+the discharge counter's energy over the fall in a state of charge the BMS
+estimates and recalibrates. It is a trend to watch, not a measurement of the
+cells, and the nameplate beside it is a reference line, never a target.
 
 **Efficiency without a returning charge.** Round-trip efficiency is withheld
 when the state of charge ends more than five points from where it started,

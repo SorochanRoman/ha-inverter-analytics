@@ -106,6 +106,8 @@ quoted from the user's installation, and `code` fragments are not translated.
 | Whole history (health badge) | Уся історія |
 | a year earlier (table column) | рік тому |
 | points (of state of charge) | в.п. |
+| percentage points, pp (a difference between two shares) | в.п. |
+| the period does not apply (Health, dimmed picker) | період тут не застосовується |
 | mean of the monthly figures | середнє місячних значень |
 | BMS (battery management system) | BMS (система керування батареєю) |
 | recalibration (BMS) | перекалібрування |

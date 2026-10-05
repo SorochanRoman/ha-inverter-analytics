@@ -22,6 +22,9 @@ export const SERIES = {
 export const YEAR_LINES = {
   newest: SERIES.load,
   older: ["#7d8590", "#a0a6ae", "#bcc1c8", "#d0d4d9", "#e0e3e7"],
+  // A fixed reference beside the years, dashed: the battery's nameplate, in
+  // the battery's colour rather than an alarm colour, since it is no target.
+  reference: SERIES.battery,
 } as const;
 
 /**

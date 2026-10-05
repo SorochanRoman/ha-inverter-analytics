@@ -499,15 +499,20 @@ export function outageHoursOption(hours: GridHour[], m: Messages): Record<string
  * One line per year over the twelve months, so a winter is set beside a
  * winter. A gap stays a gap: connecting across it would draw a month nobody
  * measured. Symbols stay on, or a month alone between gaps would vanish.
+ *
+ * A reference, when given, is a flat dashed line across all twelve months
+ * under its own name in the legend. It is drawn as a series rather than a
+ * markLine so the bundle registers no component for one line on one chart.
  */
 export function yearLinesOption(
   lines: { year: number; values: (number | null)[] }[],
   unit: string,
   m: Messages,
+  reference: { value: number; name: string } | null = null,
 ): Record<string, unknown> {
   const { base, axis } = chartBaseOption();
   const names = lines.map((line) => String(line.year));
-  const series = lines.map((line, index) => {
+  const series: Record<string, unknown>[] = lines.map((line, index) => {
     const age = lines.length - 1 - index;
     const colour =
       age === 0
@@ -526,6 +531,20 @@ export function yearLinesOption(
       data: line.values.map((value) => (value === null ? null : round(value, 2))),
     };
   });
+  if (reference !== null) {
+    names.push(reference.name);
+    series.push({
+      name: reference.name,
+      type: "line",
+      connectNulls: false,
+      showSymbol: false,
+      symbolSize: 0,
+      z: 1,
+      lineStyle: { color: YEAR_LINES.reference, width: 1.5, type: "dashed" },
+      itemStyle: { color: YEAR_LINES.reference },
+      data: Array.from({ length: 12 }, () => round(reference.value, 2)),
+    });
+  }
   return {
     ...base,
     legend: { data: names, top: 0, textStyle: base.textStyle },

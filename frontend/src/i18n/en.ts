@@ -36,6 +36,8 @@ export const en = {
     min: "min",
     h: "h",
     ofRated: "of rated",
+    // Percentage points: the difference between two shares.
+    pp: "pp",
   },
   panel: {
     language: "Language",
@@ -540,7 +542,6 @@ export const en = {
   // health.ts and the Health tab. No verdicts anywhere: each figure is set
   // beside the same month a year earlier and the reader decides.
   health: {
-    tab: "Health",
     cards: {
       capacity: "Battery capacity",
       efficiency: "Round-trip efficiency",
@@ -568,9 +569,15 @@ export const en = {
     // The figure above each card and its caption.
     lastTwelve: "Last 12 months against the 12 before",
     meanOfMonthly: "mean of the monthly figures",
-    notEnough: (p: { recent: number; previous: number }) =>
-      `Not enough months to compare: ${p.recent} of the 6 needed in the last 12, ` +
-      `${p.previous} of 6 in the 12 before.`,
+    twelveBefore: (p: { value: string }) => `the 12 before: ${p.value}`,
+    notEnough: (p: { recent: number; previous: number; needed: number }) =>
+      `Not enough months to compare: the last 12 have ${p.recent} with a figure and the ` +
+      `12 before have ${p.previous}; each side needs ${p.needed}.`,
+    // The title on the dimmed period buttons while the tab is open.
+    periodNotUsed: "Health reads the whole history; the period does not apply here.",
+    // Under an inverter month's figure.
+    inverterHint: (p: { atRated: string; measured: string }) =>
+      `${p.atRated} h at rated, of ${p.measured} h measured`,
     // Why a month has no figure, keyed by the payload's reason.
     reasons: {
       too_few_clean_hours: (p: { n: number; minHours: number }) =>
@@ -599,8 +606,9 @@ export const en = {
     // bestHourCaption.
     bestHourCaption: {
       unconstrained:
-        "Hours when the battery was at its charge limit are left out: the inverter cut the " +
-        "array back to what the house used, so their peak is the load, not the array.",
+        "Hours when the battery was at its charge limit are left out: the inverter may have " +
+        "cut the array back to what the house used, so their peak may be the load, not the " +
+        "array.",
       all:
         "Read from every hour. Without the state of charge, battery power and PV power, an " +
         "hour the system could not take cannot be told apart, so a low month may be the " +

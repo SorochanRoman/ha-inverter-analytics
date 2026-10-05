@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPARISON_MIN_MONTHS,
+  HEALTH_CARDS,
   bestHourCaption,
+  chartLines,
   comparisonView,
   energyCaption,
+  formatHealthDifference,
+  formatHealthShare,
+  formatHealthValue,
+  healthDefinitions,
+  healthReason,
   lastTwelveRows,
+  nameplateLine,
   yearLines,
 } from "./health";
+import { en } from "./i18n/en";
+import { uk } from "./i18n/uk";
 import type { HealthComparison, HealthPayload, HealthSignal, HealthSignalKey } from "./types";
 
 function monthsBetween(first: string, last: string): string[] {
@@ -182,7 +193,8 @@ describe("the twelve-against-twelve figure", () => {
     const view = comparisonView(
       signal({ comparison: comparison({ recent_months: 5, previous_months: 6 }) }),
     );
-    expect(view).toEqual({ kind: "notEnough", recent: 5, previous: 6 });
+    expect(view).toEqual({ kind: "notEnough", recent: 5, previous: 6, needed: 6 });
+    expect(COMPARISON_MIN_MONTHS).toBe(6);
   });
 
   it("shows the means and the change at six a side", () => {
@@ -197,7 +209,32 @@ describe("the twelve-against-twelve figure", () => {
         }),
       }),
     );
-    expect(view).toEqual({ kind: "figure", recent: 9.4, previous: 9.8, change: -0.4 });
+    expect(view).toMatchObject({ kind: "figure", recent: 9.4, previous: 9.8, change: -0.4 });
+    expect(view.kind === "figure" && view.share).toBeCloseTo(-0.4 / 9.8);
+  });
+
+  it("has no share of an earlier mean of zero", () => {
+    const view = comparisonView(
+      signal({
+        comparison: comparison({
+          recent_mean: 3,
+          previous_mean: 0,
+          change: 3,
+          recent_months: 12,
+          previous_months: 12,
+        }),
+      }),
+    );
+    expect(view).toMatchObject({ kind: "figure", change: 3, share: null });
+  });
+
+  it("words the not-enough case without a fixed count in the sentence", () => {
+    expect(en.health.notEnough({ recent: 9, previous: 2, needed: 6 })).toBe(
+      "Not enough months to compare: the last 12 have 9 with a figure and the 12 before " +
+        "have 2; each side needs 6.",
+    );
+    expect(en.health.notEnough({ recent: 9, previous: 2, needed: 7 })).toContain("needs 7");
+    expect(uk.health.notEnough({ recent: 9, previous: 2, needed: 7 })).toContain("потрібно 7");
   });
 });
 
@@ -215,5 +252,118 @@ describe("the captions", () => {
     expect(energyCaption(payload(months, {}, { export_limited: true }))).toBe("household");
     expect(energyCaption(payload(months, {}, { export_limited: false }))).toBe("array");
     expect(energyCaption(payload(months, {}, { export_limited: null }))).toBe("array");
+  });
+});
+
+describe("the cards", () => {
+  it("cover every signal once, the solar card holding two", () => {
+    const signals = HEALTH_CARDS.flatMap((card) => card.signals);
+    expect(signals.sort()).toEqual(
+      ["best_hour", "capacity", "efficiency", "inverter", "solar_energy"].sort(),
+    );
+    expect(HEALTH_CARDS.find((card) => card.key === "solar")?.signals).toEqual([
+      "solar_energy",
+      "best_hour",
+    ]);
+  });
+});
+
+describe("figures in their units", () => {
+  it("formats a value per signal", () => {
+    expect(formatHealthValue("capacity", 9.46, en, "en")).toBe("9.5 kWh");
+    expect(formatHealthValue("solar_energy", 412, en, "en")).toBe("412 kWh");
+    expect(formatHealthValue("efficiency", 0.912, en, "en")).toBe("91.2%");
+    expect(formatHealthValue("best_hour", 5230, en, "en")).toBe("5.2 kW");
+    expect(formatHealthValue("inverter", 14.25, en, "en")).toBe("14.3 h");
+    expect(formatHealthValue("capacity", null, en, "en")).toBe("—");
+  });
+
+  it("signs a difference, and puts efficiency in points", () => {
+    expect(formatHealthDifference("capacity", -0.42, en, "en")).toBe("-0.4 kWh");
+    expect(formatHealthDifference("solar_energy", 12, en, "en")).toBe("+12 kWh");
+    expect(formatHealthDifference("efficiency", -0.021, en, "en")).toBe("-2.1 pp");
+    expect(formatHealthDifference("efficiency", -0.021, uk, "uk")).toMatch(/2,1 в\.п\.$/);
+    expect(formatHealthDifference("best_hour", -250, en, "en")).toBe("-250 W");
+    expect(formatHealthDifference("best_hour", 1200, en, "en")).toBe("+1.2 kW");
+    expect(formatHealthDifference("inverter", 0, en, "en")).toBe("0 h");
+    expect(formatHealthDifference("inverter", null, en, "en")).toBe("—");
+  });
+
+  it("signs a share", () => {
+    expect(formatHealthShare(-0.1, "en")).toBe("-10%");
+    expect(formatHealthShare(0.025, "en")).toBe("+2.5%");
+    expect(formatHealthShare(null, "en")).toBe("—");
+  });
+});
+
+describe("the chart lines", () => {
+  const data = payload(["2025-01"], {
+    efficiency: signal({ months: { "2025-01": { value: 0.9, reason: null } } }),
+    best_hour: signal({ months: { "2025-01": { value: 5200, reason: null } } }),
+    capacity: signal({ months: { "2025-01": { value: 9.5, reason: null, clean_hours: 30 } } }),
+  });
+
+  it("draws efficiency in percent and the best hour in kilowatts", () => {
+    const efficiency = chartLines(data, "efficiency", en);
+    expect(efficiency.unit).toBe("%");
+    expect(efficiency.lines[0].values[0]).toBeCloseTo(90);
+    expect(efficiency.lines[0].values[1]).toBeNull();
+    const best = chartLines(data, "best_hour", en);
+    expect(best.unit).toBe("kW");
+    expect(best.lines[0].values[0]).toBeCloseTo(5.2);
+    expect(chartLines(data, "capacity", uk)).toMatchObject({ unit: "кВт·год" });
+    expect(chartLines(data, "capacity", en).lines[0].values[0]).toBe(9.5);
+    expect(chartLines(data, "inverter", en).unit).toBe("h");
+  });
+
+  it("draws the nameplate only on capacity, and only when it is set", () => {
+    expect(nameplateLine(data, "capacity", en, "en")).toBeNull();
+    const set = payload(["2025-01"], {}, { nameplate_kwh: 10.24 });
+    expect(nameplateLine(set, "capacity", en, "en")).toEqual({
+      value: 10.24,
+      name: "Nameplate 10.2 kWh",
+    });
+    expect(nameplateLine(set, "efficiency", en, "en")).toBeNull();
+  });
+});
+
+describe("the reasons", () => {
+  it("prints the count a month had and the one it needed", () => {
+    expect(
+      healthReason(en, "too_few_clean_hours", { value: null, reason: null, clean_hours: 12 }, "en"),
+    ).toBe(
+      "Only 12 clean discharge hours this month; it needs 20, or one strange hour moves the figure.",
+    );
+    expect(
+      healthReason(en, "curtailed", { value: null, reason: null, unconstrained_hours: 1 }, "en"),
+    ).toContain("Only 1 hour of sun the system could take in full; the best hour needs 10.");
+    expect(healthReason(en, "drift", undefined, "en")).toContain("more than 5 points");
+    expect(healthReason(en, "too_little_throughput", undefined, "en")).toContain(
+      "Less than 1 kWh",
+    );
+    expect(healthReason(en, "no_soc", undefined, "en")).toBe(en.health.reasons.no_soc);
+    expect(healthReason(en, "soc_partial", undefined, "en")).toBe(en.health.reasons.soc_partial);
+  });
+
+  it("counts zero when the month did not say", () => {
+    expect(healthReason(en, "too_few_clean_hours", undefined, "en")).toContain("Only 0");
+  });
+});
+
+describe("the definitions", () => {
+  it("print the constants they rest on", () => {
+    const d = healthDefinitions(en, "en");
+    // formatEnergy would round this to "0 kWh".
+    expect(d.capacity).toContain("at most 0.02 kWh");
+    expect(d.capacity).toContain("at least 3 points");
+    expect(d.capacity).toContain("needs 20 such hours");
+    expect(d.efficiency).toContain("more than 5 points");
+    expect(d.efficiency).toContain("less than 1 kWh");
+    expect(d.solar).toContain("needs 10 other hours of sun at or above 100 W");
+    expect(d.inverter).toContain("reached 80% of it");
+  });
+
+  it("use the locale's decimal mark", () => {
+    expect(healthDefinitions(uk, "uk").capacity).toContain("0,02 кВт·год");
   });
 });
