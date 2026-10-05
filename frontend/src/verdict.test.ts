@@ -6,6 +6,7 @@ import {
   fullModeNote,
   reasonHint,
   reasonSentence,
+  solarCellFigure,
   solarFillTested,
   solarRuleKind,
   verdictLabel,
@@ -298,6 +299,31 @@ describe("which full the note says was read", () => {
     );
     expect(fullModeNote(uk, payloadWith({}), "95%")).toBe(
       "Повний заряд означає рівень заряду щонайменше 95%.",
+    );
+  });
+});
+
+describe("the Sun's month cell", () => {
+  const evidence = { production_share: 1.04, fill_share: 0.61 };
+
+  it("shows the share of load under the export rule", () => {
+    expect(solarCellFigure(en, false, evidence, "en")).toBe("104% of load");
+    // An unknown decision is read as exporting, as the backend reads it.
+    expect(solarCellFigure(en, null, evidence, "en")).toBe("104% of load");
+  });
+
+  it("shows the fill share under the no-export rule, which decided the verdict", () => {
+    expect(solarCellFigure(en, true, evidence, "en")).toBe("filled on 61% of days");
+    expect(solarCellFigure(uk, true, evidence, "uk")).toBe("повний заряд у 61% днів");
+  });
+
+  it("shows a dash when the figure its rule reads is missing", () => {
+    expect(solarCellFigure(en, true, { production_share: 1.04, fill_share: null }, "en")).toBe(
+      "—",
+    );
+    expect(solarCellFigure(en, true, { production_share: 1.04 }, "en")).toBe("—");
+    expect(solarCellFigure(en, false, { production_share: null, fill_share: 0.61 }, "en")).toBe(
+      "—",
     );
   });
 });

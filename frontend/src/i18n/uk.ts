@@ -418,6 +418,7 @@ export const uk: Messages = {
       `${p.days} з ${p.total} ` +
       plural("uk", p.total, { one: "дня", few: "днів", many: "днів", other: "дня" }),
     ofLoad: (p) => `${p.share} від споживання`,
+    filledOnDays: (p) => `повний заряд у ${p.share} днів`,
     countOf: (p) => `${p.count} з ${p.total}`,
     hoursReachedRated: "Годин, коли навантаження досягало номінальної потужності",
     // «Сягало» — досягало щонайменше цієї частки, як і рахує код (>=).

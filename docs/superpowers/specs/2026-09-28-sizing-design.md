@@ -166,7 +166,8 @@ which one; the period card says what the year as a whole looked like.
 A table with a row for each month the period touches, in the installation's
 zone, and three cells: the verdict as a word and a colour, and under it the
 one figure the rule turned on — hours at rated power, days full-and-low,
-production share. Months are built by the Seasonality tab's month machinery,
+production share (on a system that does not export, whose sun is judged by
+the days the battery filled, the share of days it filled). Months are built by the Seasonality tab's month machinery,
 so the same rules apply: a month whose coverage is below `INCOMPLETE_COVERAGE`
 (`0.6`) keeps its verdict but is drawn in grey with "from 40% of the month"
 under it; a month with no data at all is present, named, and empty. The

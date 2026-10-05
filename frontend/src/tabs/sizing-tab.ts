@@ -24,6 +24,7 @@ import {
   fullModeNote,
   reasonHint,
   reasonSentence,
+  solarCellFigure,
   solarRuleKind,
   verdictLabel,
 } from "../verdict";
@@ -82,7 +83,12 @@ export class IaSizingTab extends LitElement {
   }
 
   /** The one figure a rule turned on, for a month cell. */
-  private cellFigure(card: SizingCardKey, block: VerdictBlock, locale: string): string {
+  private cellFigure(
+    card: SizingCardKey,
+    block: VerdictBlock,
+    payload: SizingPayload,
+    locale: string,
+  ): string {
     const m = this.i18n.m;
     const e = block.evidence;
     if (card === "inverter") return m.sizing.hoursAtRated({ hours: `${e.hours_at_rated ?? 0}` });
@@ -92,9 +98,7 @@ export class IaSizingTab extends LitElement {
         total: e.days_with_data ?? 0,
       });
     }
-    return e.production_share === null || e.production_share === undefined
-      ? DASH
-      : m.sizing.ofLoad({ share: formatPercent(e.production_share, locale) });
+    return solarCellFigure(m, payload.rules.export_limited, e, locale);
   }
 
   private renderEvidence(
@@ -350,7 +354,7 @@ export class IaSizingTab extends LitElement {
             html`<span class="hint"
               >${reasonHint(m, card, block.reason ?? "no_data", payload.rules.full_mode)}</span
             >`
-          : html`<span class="hint">${this.cellFigure(card, block, locale)}</span>`}
+          : html`<span class="hint">${this.cellFigure(card, block, payload, locale)}</span>`}
         ${thin
           ? html`<span class="hint"
               >${m.sizing.cellCoverage({ share: formatCoverage(block.coverage, locale) })}</span

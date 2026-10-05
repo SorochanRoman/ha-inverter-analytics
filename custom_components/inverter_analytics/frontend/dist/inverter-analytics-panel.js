@@ -991,6 +991,8 @@ const Bb = {
     // The total is a number so a language can inflect "days" by it.
     daysOf: (e) => `${e.days} of ${e.total} days`,
     ofLoad: (e) => `${e.share} of load`,
+    // A Sun month cell on a no-export system, whose verdict the fill decided.
+    filledOnDays: (e) => `filled on ${e.share} of days`,
     // The evidence rows of each card.
     countOf: (e) => `${e.count} of ${e.total}`,
     hoursReachedRated: "Hours the load reached rated power",
@@ -1511,6 +1513,7 @@ const Bb = {
     // Genitive after «з»: з 1 дня, з 3 днів, з 30 днів, з 21 дня.
     daysOf: (e) => `${e.days} з ${e.total} ` + Ct("uk", e.total, { one: "дня", few: "днів", many: "днів", other: "дня" }),
     ofLoad: (e) => `${e.share} від споживання`,
+    filledOnDays: (e) => `повний заряд у ${e.share} днів`,
     countOf: (e) => `${e.count} з ${e.total}`,
     hoursReachedRated: "Годин, коли навантаження досягало номінальної потужності",
     // «Сягало» — досягало щонайменше цієї частки, як і рахує код (>=).
@@ -26776,7 +26779,15 @@ function vP(e) {
 function pP(e) {
   return e.rules.export_limited === !0 ? e.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : vP(e) ? "with_fill" : "plain";
 }
-function gP(e, t, r) {
+function gP(e, t, r, n) {
+  if (t === !0) {
+    const a = r.fill_share;
+    return a == null ? it : e.sizing.filledOnDays({ share: Y(a, n) });
+  }
+  const i = r.production_share;
+  return i == null ? it : e.sizing.ofLoad({ share: Y(i, n) });
+}
+function yP(e, t, r) {
   if (t.cards.battery.missing.includes("battery_soc")) return null;
   const n = t.rules;
   if (n.full_mode === "ceiling") return e.sizing.fullModeCeiling;
@@ -26786,13 +26797,13 @@ function gP(e, t, r) {
   const a = n.ceiling_no_rows ?? [];
   return a.length ? e.sizing.fullModeNoRows({ full: r, roles: Pn(e, a, !0), n: a.length }) : e.sizing.fullModePlain({ full: r });
 }
-var yP = Object.defineProperty, mP = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? mP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var mP = Object.defineProperty, _P = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? _P(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && yP(t, r, i), i;
+  return n && i && mP(t, r, i), i;
 };
-const _P = ["inverter", "battery", "solar"];
-function bP(e, t) {
+const bP = ["inverter", "battery", "solar"];
+function wP(e, t) {
   const [r, n] = e.split("-").map(Number);
   return new Date(r, n - 1, 1).toLocaleDateString(t, {
     month: "short",
@@ -26822,12 +26833,12 @@ let wr = class extends Ht {
     }
   }
   /** The one figure a rule turned on, for a month cell. */
-  cellFigure(e, t, r) {
-    const n = this.i18n.m, i = t.evidence;
-    return e === "inverter" ? n.sizing.hoursAtRated({ hours: `${i.hours_at_rated ?? 0}` }) : e === "battery" ? n.sizing.daysOf({
-      days: `${i.days_full_and_low ?? 0}`,
-      total: i.days_with_data ?? 0
-    }) : i.production_share === null || i.production_share === void 0 ? it : n.sizing.ofLoad({ share: Y(i.production_share, r) });
+  cellFigure(e, t, r, n) {
+    const i = this.i18n.m, a = t.evidence;
+    return e === "inverter" ? i.sizing.hoursAtRated({ hours: `${a.hours_at_rated ?? 0}` }) : e === "battery" ? i.sizing.daysOf({
+      days: `${a.days_full_and_low ?? 0}`,
+      total: a.days_with_data ?? 0
+    }) : gP(i, r.rules.export_limited, a, n);
   }
   renderEvidence(e, t, r, n) {
     const i = this.i18n.m, a = t.evidence, o = (l, u) => i.sizing.countOf({ count: `${l ?? it}`, total: `${u ?? it}` }), s = (l, u) => I`<span class="row"><span>${l}</span><span>${u}</span></span>`;
@@ -27013,7 +27024,7 @@ let wr = class extends Ht {
         I`<span class="hint"
               >${dP(t, i, o.reason ?? "no_data", e.rules.full_mode)}</span
             >`
-      ) : I`<span class="hint">${this.cellFigure(i, o, r)}</span>`}
+      ) : I`<span class="hint">${this.cellFigure(i, o, e, r)}</span>`}
         ${s ? I`<span class="hint"
               >${t.sizing.cellCoverage({ share: Xe(o.coverage, r) })}</span
             >` : O}
@@ -27032,7 +27043,7 @@ let wr = class extends Ht {
         ${e.months.map(
       (i) => I`<tr class=${i.complete ? "" : "partial"}>
             <td>
-              ${bP(i.key, r)}
+              ${wP(i.key, r)}
               ${i.coverage === 0 ? I`<span class="hint">${t.verdict.hintNoData}</span>` : i.complete ? O : I`<span class="hint"
                       >${t.sizing.ofTheMonth({
         share: Xe(i.coverage, r)
@@ -27057,7 +27068,7 @@ let wr = class extends Ht {
     const t = this.payload, r = this.i18n.locale, n = (a) => e.sizing.ruleLine({
       part: e.sizing.parts[a],
       rule: this.ruleSentence(a, t, r)
-    }), i = gP(e, t, Y(t.rules.full_pct / 100, r));
+    }), i = yP(e, t, Y(t.rules.full_pct / 100, r));
     return I`
       <div class="status">
         <span class="badge">${e.balance.hourlyStatistics}</span>
@@ -27073,7 +27084,7 @@ let wr = class extends Ht {
       </div>
 
       <section>
-        <div class="cards">${_P.map((a) => this.renderCard(a, t))}</div>
+        <div class="cards">${bP.map((a) => this.renderCard(a, t))}</div>
       </section>
 
       <section>
@@ -27184,12 +27195,12 @@ Gn([
 wr = Gn([
   xe("ia-sizing-tab")
 ], wr);
-var wP = Object.defineProperty, SP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? SP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var SP = Object.defineProperty, xP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? xP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && wP(t, r, i), i;
+  return n && i && SP(t, r, i), i;
 };
-const xP = "/inverter-analytics", iy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
+const TP = "/inverter-analytics", iy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
 let ke = class extends Ht {
   constructor() {
     super(...arguments), this.narrow = !1, this.tab = "load", this.range = "30d", this.i18n = new Ne(this), this.readLocation = () => {
@@ -27218,7 +27229,7 @@ let ke = class extends Ht {
    * a filter before leaving the page.
    */
   writeLocation(e = !1) {
-    const t = ew(xP, {
+    const t = ew(TP, {
       tab: this.tab,
       range: this.range,
       entryId: this.entryId

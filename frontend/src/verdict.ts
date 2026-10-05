@@ -6,6 +6,7 @@
  * copy that has to stay exact lives in pure functions and the element only
  * arranges what they return.
  */
+import { DASH, formatPercent } from "./format";
 import type { Messages } from "./i18n/en";
 import { listRoles } from "./roles";
 import type { FullMode, SizingCardKey, SizingPayload, Verdict } from "./types";
@@ -101,6 +102,33 @@ export function solarRuleKind(
     return payload.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed";
   }
   return solarFillTested(payload) ? "with_fill" : "plain";
+}
+
+/**
+ * The one figure a Sun month cell shows: the one its verdict turned on.
+ *
+ * Under the no-export rule (`export_limited === true`) the verdict was read
+ * from the share of days the battery filled, so production as a share of
+ * load — which such a system cannot push above what it used — would explain
+ * nothing about it. Otherwise it is the share of load. A missing figure is a
+ * dash, not a zero.
+ */
+export function solarCellFigure(
+  m: Messages,
+  exportLimited: boolean | null,
+  evidence: Record<string, number | null | undefined>,
+  locale: string,
+): string {
+  if (exportLimited === true) {
+    const fill = evidence.fill_share;
+    return fill === null || fill === undefined
+      ? DASH
+      : m.sizing.filledOnDays({ share: formatPercent(fill, locale) });
+  }
+  const share = evidence.production_share;
+  return share === null || share === undefined
+    ? DASH
+    : m.sizing.ofLoad({ share: formatPercent(share, locale) });
 }
 
 /**

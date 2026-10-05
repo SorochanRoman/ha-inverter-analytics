@@ -443,6 +443,8 @@ export const en = {
     // The total is a number so a language can inflect "days" by it.
     daysOf: (p: { days: string; total: number }) => `${p.days} of ${p.total} days`,
     ofLoad: (p: { share: string }) => `${p.share} of load`,
+    // A Sun month cell on a no-export system, whose verdict the fill decided.
+    filledOnDays: (p: { share: string }) => `filled on ${p.share} of days`,
     // The evidence rows of each card.
     countOf: (p: { count: string; total: string }) => `${p.count} of ${p.total}`,
     hoursReachedRated: "Hours the load reached rated power",
