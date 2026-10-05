@@ -22,8 +22,6 @@ const BASE_PATH = "/inverter-analytics";
 
 const TABS = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"] as const;
 
-/** Tabs that read the whole history and take no period. */
-
 @customElement("inverter-analytics-panel")
 export class InverterAnalyticsPanel extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;

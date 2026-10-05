@@ -121,12 +121,11 @@ beyond pointing the integration at the ones you already have.
   beside a winter, with a table of the last twelve months against the same
   months a year earlier. It uses no period: it reads five years of Home
   Assistant's hourly statistics, so the picker is dimmed while it is open.
-  There are no verdicts. A month that cannot be read honestly says why — the
-  current month among them, since part of a month is not set beside a whole
-  one — the
+  There are no verdicts. A month that cannot be read honestly says why, the
   nameplate capacity is drawn as a reference line and never multiplied in,
   and a system that does not export is told that its energy measures the
-  household, not the array.
+  household, not the array. The current month is usually among the withheld
+  ones: part of a month is not set beside a whole one.
 - **Automatic source selection.** Home Assistant keeps two records of the
   past: precise raw states, purged after `purge_keep_days`, and hourly
   long-term statistics kept forever. The integration decides which to
