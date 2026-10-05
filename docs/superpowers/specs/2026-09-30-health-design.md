@@ -89,7 +89,13 @@ more than `EFFICIENCY_MAX_DRIFT_PCT` (5) points from where it began — read
 as the mean of the month's last hour against the mean of its first — with
 the reason `drift`, and when less than `EFFICIENCY_MIN_KWH` (1) was charged,
 with the reason `too_little_throughput`. Without a state of charge the drift
-cannot be checked and the figure is withheld with `no_soc`. When the month's
+cannot be checked and the figure is withheld with `no_soc`. The two counters
+must cover the same span: when the month has rows in only one of them, or
+one counter's first or last row of the month is more than an hour from the
+other's — a discharge counter added on the 15th, say — the figure is
+withheld with `counters_partial`, checked right after `no_soc`, since the
+ratio would set a month of charging against half a month of discharging.
+When the month's
 state of charge does not span its counter hours — fewer than two rows, or a
 first row more than an hour after the first counter hour or a last row more
 than an hour before the last — the figure is withheld with `soc_partial`:
@@ -224,8 +230,9 @@ admitted and 2.9 rejected, a zero discharge change rejected; a month at 19
 and at 20 clean hours; and the energy-per-point arithmetic on hand-built
 hours including a BMS recalibration hour that inflates the denominator.
 
-Efficiency is tested for both gates with the Battery tab's constants, and
-for `no_soc`.
+Efficiency is tested for both gates with the Battery tab's constants, for
+`no_soc`, and for `counters_partial` with a discharge counter that starts
+mid-month and with a month that has only the charge counter.
 
 The best hour is tested to read every hour in a month the three sensors
 never saw, to read every hour on an exporting system, to skip ceiling hours, to be withheld as

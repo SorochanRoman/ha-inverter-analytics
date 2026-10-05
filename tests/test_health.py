@@ -210,6 +210,39 @@ def test_soc_starting_more_than_an_hour_late_is_soc_partial():
     assert efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]["reason"] == "soc_partial"
 
 
+def january_hours(from_day: int = 1) -> list[datetime]:
+    start = datetime(2026, 1, from_day, tzinfo=KYIV).astimezone(UTC)
+    end = datetime(2026, 2, 1, tzinfo=KYIV).astimezone(UTC)
+    return [start + timedelta(hours=index) for index in range(int((end - start) / HOUR))]
+
+
+def test_a_discharge_counter_starting_mid_month_is_counters_partial():
+    whole, late = january_hours(), january_hours(15)
+    charge = EnergySeries(tuple(EnergyRow(start, 0.1) for start in whole))
+    discharge = EnergySeries(tuple(EnergyRow(start, 0.09) for start in late))
+    soc = [HourlyRow(start, 50.0, 50.0, 50.0) for start in whole]
+    months = efficiency_by_month(charge, discharge, soc, KYIV)
+    assert months["2026-01"] == {"value": None, "reason": "counters_partial"}
+    # Without a charge, no_soc still comes first.
+    assert efficiency_by_month(charge, discharge, None, KYIV)["2026-01"]["reason"] == "no_soc"
+
+
+def test_a_month_with_only_the_charge_counter_is_counters_partial():
+    whole = january_hours()
+    charge = EnergySeries(tuple(EnergyRow(start, 0.1) for start in whole))
+    soc = [HourlyRow(start, 50.0, 50.0, 50.0) for start in whole]
+    months = efficiency_by_month(charge, EnergySeries(()), soc, KYIV)
+    assert months["2026-01"] == {"value": None, "reason": "counters_partial"}
+
+
+def test_counters_within_an_hour_of_each_other_pass_on():
+    charge = energy({1: 5.0, 5: 5.0})
+    discharge = energy({2: 4.5, 4: 4.5})
+    soc = [soc_hour(1), soc_hour(5)]
+    month = efficiency_by_month(charge, discharge, soc, KYIV)["2026-01"]
+    assert month == {"value": pytest.approx(0.9), "reason": None}
+
+
 def test_efficiency_drift_above_five_points_is_withheld():
     charge, discharge = month_of_counters()
     soc = [soc_hour(0, mean=50.0), soc_hour(5, mean=55.1)]

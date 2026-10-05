@@ -1084,6 +1084,7 @@ const kb = {
         other: `Only ${e.n} clean discharge hours`
       })} this month; it needs ${e.minHours}, or one strange hour moves the figure.`,
       no_soc: "No state of charge this month, so there is no telling whether the battery ended where it began.",
+      counters_partial: "The charge and discharge counters do not cover the same hours this month, so what went in and what came out are not from the same span.",
       soc_partial: "The state of charge covers only part of the hours the counters do, so the check that the battery ended where it began would not cover the same span.",
       drift: (e) => `The charge ended more than ${e.points} points from where it began, so part of what came out went in another month, or the reverse.`,
       too_little_throughput: (e) => `Less than ${e.min} went into the battery this month — too little to read an efficiency from.`,
@@ -1570,6 +1571,7 @@ const kb = {
         other: `Лише ${e.n} чистої години розряду`
       })} за місяць; потрібно ${e.minHours}, інакше одна дивна година зсуває значення.`,
       no_soc: "За цей місяць немає рівня заряду, тож не видно, чи батарея закінчила там, де почала.",
+      counters_partial: "Лічильники заряду й розряду цього місяця покривають різні години, тож те, що надійшло, і те, що вийшло, взято не з того самого проміжку.",
       soc_partial: "Рівень заряду покриває лише частину годин, які покривають лічильники, тож перевірка, чи батарея закінчила там, де почала, охопила б інший проміжок.",
       drift: (e) => `Заряд закінчився більш ніж за ${e.points} в.п. від того, де почався, тож частина того, що вийшло, увійшла в іншому місяці, або навпаки.`,
       too_little_throughput: (e) => `За місяць у батарею надійшло менше ніж ${e.min} — замало, щоб читати з цього ККД.`,
@@ -25816,6 +25818,8 @@ function Z$(e, t, r, n) {
       });
     case "no_soc":
       return i.no_soc;
+    case "counters_partial":
+      return i.counters_partial;
     case "soc_partial":
       return i.soc_partial;
     case "drift":

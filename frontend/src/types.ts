@@ -463,7 +463,8 @@ export type HealthSignalKey = "capacity" | "efficiency" | "solar_energy" | "best
 
 /**
  * Why a month has no figure. Capacity: too_few_clean_hours. Efficiency:
- * no_soc, soc_partial, drift, too_little_throughput. Best hour: curtailed.
+ * no_soc, counters_partial, soc_partial, drift, too_little_throughput.
+ * Best hour: curtailed.
  * Solar energy, best hour and inverter: partial_month, when the month's rows
  * cover too little of it to set beside a whole month.
  * A month absent from a signal's months is a gap and has no reason at all.
@@ -472,6 +473,7 @@ export type HealthReason =
   | "partial_month"
   | "too_few_clean_hours"
   | "no_soc"
+  | "counters_partial"
   | "soc_partial"
   | "drift"
   | "too_little_throughput"

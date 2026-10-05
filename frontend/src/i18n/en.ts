@@ -588,6 +588,9 @@ export const en = {
       no_soc:
         "No state of charge this month, so there is no telling whether the battery ended " +
         "where it began.",
+      counters_partial:
+        "The charge and discharge counters do not cover the same hours this month, so what " +
+        "went in and what came out are not from the same span.",
       soc_partial:
         "The state of charge covers only part of the hours the counters do, so the check " +
         "that the battery ended where it began would not cover the same span.",

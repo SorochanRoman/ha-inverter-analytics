@@ -366,6 +366,16 @@ describe("the reasons", () => {
     );
   });
 
+  it("says the two counters cover different spans", () => {
+    expect(healthReason(en, "counters_partial", undefined, "en")).toBe(
+      "The charge and discharge counters do not cover the same hours this month, so what " +
+        "went in and what came out are not from the same span.",
+    );
+    expect(healthReason(uk, "counters_partial", undefined, "uk")).toBe(
+      uk.health.reasons.counters_partial,
+    );
+  });
+
   it("counts zero when the month did not say", () => {
     expect(healthReason(en, "too_few_clean_hours", undefined, "en")).toContain("Only 0");
   });

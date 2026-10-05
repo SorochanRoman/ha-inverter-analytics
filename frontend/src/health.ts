@@ -295,6 +295,8 @@ export function healthReason(
       });
     case "no_soc":
       return reasons.no_soc;
+    case "counters_partial":
+      return reasons.counters_partial;
     case "soc_partial":
       return reasons.soc_partial;
     case "drift":
