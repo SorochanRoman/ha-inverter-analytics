@@ -198,10 +198,16 @@ lie once more than one series is involved. This change forces the issue.
     "imbalance": {"mean": 0.18, "p95": 0.44, "fraction_above": 0.07, "threshold": 0.3,
                   "floor_w": 600, "coverage": 0.94},
     "episodes": [{"start": "...", "end": "...", "seconds": 900, "peak_imbalance": 0.52,
-                  "phases": [3900, 2100, 800]}]
+                  "phases": [3900, 2100, 800]}],
+    "episodes_total": 1
   }
 }
 ```
+
+`episodes` holds at most `EPISODES_SHOWN = 20` episodes: the longest, ties
+broken by the worse peak imbalance, returned in chronological order.
+`episodes_total` is the count before the cut. Every imbalance figure is
+computed from all of them.
 
 The top-level fields stay and describe **the primary series**, the total load —
 that is what the badge shows, and the existing frontend keeps working unchanged.

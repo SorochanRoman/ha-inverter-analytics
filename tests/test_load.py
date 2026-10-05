@@ -172,3 +172,40 @@ def test_high_load_share_is_measured_against_covered_time_not_the_window():
     payload = build_load_payload(series, rated_power=9000.0)
     assert payload["coverage"] == 0.25
     assert payload["kpi"]["fraction_above_80pct"] == 1.0
+
+
+def _overloads(durations: list[float], peaks: list[float]) -> Series:
+    """One overload per duration, each followed by ten minutes well under rated."""
+    samples = []
+    minute = 0.0
+    for duration, peak in zip(durations, peaks, strict=True):
+        samples.append(Sample(at(minute), peak))
+        samples.append(Sample(at(minute + duration), 1000.0))
+        minute += duration + 10.0
+    return Series.of(BASE, at(minute), samples)
+
+
+def test_only_the_twenty_longest_overloads_are_listed_in_order():
+    # Thirty overloads of 2..31 minutes, in no particular order. The shortest
+    # carries the highest peak, so the peak KPI must still see it.
+    durations = [float(2 + (index * 7) % 30) for index in range(30)]
+    peaks = [9900.0 if duration == 2.0 else 8500.0 for duration in durations]
+    payload = build_load_payload(_overloads(durations, peaks), rated_power=8000.0)
+
+    listed = payload["overloads"]
+    assert payload["overloads_total"] == 30
+    assert len(listed) == 20
+    assert sorted(item["seconds"] for item in listed) == [m * 60.0 for m in range(12, 32)]
+    assert [item["start"] for item in listed] == sorted(item["start"] for item in listed)
+    assert payload["kpi"]["max"] == pytest.approx(9900.0)
+
+
+def test_equal_overloads_are_kept_by_the_higher_peak():
+    durations = [5.0] * 21
+    peaks = [8100.0 + 10.0 * index for index in range(21)]
+    peaks[7] = 8001.0
+    payload = build_load_payload(_overloads(durations, peaks), rated_power=8000.0)
+
+    assert payload["overloads_total"] == 21
+    assert 8001.0 not in [item["peak"] for item in payload["overloads"]]
+    assert len(payload["overloads"]) == 20

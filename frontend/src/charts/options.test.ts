@@ -60,6 +60,7 @@ const payload: LoadPayload = {
     { key: "100+", from: 1, to: null, seconds: 2700, fraction: 0.75 },
   ],
   overloads: [],
+  overloads_total: 0,
   series: {},
   consistency: {},
   precision: "raw",

@@ -114,7 +114,10 @@ Bucketing by hour of day is done **in the local time zone** (`hass.config.time_z
 - load duration curve (LDC): power sorted descending vs. cumulative % of time
 - distribution across rated-power bands: 0-10 / 10-25 / 25-50 / 50-75 / 75-100 / >100%
 - maximum sustained 15-minute load
-- overload episodes: contiguous intervals above rated power, with duration and peak
+- overload episodes: contiguous intervals above rated power, with duration and peak.
+  The payload lists at most `EPISODES_SHOWN = 20` of them — the longest, ties
+  broken by the higher peak, in chronological order — with `overloads_total`,
+  the count before the cut, beside the list
 
 ### 7.2 Battery (`battery.py`)
 

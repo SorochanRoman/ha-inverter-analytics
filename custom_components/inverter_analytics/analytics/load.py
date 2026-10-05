@@ -24,6 +24,7 @@ from .resample import (
     duration_curve,
     duration_histogram,
     episodes_above,
+    longest_episodes,
     max_sustained_mean,
     percentile_in_range,
     time_weighted_mean,
@@ -135,6 +136,7 @@ def build_load_payload(
             for fraction, value in duration_curve(histogram, points=DURATION_CURVE_POINTS)
         ],
         "bands": bands,
+        # The twenty longest, in order; the count says how many there were.
         "overloads": [
             {
                 "start": episode.start.isoformat(),
@@ -142,8 +144,13 @@ def build_load_payload(
                 "seconds": episode.seconds,
                 "peak": episode.extreme,
             }
-            for episode in overloads
+            for episode in longest_episodes(
+                overloads,
+                seconds=lambda episode: episode.seconds,
+                severity=lambda episode: episode.extreme,
+            )
         ],
+        "overloads_total": len(overloads),
     }
 
 

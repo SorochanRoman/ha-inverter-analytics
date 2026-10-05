@@ -78,7 +78,10 @@ export interface Phases {
   rating_per_phase_derived: boolean;
   rating_per_phase_divisor: number;
   imbalance: Imbalance;
+  /** The EPISODES_SHOWN longest episodes, in chronological order. */
   episodes: ImbalanceEpisode[];
+  /** How many episodes there were before the list was cut. */
+  episodes_total: number;
 }
 
 export interface Strings {
@@ -108,7 +111,10 @@ export interface LoadPayload {
   };
   duration_curve: { fraction: number; value: number }[];
   bands: Band[];
+  /** The EPISODES_SHOWN longest overloads, in chronological order. */
   overloads: Overload[];
+  /** How many overloads there were before the list was cut. */
+  overloads_total: number;
   precision: Precision;
   boundary: string | null;
   window: { start: string; end: string };

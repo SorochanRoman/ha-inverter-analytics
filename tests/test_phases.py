@@ -151,3 +151,41 @@ def test_two_mapped_phases_of_a_three_phase_inverter_do_not_halve_the_rating():
     payload = build([span(0, 60, 3000.0, 3000.0)], identities=(L1, L3))
     assert payload["rating_per_phase_divisor"] == 3
     assert payload["rating_per_phase"] == 3000.0
+
+
+def _episodes(durations: list[float], severities: list[float]) -> list[AlignedInterval]:
+    """One imbalance episode per duration, each followed by ten balanced minutes.
+
+    severity is L1's reading against 2000 W on the other two phases.
+    """
+    aligned = []
+    minute = 0.0
+    for duration, l1 in zip(durations, severities, strict=True):
+        aligned.append(span(minute, minute + duration, l1, 2000.0, 2000.0))
+        aligned.append(span(minute + duration, minute + duration + 10, 3000.0, 3000.0, 3000.0))
+        minute += duration + 10.0
+    return aligned
+
+
+def test_only_the_twenty_longest_episodes_are_listed_in_order():
+    durations = [float(2 + (index * 7) % 30) for index in range(30)]
+    payload = build(_episodes(durations, [5000.0] * 30))
+
+    listed = payload["episodes"]
+    assert payload["episodes_total"] == 30
+    assert len(listed) == 20
+    assert sorted(item["seconds"] for item in listed) == [m * 60.0 for m in range(12, 32)]
+    assert [item["start"] for item in listed] == sorted(item["start"] for item in listed)
+    # The share above the threshold still counts every episode, listed or not.
+    above = sum(durations)
+    assert payload["imbalance"]["fraction_above"] == above / (above + 10.0 * 30)
+
+
+def test_equal_episodes_are_kept_by_the_worse_imbalance():
+    severities = [5000.0 + 10.0 * index for index in range(21)]
+    severities[7] = 4000.0
+    payload = build(_episodes([5.0] * 21, severities))
+
+    assert payload["episodes_total"] == 21
+    assert len(payload["episodes"]) == 20
+    assert [4000.0, 2000.0, 2000.0] not in [item["phases"] for item in payload["episodes"]]

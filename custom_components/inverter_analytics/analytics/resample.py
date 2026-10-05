@@ -486,6 +486,33 @@ def episodes_below(
     return _episodes(intervals, lambda value: value < threshold, min, min_seconds)
 
 
+EPISODES_SHOWN = 20
+
+
+def longest_episodes[T](
+    episodes: Sequence[T],
+    *,
+    seconds: Callable[[T], float],
+    severity: Callable[[T], float],
+    limit: int = EPISODES_SHOWN,
+) -> list[T]:
+    """The longest episodes of a chronological list, still in chronological order.
+
+    A table of hundreds of rows is one nobody reads, and the rows worth reading
+    are the long ones. Ties go to the more severe episode. Only the list is
+    cut: every figure computed from the episodes is computed before this, from
+    all of them, and the caller sends the full count beside the list.
+    """
+    if len(episodes) <= limit:
+        return list(episodes)
+    ranked = sorted(
+        range(len(episodes)),
+        key=lambda index: (seconds(episodes[index]), severity(episodes[index])),
+        reverse=True,
+    )
+    return [episodes[index] for index in sorted(ranked[:limit])]
+
+
 def _max_window_mean(run: Sequence[Interval], window_seconds: float) -> float | None:
     """Maximum sliding-window mean within a single contiguous run."""
     times: list[float] = [0.0]

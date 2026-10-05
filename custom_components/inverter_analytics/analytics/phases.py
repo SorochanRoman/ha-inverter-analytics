@@ -17,6 +17,7 @@ from .resample import (
     aligned_coverage,
     duration_histogram,
     episodes_above,
+    longest_episodes,
     percentile_in_range,
     time_weighted_mean,
 )
@@ -140,6 +141,7 @@ def build_phase_payload(
             continue
         gated.append((Interval(item.start, item.end, value), item.values))
 
+    episodes = _imbalance_episodes(gated, threshold)
     imbalance = _imbalance_summary(gated, threshold, window_seconds)
     imbalance |= {
         "threshold": threshold,
@@ -154,7 +156,13 @@ def build_phase_payload(
         "rating_per_phase_derived": rating_derived,
         "rating_per_phase_divisor": divisor,
         "imbalance": imbalance,
-        "episodes": _imbalance_episodes(gated, threshold),
+        # The twenty longest, in order; the count says how many there were.
+        "episodes": longest_episodes(
+            episodes,
+            seconds=lambda episode: episode["seconds"],
+            severity=lambda episode: episode["peak_imbalance"],
+        ),
+        "episodes_total": len(episodes),
     }
 
 
