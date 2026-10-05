@@ -6,7 +6,7 @@
  * a difference is printed, when the twelve-against-twelve figure appears —
  * live in pure functions, and the tab only renders what they return.
  */
-import { DASH, formatEnergy, formatPercent, formatPower } from "./format";
+import { DASH, formatCoverage, formatEnergy, formatPercent, formatPower } from "./format";
 import type { Messages } from "./i18n/en";
 import type {
   HealthMonth,
@@ -31,6 +31,7 @@ export const EFFICIENCY_MAX_DRIFT_PCT = 5.0;
 export const EFFICIENCY_MIN_KWH = 1.0;
 export const CEILING_PV_MIN_W = 100.0;
 export const HIGH_LOAD_SHARE = 0.8;
+export const PARTIAL_MONTH_COVERAGE = 0.95;
 
 export type HealthCardKey = "capacity" | "efficiency" | "solar" | "inverter";
 
@@ -283,6 +284,28 @@ function plain(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
 
+/**
+ * A share cut to the one decimal of a percentage it is printed with, never
+ * rounded up: 94.96% printed as "95%" beside "a month needs 95%" would
+ * contradict the reason it is printed for.
+ */
+function roundedDown(share: number): number {
+  return Math.floor(share * 1000) / 1000;
+}
+
+/**
+ * The hint beside an efficiency month whose figure was corrected for the
+ * charge the battery ended with, or null for a month read as it was.
+ */
+export function correctionHint(
+  m: Messages,
+  signal: HealthSignalKey,
+  month: HealthMonth | undefined,
+): string | null {
+  if (signal !== "efficiency" || month?.drift_corrected !== true) return null;
+  return m.health.driftCorrected;
+}
+
 /** Why a month has no figure, with the count it did have and the one it needed. */
 export function healthReason(
   m: Messages,
@@ -308,7 +331,11 @@ export function healthReason(
     case "too_little_throughput":
       return reasons.too_little_throughput({ min: formatEnergy(EFFICIENCY_MIN_KWH, locale) });
     case "partial_month":
-      return reasons.partial_month;
+      if (month?.coverage === undefined) return reasons.partial_month;
+      return reasons.partialCoverage({
+        share: formatCoverage(roundedDown(month.coverage), locale),
+        needed: formatPercent(PARTIAL_MONTH_COVERAGE, locale),
+      });
     case "curtailed":
       return reasons.curtailed({
         n: month?.unconstrained_hours ?? 0,

@@ -9,6 +9,7 @@ import {
   bestHourCaption,
   chartLines,
   comparisonView,
+  correctionHint,
   energyCaption,
   formatHealthDifference,
   formatHealthShare,
@@ -161,6 +162,9 @@ export class IaHealthTab extends LitElement {
                 ${formatHealthValue(signal, row.value, m, locale)}
                 ${row.reason !== null
                   ? html`<span class="hint">${healthReason(m, row.reason, month, locale)}</span>`
+                  : nothing}
+                ${correctionHint(m, signal, month) !== null
+                  ? html`<span class="hint">${correctionHint(m, signal, month)}</span>`
                   : nothing}
                 ${signal === "inverter" && month?.measured_hours !== undefined
                   ? html`<span class="hint"

@@ -10,6 +10,7 @@ import {
   formatHealthShare,
   formatHealthValue,
   healthDefinitions,
+  correctionHint,
   healthReason,
   lastTwelveRows,
   nameplateLine,
@@ -395,6 +396,21 @@ describe("the reasons", () => {
     );
   });
 
+  it("says how much of a partial month was covered, and the share a month needs", () => {
+    const month = { value: null, reason: "partial_month" as const, coverage: 0.946 };
+    expect(healthReason(en, "partial_month", month, "en")).toBe(
+      "94.6% of the month has statistics; a month needs 95%, and a part is not compared " +
+        "with a whole month.",
+    );
+    expect(healthReason(uk, "partial_month", month, "uk")).toContain("94,6%");
+    expect(healthReason(uk, "partial_month", month, "uk")).toContain("95%");
+  });
+
+  it("never rounds a partial month's coverage up to the share it fell short of", () => {
+    const month = { value: null, reason: "partial_month" as const, coverage: 0.9496 };
+    expect(healthReason(en, "partial_month", month, "en")).toMatch(/^94\.9% of the month/);
+  });
+
   it("says the two counters cover different spans", () => {
     expect(healthReason(en, "counters_partial", undefined, "en")).toBe(
       "The charge and discharge counters do not cover the same hours this month, so what " +
@@ -407,6 +423,24 @@ describe("the reasons", () => {
 
   it("counts zero when the month did not say", () => {
     expect(healthReason(en, "too_few_clean_hours", undefined, "en")).toContain("Only 0");
+  });
+});
+
+describe("the correction hint", () => {
+  it("marks an efficiency month corrected for the change in the battery's charge", () => {
+    const month = { value: 0.83, reason: null, drift_corrected: true };
+    expect(correctionHint(en, "efficiency", month)).toBe(
+      "corrected for the change in the battery's charge",
+    );
+    expect(correctionHint(uk, "efficiency", month)).toBe(uk.health.driftCorrected);
+  });
+
+  it("is absent on a month read as it was, and off the efficiency signal", () => {
+    expect(correctionHint(en, "efficiency", { value: 0.9, reason: null })).toBeNull();
+    expect(correctionHint(en, "efficiency", undefined)).toBeNull();
+    expect(
+      correctionHint(en, "capacity", { value: 9, reason: null, drift_corrected: true }),
+    ).toBeNull();
   });
 });
 

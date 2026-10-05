@@ -587,6 +587,9 @@ export const en = {
     // Under an inverter month's figure.
     inverterHint: (p: { atRated: string; measured: string }) =>
       `${p.atRated} h at rated, of ${p.measured} h measured`,
+    // Under an efficiency month whose figure the month's capacity corrected for
+    // the charge it ended with: the drift can run either way, so it names the change.
+    driftCorrected: "corrected for the change in the battery's charge",
     // Why a month has no figure, keyed by the payload's reason.
     reasons: {
       too_few_clean_hours: (p: { n: number; minHours: number }) =>
@@ -612,6 +615,10 @@ export const en = {
         "efficiency from.",
       partial_month:
         "Only part of this month has statistics, and a part is not compared with a whole month.",
+      // partial_month when the payload says how much of the month was covered.
+      partialCoverage: (p: { share: string; needed: string }) =>
+        `${p.share} of the month has statistics; a month needs ${p.needed}, and a part is ` +
+        "not compared with a whole month.",
       curtailed: (p: { n: number; minHours: number }) =>
         `${plural("en", p.n, {
           one: `Only ${p.n} hour of sun`,

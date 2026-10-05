@@ -117,7 +117,8 @@ efficiency = (discharged + stored_kwh) / charged
 `drift_points` is the last hour's mean minus the first's, so a positive drift
 — the charge ended higher — is energy that went in and stayed, and a negative
 one is energy that came out of what was there before. Such a month carries
-`drift_corrected: true` with `reason: null`; the throughput check still
+`drift_corrected: true` with `reason: null`, and the panel marks its figure
+as corrected for the change in the battery's charge; the throughput check still
 applies. Without a capacity figure for that month — or if the correction
 would leave nothing discharged — the reason stays `drift`. Five points of a
 31 kWh battery is about 1.5 kWh, against hundreds of kWh of monthly
@@ -220,7 +221,8 @@ withheld with the reason `partial_month` when the signal's own distinct
 hourly rows in it are fewer than `PARTIAL_MONTH_COVERAGE = 0.95` of the
 month's hours, and carries `coverage: float` — those rows over the whole
 calendar month's hours — so the panel can say how far short it fell ("94.6% of
-the month has statistics; a month needs 95%"). It is stricter than the Seasonality tab's
+the month has statistics; a month needs 95%"; the share is cut, never rounded
+up to the 95% it fell short of). It is stricter than the Seasonality tab's
 `INCOMPLETE_COVERAGE` (0.6) on purpose: that marks means, which do not
 scale with coverage, while a sum does — a month 60% covered would read up
 to 40% low. A missing 5% stays inside the noise a month's weather already
