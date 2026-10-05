@@ -681,3 +681,31 @@ def test_efficiency_without_a_mapped_charge_has_no_months():
     )
     assert result["signals"]["efficiency"]["missing"] == ["battery_soc"]
     assert result["signals"]["efficiency"]["months"] == {}
+
+
+def ceiling_february(export_kwh: float):
+    """A February of hours at the charge ceiling, a PV counter, and an export counter."""
+    hours = local_hours(2026, 2)
+    return payload(
+        pv_power=HourlySeries(tuple(HourlyRow(start, 1500.0, 0.0, 3000.0) for start in hours)),
+        soc=HourlySeries(tuple(HourlyRow(start, 85.0, 85.0, 85.0) for start in hours)),
+        battery_power=HourlySeries(tuple(HourlyRow(start, 0.0, 0.0, 0.0) for start in hours)),
+        pv=EnergySeries(tuple(EnergyRow(start, 1.0) for start in hours)),
+        export=EnergySeries(tuple(EnergyRow(start, export_kwh) for start in hours)),
+    )
+
+
+def test_an_exporting_system_reads_the_best_hour_from_every_hour():
+    # A full battery does not cut back an array that can export.
+    result = ceiling_february(export_kwh=0.5)
+    assert result["export_limited"] is False
+    assert result["best_hour_mode"] == "all"
+    month = result["signals"]["best_hour"]["months"]["2026-02"]
+    assert month == {"value": 3000.0, "reason": None, "unconstrained_hours": None}
+
+
+def test_a_system_that_keeps_its_production_in_leaves_ceiling_hours_out():
+    result = ceiling_february(export_kwh=0.0)
+    assert result["export_limited"] is True
+    assert result["best_hour_mode"] == "unconstrained"
+    assert result["signals"]["best_hour"]["months"]["2026-02"]["reason"] == "curtailed"

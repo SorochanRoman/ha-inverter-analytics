@@ -111,7 +111,8 @@ taking sun when the battery is at its limit and export is limited: PV is
 then cut back to what the house uses, and its maximum in that hour is the
 load, not the array. A summer of such hours would draw as a falling best
 hour while the array is fine. So, when `battery_soc`, `battery_power` and
-`pv_power` are all mapped, the best hour is read only from hours that are
+`pv_power` are all mapped and `export_limited` is not `False`, the best hour
+is read only from hours that are
 **not ceiling hours** — the Sizing tab's `charge_ceiling`, imported, with
 the same constants. A month with fewer than `BEST_HOUR_MIN_HOURS = 10`
 unconstrained hours of PV at or above `CEILING_PV_MIN_W` is withheld with
@@ -122,6 +123,14 @@ all — before one of them was added, say — is read the same way, from every
 hour with `unconstrained_hours: null`: its hours were never measured, and
 calling it `curtailed` would claim a limit nobody saw. A month with some
 observed hours keeps the rule above.
+
+On a system known to export (`export_limited` is `False`) a full battery
+does not cut the array back — the surplus goes to the grid — so ceiling
+hours are not left out: leaving them out would make the best hour follow
+the battery filling, not the array. The best hour is then read from every
+hour and `best_hour_mode` is `"all"`; the card says the system exports, so
+every hour's peak is the array's, rather than that sensors are missing.
+Unknown export (`None`) counts as limited, the safe side.
 
 **Energy without export follows the house.** When the installation does not
 export — the Sizing tab's `export_limited`, imported, decided once over the
@@ -219,7 +228,7 @@ Efficiency is tested for both gates with the Battery tab's constants, and
 for `no_soc`.
 
 The best hour is tested to read every hour in a month the three sensors
-never saw, to skip ceiling hours, to be withheld as
+never saw, to read every hour on an exporting system, to skip ceiling hours, to be withheld as
 `curtailed` at 9 unconstrained hours and read at 10, and to fall back to
 every hour without the three sensors; the export caption is tested to
 follow `export_limited`.

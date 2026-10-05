@@ -1096,7 +1096,8 @@ const kb = {
     // bestHourCaption.
     bestHourCaption: {
       unconstrained: "Hours when the battery was at its charge limit are left out: the inverter may have cut the array back to what the house used, so their peak may be the load, not the array.",
-      all: "Read from every hour. Without the state of charge, battery power and PV power, an hour the system could not take cannot be told apart, so a low month may be the house and not the array."
+      all: "Read from every hour. Without the state of charge, battery power and PV power, an hour the system could not take cannot be told apart, so a low month may be the house and not the array.",
+      exporting: "Read from every hour. This system exports, so a full battery does not cut the array back — the surplus goes to the grid — and every hour's peak is the array's."
     },
     // energyCaption.
     energyCaption: {
@@ -1582,7 +1583,8 @@ const kb = {
     },
     bestHourCaption: {
       unconstrained: "Години, коли батарея була на ліміті заряду, не враховано: інвертор міг урізати СЕС до того, що споживав будинок, тож їхній пік може бути навантаженням, а не СЕС.",
-      all: "Враховано всі години. Без рівня заряду, потужності батареї й потужності СЕС годину, коли система не могла взяти сонце, не відрізнити, тож низький місяць може бути будинком, а не СЕС."
+      all: "Враховано всі години. Без рівня заряду, потужності батареї й потужності СЕС годину, коли система не могла взяти сонце, не відрізнити, тож низький місяць може бути будинком, а не СЕС.",
+      exporting: "Враховано всі години. Ця система експортує, тож повна батарея не урізає СЕС — надлишок іде в мережу, — і пік кожної години належить СЕС."
     },
     energyCaption: {
       household: "Ця система без експорту, тож енергія — це те, що спожив будинок, а не те, що могла дати СЕС: її різниця з минулим роком міряє домогосподарство. Про СЕС каже найкраща година.",
@@ -25736,7 +25738,7 @@ function W$(e) {
   };
 }
 function U$(e) {
-  return e.best_hour_mode;
+  return e.best_hour_mode === "all" && e.export_limited === !1 ? "exporting" : e.best_hour_mode;
 }
 function Y$(e) {
   return e.export_limited === !0 ? "household" : "array";

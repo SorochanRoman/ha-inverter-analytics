@@ -151,8 +151,13 @@ export function comparisonView(signal: HealthSignal): ComparisonView {
   };
 }
 
-/** Whether the best hour left out hours the system could not take, or read every hour. */
-export function bestHourCaption(payload: HealthPayload): "unconstrained" | "all" {
+/**
+ * Whether the best hour left out hours the system could not take, or read
+ * every hour — and, when it read every hour, whether that is because export
+ * let the array run free or because the sensors to tell were missing.
+ */
+export function bestHourCaption(payload: HealthPayload): "unconstrained" | "all" | "exporting" {
+  if (payload.best_hour_mode === "all" && payload.export_limited === false) return "exporting";
   return payload.best_hour_mode;
 }
 

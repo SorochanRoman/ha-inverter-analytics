@@ -615,6 +615,9 @@ export const en = {
         "Read from every hour. Without the state of charge, battery power and PV power, an " +
         "hour the system could not take cannot be told apart, so a low month may be the " +
         "house and not the array.",
+      exporting:
+        "Read from every hour. This system exports, so a full battery does not cut the array " +
+        "back — the surplus goes to the grid — and every hour's peak is the array's.",
     },
     // energyCaption.
     energyCaption: {

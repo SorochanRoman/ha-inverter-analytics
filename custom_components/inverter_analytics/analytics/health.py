@@ -388,8 +388,8 @@ def build_health_payload(
     is already signed so that negative is export. `missing` names, per
     signal, the roles it needs that are not mapped, and such a signal has no
     months at all. The ceiling is read only when the charge, the battery's
-    power and the PV power all have rows: a sensor with none would make every
-    hour look unconstrained.
+    power and the PV power all have rows — a sensor with none would make every
+    hour look unconstrained — and only when export is not known to flow.
     """
     window = Window(now - timedelta(days=HEALTH_MAX_YEARS * _DAYS_PER_YEAR), now)
     # Whole calendar months, the current one too: see withhold_partial_months.
@@ -398,8 +398,26 @@ def build_health_payload(
     }
     keys = sorted(month_hours)
 
+    exports = export_limited(
+        pv=pv,
+        export=export,
+        grid=grid.rows if grid is not None else None,
+        zero_w=zero_w,
+    )
+    # A full battery cuts the array back only where the surplus cannot go to
+    # the grid. On a system known to export, leaving ceiling hours out would
+    # make the best hour follow the battery filling, not the array. Unknown
+    # counts as limited: leaving hours out is the safe side.
     ceiling = None
-    if soc and soc.rows and battery_power and battery_power.rows and pv_power and pv_power.rows:
+    if (
+        exports is not False
+        and soc
+        and soc.rows
+        and battery_power
+        and battery_power.rows
+        and pv_power
+        and pv_power.rows
+    ):
         ceiling = charge_ceiling(
             soc.rows, battery_power.rows, pv_power.rows, low_pct=low_pct, idle_w=idle_w
         )
@@ -451,12 +469,7 @@ def build_health_payload(
         "first_month": _first_month(keys, signals),
         "covered_end": covered_end.isoformat() if covered_end else None,
         "covers_now": bool(covered_end and covered_end >= now - _COVERS_NOW_SLACK),
-        "export_limited": export_limited(
-            pv=pv,
-            export=export,
-            grid=grid.rows if grid is not None else None,
-            zero_w=zero_w,
-        ),
+        "export_limited": exports,
         "best_hour_mode": "unconstrained" if ceiling is not None else "all",
         "nameplate_kwh": nameplate_kwh,
         "signals": signals,

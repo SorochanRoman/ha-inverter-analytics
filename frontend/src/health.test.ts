@@ -244,7 +244,19 @@ describe("the captions", () => {
     expect(bestHourCaption(payload(months, {}, { best_hour_mode: "unconstrained" }))).toBe(
       "unconstrained",
     );
-    expect(bestHourCaption(payload(months, {}, { best_hour_mode: "all" }))).toBe("all");
+    expect(
+      bestHourCaption(payload(months, {}, { best_hour_mode: "all", export_limited: true })),
+    ).toBe("all");
+  });
+
+  it("says an exporting system's every hour is the array's", () => {
+    const months = ["2025-01"];
+    expect(
+      bestHourCaption(payload(months, {}, { best_hour_mode: "all", export_limited: false })),
+    ).toBe("exporting");
+    expect(
+      bestHourCaption(payload(months, {}, { best_hour_mode: "all", export_limited: null })),
+    ).toBe("all");
   });
 
   it("says the energy follows the house only when export is limited", () => {
