@@ -598,24 +598,39 @@ def energy_series(total: float) -> EnergySeries:
     return EnergySeries((EnergyRow(BASE, total),))
 
 
+PV_1000 = energy_series(1000.0)
+
+
 def test_export_is_limited_by_the_counter():
-    args = {"pv_kwh": 1000.0, "grid": None, "zero_w": 10.0}
+    args = {"pv": energy_series(1000.0), "grid": None, "zero_w": 10.0}
     assert export_limited(export=energy_series(5.0), **args) is True
     assert export_limited(export=energy_series(10.0), **args) is True, "1% exactly is limited"
     assert export_limited(export=energy_series(50.0), **args) is False
 
 
+def test_the_export_share_counts_production_only_over_the_export_counters_hours():
+    """An export counter added later is set against the production of its own hours."""
+    early = EnergySeries(tuple(EnergyRow(BASE + timedelta(hours=h), 10.0) for h in range(90)))
+    late = tuple(EnergyRow(BASE + timedelta(hours=h), 10.0) for h in range(90, 100))
+    pv = EnergySeries(early.rows + late)
+    # 5 kWh out of the 100 produced while the counter ran is 5%: exporting.
+    # Against all 1000 kWh it would read as 0.5%, limited.
+    export = EnergySeries(tuple(EnergyRow(BASE + timedelta(hours=h), 0.5) for h in range(90, 100)))
+    assert export_limited(pv=pv, export=export, grid=None, zero_w=10.0) is False
+    assert export_limited(pv=None, export=export, grid=None, zero_w=10.0) is None
+
+
 def test_export_is_limited_by_grid_power_when_no_counter():
     never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
     out = [hour(12, mean=-300.0, low=-800.0, high=900.0)]
-    assert export_limited(pv_kwh=1000.0, export=None, grid=never_out, zero_w=10.0) is True
-    assert export_limited(pv_kwh=1000.0, export=None, grid=out, zero_w=10.0) is False
+    assert export_limited(pv=PV_1000, export=None, grid=never_out, zero_w=10.0) is True
+    assert export_limited(pv=PV_1000, export=None, grid=out, zero_w=10.0) is False
 
 
 def test_a_second_of_overshoot_is_not_export():
     # A zero-export inverter regulating against a CT overshoots when a load switches off.
     overshoot = [hour(h, mean=200.0, low=-300.0, high=900.0) for h in range(100)]
-    assert export_limited(pv_kwh=1000.0, export=None, grid=overshoot, zero_w=10.0) is True
+    assert export_limited(pv=PV_1000, export=None, grid=overshoot, zero_w=10.0) is True
 
 
 def test_export_by_grid_power_tolerates_one_percent_of_exporting_hours():
@@ -625,19 +640,19 @@ def test_export_by_grid_power_tolerates_one_percent_of_exporting_hours():
             for h in range(100)
         ]
 
-    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(1), zero_w=10.0) is True
-    assert export_limited(pv_kwh=1000.0, export=None, grid=grid(2), zero_w=10.0) is False
+    assert export_limited(pv=PV_1000, export=None, grid=grid(1), zero_w=10.0) is True
+    assert export_limited(pv=PV_1000, export=None, grid=grid(2), zero_w=10.0) is False
 
 
 def test_an_export_counter_with_no_rows_falls_back_to_grid_power():
     never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
     empty = EnergySeries(())
-    assert export_limited(pv_kwh=1000.0, export=empty, grid=never_out, zero_w=10.0) is True
-    assert export_limited(pv_kwh=1000.0, export=empty, grid=[], zero_w=10.0) is None
+    assert export_limited(pv=PV_1000, export=empty, grid=never_out, zero_w=10.0) is True
+    assert export_limited(pv=PV_1000, export=empty, grid=[], zero_w=10.0) is None
 
 
 def test_export_is_unknown_without_either():
-    assert export_limited(pv_kwh=1000.0, export=None, grid=None, zero_w=10.0) is None
+    assert export_limited(pv=PV_1000, export=None, grid=None, zero_w=10.0) is None
 
 
 def no_export(share: float, fill: float | None):
@@ -776,5 +791,5 @@ def test_an_export_counter_without_measured_pv_cannot_decide():
     """A share of no production is no share: the counter steps aside for grid power."""
     never_out = [hour(12, mean=300.0, low=-5.0, high=900.0)]
     args = {"export": energy_series(5.0), "zero_w": 10.0}
-    assert export_limited(pv_kwh=0.0, grid=None, **args) is None
-    assert export_limited(pv_kwh=0.0, grid=never_out, **args) is True
+    assert export_limited(pv=energy_series(0.0), grid=None, **args) is None
+    assert export_limited(pv=energy_series(0.0), grid=never_out, **args) is True

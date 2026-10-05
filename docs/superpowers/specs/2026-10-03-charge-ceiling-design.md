@@ -97,7 +97,9 @@ In ceiling mode both are empty.
 
 1. `grid_export_total` mapped and the window has rows → `True` when its
    total is at most `EXPORT_LIMITED_SHARE = 0.01` of the PV total, else
-   `False`.
+   `False`. The PV total is summed only over the hours the export counter
+   has rows for, so a counter added later is not set against years it never
+   saw.
 2. Otherwise `grid_power` mapped and the window has rows → an hour
    exported when its **mean** fell below `−grid_zero_w` (option, or
    `DEFAULT_GRID_ZERO_W`), with the sensor's configured sign applied so

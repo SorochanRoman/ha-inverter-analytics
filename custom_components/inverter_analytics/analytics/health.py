@@ -399,7 +399,7 @@ def build_health_payload(
         "covered_end": covered_end.isoformat() if covered_end else None,
         "covers_now": bool(covered_end and covered_end >= now - _COVERS_NOW_SLACK),
         "export_limited": export_limited(
-            pv_kwh=pv.total if pv is not None else 0.0,
+            pv=pv,
             export=export,
             grid=grid.rows if grid is not None else None,
             zero_w=zero_w,

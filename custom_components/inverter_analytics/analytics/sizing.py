@@ -274,7 +274,7 @@ def solar_evidence(
 
 def export_limited(
     *,
-    pv_kwh: float,
+    pv: EnergySeries | None,
     export: EnergySeries | None,
     grid: Sequence[HourlyRow] | None,
     zero_w: float,
@@ -286,14 +286,22 @@ def export_limited(
     measured; then grid power, signed so that negative is export; otherwise
     None — unknown, which the Sun rule reads as exporting.
 
+    Production is summed only over the hours the export counter has rows for:
+    a counter added a year after the PV counter, set against all of the PV
+    counter's years, would understate the share and call an exporting system
+    limited.
+
     By grid power an hour exported when its mean fell below the zero band, and
     the system kept its production in when such hours are at most
     `EXPORT_LIMITED_SHARE` of the hours read. The hour's minimum is not used:
     a zero-export inverter regulating against a clamp overshoots into export
     for a few seconds whenever a load switches off.
     """
-    if export is not None and export.rows and pv_kwh > 0:
-        return export.total <= EXPORT_LIMITED_SHARE * pv_kwh
+    if export is not None and export.rows and pv is not None:
+        exported_hours = {row.start for row in export.rows}
+        pv_kwh = sum(row.change for row in pv.rows if row.start in exported_hours)
+        if pv_kwh > 0:
+            return export.total <= EXPORT_LIMITED_SHARE * pv_kwh
     if grid:
         exporting = sum(1 for row in grid if row.mean < -zero_w)
         return exporting <= EXPORT_LIMITED_SHARE * len(grid)
@@ -717,9 +725,8 @@ async def async_sizing_analytics(
     # there the crossed pair is as wrong as it ever was.
     thresholds_inverted = ceiling is None and marks_crossed
     judged_soc = None if thresholds_inverted else read_soc
-    pv_series = energy.get("pv_energy_total")
     export = export_limited(
-        pv_kwh=pv_series.total if pv_series is not None else 0.0,
+        pv=energy.get("pv_energy_total"),
         export=energy.get("grid_export_total"),
         grid=signed_grid(config, extremes.get(grid_id) if grid_id else None),
         zero_w=config.number("grid_zero_w") or DEFAULT_GRID_ZERO_W,
