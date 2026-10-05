@@ -600,3 +600,57 @@ describe("year lines", () => {
     expect(unsupported).toEqual([]);
   });
 });
+
+describe("room for the axis names", () => {
+  // ECharts' containLabel makes room for the tick labels, not for the axis
+  // names: a y-axis name sits nameGap (15 px) above the plot in a 12 px font,
+  // and an x-axis name at the end of its axis runs off the right edge.
+  const months: MonthBucket[] = [
+    { key: "2025-12", load_mean: 3000, load_peak_hourly: 5000, pv_mean: 200,
+      seconds: 100, month_seconds: 100, coverage: 1, complete: true },
+  ];
+  const hours: HourBucket[] = [{ hour: 0, load_mean: 1, pv_mean: 1, seconds: 3600 }];
+  const imbalance: Imbalance = {
+    mean: 0.2, p95: 0.5, fraction_above: 0.1, analysed_seconds: 60, coverage: 1,
+    threshold: 0.3, floor_w: 400, below_floor_seconds: 0, aligned_coverage: 1,
+    histogram: [{ start: 0, end: 0.2, fraction: 1 }],
+  };
+  const battery = {
+    low_pct: 20,
+    histogram: { bucket_width: 5, clipped_low_seconds: 0, clipped_high_seconds: 0, buckets: [] },
+  } as unknown as BatteryPayload;
+  const flows = ["pv_energy_total"];
+  const built: [string, any][] = [
+    ["histogram", histogramOption(payload, "percent", uk)],
+    ["durationCurve", durationCurveOption(payload, uk)],
+    ["bands", bandsOption(payload, uk)],
+    ["imbalance", imbalanceOption(imbalance, uk)],
+    ["parts", partsOption([], SERIES.pv, uk)],
+    ["socHistogram", socHistogramOption(battery, uk)],
+    ["socBands", socBandsOption([], uk)],
+    ["monthly", monthlyOption(months, false, uk)],
+    ["monthlyPv", monthlyOption(months, true, uk)],
+    ["hourOfDay", hourOfDayOption(hours, false, uk)],
+    ["hourOfDayPv", hourOfDayOption(hours, true, uk)],
+    ["heatmap", monthHourHeatmapOption([], months, uk)],
+    ["flowBars", flowBarsOption({ pv_energy_total: 1 }, flows, [], uk)],
+    ["dailyFlows", dailyFlowsOption([], flows, [], uk)],
+    ["outageDays", outageDaysOption([], uk)],
+    ["outageHours", outageHoursOption([], uk)],
+    ["yearLines", yearLinesOption([{ year: 2025, values: [] }], uk.units.kwh, uk)],
+  ];
+
+  it.each(built)("%s leaves a y-axis name room above the plot", (_name, option) => {
+    if (!option.yAxis.name) return;
+    // 15 px gap + a 12 px line + a margin; under a legend, the legend's two
+    // rows on a narrow screen as well.
+    const needed = option.legend ? 64 : 40;
+    expect(option.grid.top).toBeGreaterThanOrEqual(needed);
+  });
+
+  it.each(built)("%s centres an x-axis name under the axis", (_name, option) => {
+    if (!option.xAxis.name) return;
+    expect(option.xAxis.nameLocation).toBe("middle");
+    expect(option.xAxis.nameGap).toBeGreaterThanOrEqual(24);
+  });
+});

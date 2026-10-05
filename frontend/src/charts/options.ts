@@ -1,6 +1,6 @@
 import type { Messages } from "../i18n/en";
 import { partLabel } from "../roles";
-import { SERIES, YEAR_LINES, chartBaseOption } from "../theme";
+import { LEGEND_GRID_TOP, SERIES, X_AXIS_NAME, YEAR_LINES, chartBaseOption } from "../theme";
 import type {
   BalanceDay,
   Band,
@@ -48,7 +48,7 @@ export function histogramOption(
       type: "category",
       data: labels,
       name: mode === "watts" ? m.units.w : `% ${m.units.ofRated}`,
-      nameLocation: "end",
+      ...X_AXIS_NAME,
     },
     yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
@@ -66,7 +66,14 @@ export function durationCurveOption(payload: LoadPayload, m: Messages): Record<s
   const { base, axis } = chartBaseOption();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
+    xAxis: {
+      ...axis,
+      ...X_AXIS_NAME,
+      type: "value",
+      name: m.charts.percentOfTime,
+      min: 0,
+      max: 100,
+    },
     yAxis: { ...axis, type: "value", name: m.units.w },
     series: [
       {
@@ -90,7 +97,14 @@ export function bandsOption(payload: LoadPayload, m: Messages): Record<string, u
   const bands = [...payload.bands].reverse();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
+    xAxis: {
+      ...axis,
+      ...X_AXIS_NAME,
+      type: "value",
+      name: m.charts.percentOfTime,
+      min: 0,
+      max: 100,
+    },
     yAxis: { ...axis, type: "category", data: bands.map((band) => band.key) },
     series: [
       {
@@ -115,7 +129,7 @@ export function imbalanceOption(imbalance: Imbalance, m: Messages): Record<strin
       type: "category",
       data: buckets.map((bucket) => String(round(bucket.start * 100, 0))),
       name: m.charts.percentImbalance,
-      nameLocation: "end",
+      ...X_AXIS_NAME,
     },
     yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
@@ -145,11 +159,10 @@ export function partsOption(
   const { base, axis } = chartBaseOption();
   return {
     ...base,
-    // Two bar colours with nothing naming them is a guess. The shared grid
-    // starts 24px from the top, which is exactly where the legend draws, so
-    // the plot has to be pushed down to make room for it.
+    // Two bar colours with nothing naming them is a guess. The legend draws
+    // where the shared grid starts, so the plot is pushed down below it.
     legend: { data: [m.charts.mean, m.charts.peak], top: 0, textStyle: base.textStyle },
-    grid: { ...(base.grid as Record<string, unknown>), top: 48 },
+    grid: { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP },
     xAxis: { ...axis, type: "category", data: parts.map((part) => partLabel(m, part)) },
     yAxis: { ...axis, type: "value", name: m.units.w },
     series: [
@@ -179,7 +192,7 @@ export function socHistogramOption(payload: BatteryPayload, m: Messages): Record
       type: "category",
       data: buckets.map((bucket) => String(round(bucket.start, 0))),
       name: m.charts.percentCharge,
-      nameLocation: "end",
+      ...X_AXIS_NAME,
     },
     yAxis: { ...axis, type: "value", name: m.charts.percentOfTime },
     series: [
@@ -205,7 +218,14 @@ export function socBandsOption(bands: Band[], m: Messages): Record<string, unkno
   const ordered = [...bands].reverse();
   return {
     ...base,
-    xAxis: { ...axis, type: "value", name: m.charts.percentOfTime, min: 0, max: 100 },
+    xAxis: {
+      ...axis,
+      ...X_AXIS_NAME,
+      type: "value",
+      name: m.charts.percentOfTime,
+      min: 0,
+      max: 100,
+    },
     yAxis: { ...axis, type: "category", data: ordered.map((band) => band.key) },
     series: [
       {
@@ -272,7 +292,7 @@ export function monthlyOption(
     legend: hasPv
       ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle }
       : undefined,
-    grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
+    grid: hasPv ? { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP } : base.grid,
     xAxis: { ...axis, type: "category", data: labels },
     yAxis: { ...axis, type: "value", name: m.units.w },
     series,
@@ -311,13 +331,13 @@ export function hourOfDayOption(
     legend: hasPv
       ? { data: [m.charts.load, m.charts.pv], top: 0, textStyle: base.textStyle }
       : undefined,
-    grid: { ...(base.grid as Record<string, unknown>), top: hasPv ? 48 : 24 },
+    grid: hasPv ? { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP } : base.grid,
     xAxis: {
       ...axis,
       type: "category",
       data: hours.map((hour) => String(hour.hour)),
       name: m.charts.hour,
-      nameLocation: "end",
+      ...X_AXIS_NAME,
     },
     yAxis: { ...axis, type: "value", name: m.units.w },
     series,
@@ -395,8 +415,8 @@ export function flowBarsOption(
   return {
     ...base,
     legend: { data: present.map((role) => flowLabel(m, role)), top: 0, textStyle: base.textStyle },
-    grid: { ...(base.grid as Record<string, unknown>), top: 56 },
-    xAxis: { ...axis, type: "value", name: m.units.kwh },
+    grid: { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP },
+    xAxis: { ...axis, ...X_AXIS_NAME, type: "value", name: m.units.kwh },
     yAxis: { ...axis, type: "category", data: [m.charts.out, m.charts.in] },
     series: present.map((role) => ({
       name: flowLabel(m, role),
@@ -425,7 +445,7 @@ export function dailyFlowsOption(
   return {
     ...base,
     legend: { data: present.map((role) => flowLabel(m, role)), top: 0, textStyle: base.textStyle },
-    grid: { ...(base.grid as Record<string, unknown>), top: 56 },
+    grid: { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP },
     xAxis: { ...axis, type: "category", data: days.map((day) => day.day.slice(5)) },
     yAxis: { ...axis, type: "value", name: m.units.kwh },
     series: present.map((role) => ({
@@ -548,7 +568,7 @@ export function yearLinesOption(
   return {
     ...base,
     legend: { data: names, top: 0, textStyle: base.textStyle },
-    grid: { ...(base.grid as Record<string, unknown>), top: 48 },
+    grid: { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP },
     xAxis: {
       ...axis,
       type: "category",

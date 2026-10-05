@@ -27,6 +27,23 @@ export const YEAR_LINES = {
   reference: SERIES.battery,
 } as const;
 
+/*
+ * Room for the axis names. ECharts' containLabel makes room for the tick
+ * labels and not for the axis names: a y-axis name sits nameGap (15 px) above
+ * the plot in a 12 px font, so a grid that starts closer to the top than
+ * that cuts the name off. Under a legend the plot also has to clear the
+ * legend, which wraps to a second row on a narrow screen.
+ */
+const AXIS_NAME_TOP = 40;
+export const LEGEND_GRID_TOP = 64;
+
+/**
+ * Where an x-axis name goes: centred under the tick labels. At the end of
+ * the axis it starts nameGap to the right of the plot and runs off the
+ * canvas, however long the language makes it.
+ */
+export const X_AXIS_NAME = { nameLocation: "middle", nameGap: 28 } as const;
+
 /**
  * Shared base for ECharts options: transparent background and colours taken
  * from the Home Assistant theme. Returns base and axis separately because
@@ -47,7 +64,7 @@ export function chartBaseOption(): {
     base: {
       backgroundColor: "transparent",
       textStyle: { color: text, fontFamily: "inherit" },
-      grid: { left: 56, right: 24, top: 24, bottom: 40, containLabel: true },
+      grid: { left: 56, right: 24, top: AXIS_NAME_TOP, bottom: 40, containLabel: true },
       tooltip: { trigger: "axis" },
     },
     axis: {
