@@ -20,8 +20,8 @@ Health is a question about the whole record, so the tab does not use the
 period picker. Its command takes no window: the server reads from
 `HEALTH_MAX_YEARS = 5` years ago to now, from long-term statistics only —
 the hourly mean, minimum and maximum of the numeric sensors, and the
-counters' hourly `change` rows — which is a few thousand rows per sensor per
-year and is cached for a day. The picker is dimmed while the tab is open,
+counters' hourly `change` rows — which is about 8.8k rows per sensor per
+year (one an hour) and is cached for a day. The picker is dimmed while the tab is open,
 and the badge reads "Whole history, from <the first month with data>".
 
 Raw states are never read here. They reach back only to the recorder's
@@ -151,7 +151,10 @@ Needs `load_power` and `rated_power`.
 
 Per month: hours whose peak reached rated power and hours whose peak reached
 `HIGH_LOAD_SHARE` of it, computed by the Sizing tab's `inverter_evidence`,
-imported. This is a change in how the house is used rather than in the
+imported. Every month is counted against the rated power configured now —
+the option has no history — and the definition says "current rated power",
+so that an inverter swap moving the earlier years is not read as the house.
+This is a change in how the house is used rather than in the
 hardware, and the card says so; without a temperature or a fault sensor
 there is nothing more the data can say about the inverter itself.
 

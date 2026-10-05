@@ -392,6 +392,8 @@ describe("the definitions", () => {
     expect(d.efficiency).toContain("less than 1 kWh");
     expect(d.solar).toContain("needs 10 other hours of sun at or above 100 W");
     expect(d.inverter).toContain("reached 80% of it");
+    expect(d.inverter).toContain("current rated power");
+    expect(healthDefinitions(uk, "uk").inverter).toContain("поточної номінальної потужності");
   });
 
   it("use the locale's decimal mark", () => {

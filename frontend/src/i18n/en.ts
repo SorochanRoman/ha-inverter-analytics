@@ -657,10 +657,10 @@ export const en = {
         `system could not take are left out, and a month needs ${p.minHours} other hours of ` +
         `sun at or above ${p.minPower}.`,
       inverter: (p: { share: string }) =>
-        "Inverter load counts the hours whose peak reached rated power, and those whose peak " +
-        `reached ${p.share} of it. That is how the house is used, not the state of the ` +
-        "hardware: without a temperature or fault sensor the data can say nothing more about " +
-        "the inverter itself.",
+        "Inverter load counts the hours whose peak reached the current rated power, and those " +
+        `whose peak reached ${p.share} of it; every year is counted against today's rating. ` +
+        "That is how the house is used, not the state of the hardware: without a temperature " +
+        "or fault sensor the data can say nothing more about the inverter itself.",
     },
     caveats: {
       bms:

@@ -236,6 +236,23 @@ the discharge counter's energy over the fall in a state of charge the BMS
 estimates and recalibrates. It is a trend to watch, not a measurement of the
 cells, and the nameplate beside it is a reference line, never a target.
 
+**Health judges past years by today's rating.** The inverter signal counts
+each month's hours against the rated power configured now; the option has no
+history. After an inverter swap, every earlier year moves — more or fewer hours
+"near rated" — for no reason in the house. The definition at the foot of the
+tab says the hours are counted against the current rating; a dated rating per
+period would be the fix, and nothing else needs one yet.
+
+**What a Health request costs is unmeasured.** Hourly statistics are about 8.8k
+rows per sensor per year, and the command reads up to nine statistic IDs (four
+hourly sensors, grid power when no export counter is mapped, four counters)
+over five years — some 400k rows, held in memory as rows and then as the
+per-month groupings built from them. The result is cached for the local day,
+but the transient peak while it is computed has not been measured, and on a
+1 GB host it is the number that matters. It stays unmeasured until the live
+run. There is no single-flight on the cache either: two first requests that
+arrive together, from two open panels, both compute.
+
 **Efficiency without a returning charge.** Round-trip efficiency is withheld
 when the state of charge ends more than five points from where it started,
 because the gap between charged and discharged is then mostly stored energy. It
