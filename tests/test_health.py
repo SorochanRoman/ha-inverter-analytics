@@ -402,6 +402,19 @@ def test_hours_below_the_sun_floor_do_not_count_as_unconstrained():
     assert month["unconstrained_hours"] == 9
 
 
+def test_hours_the_three_sensors_never_saw_are_not_candidates():
+    rows, ceiling = sunny_month(BEST_HOUR_MIN_HOURS)
+    # A brighter hour the charge never saw: the system may have been at its limit.
+    unseen = pv_hour(60, peak=8000.0)
+    rows.append(unseen)
+    month = best_hour_by_month(rows, KYIV, ceiling=ceiling)["2026-01"]
+    assert month["value"] == 3000.0 + BEST_HOUR_MIN_HOURS - 1
+    assert month["unconstrained_hours"] == BEST_HOUR_MIN_HOURS
+    blind = Ceiling(ceiling.hours, ceiling.observed - {rows[0].start})
+    month = best_hour_by_month(rows, KYIV, ceiling=blind)["2026-01"]
+    assert month == {"value": None, "reason": "curtailed", "unconstrained_hours": 9}
+
+
 def test_without_a_ceiling_the_best_hour_reads_every_hour():
     rows, _ = sunny_month(3)
     month = best_hour_by_month(rows, KYIV, ceiling=None)["2026-01"]
@@ -579,3 +592,16 @@ def test_the_battery_signals_come_from_the_counters_and_the_charge():
     assert capacity["clean_hours"] == 25
     efficiency = result["signals"]["efficiency"]["months"]["2026-02"]
     assert efficiency["reason"] == "too_little_throughput"
+
+
+def test_efficiency_without_a_mapped_charge_has_no_months():
+    hours = [NOW - timedelta(days=20, hours=index) for index in range(3)]
+    charge = EnergySeries(tuple(EnergyRow(start, 1.0) for start in sorted(hours)))
+    discharge = EnergySeries(tuple(EnergyRow(start, 0.9) for start in sorted(hours)))
+    result = payload(
+        charge=charge,
+        discharge=discharge,
+        missing=NO_MISSING | {"efficiency": ["battery_soc"]},
+    )
+    assert result["signals"]["efficiency"]["missing"] == ["battery_soc"]
+    assert result["signals"]["efficiency"]["months"] == {}

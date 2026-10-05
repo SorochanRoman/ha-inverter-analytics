@@ -1155,6 +1155,12 @@ async def test_health_command_takes_no_window_and_reads_five_years_back(
         "battery_charge_total",
     ]
     assert result["signals"]["best_hour"]["missing"] == ["pv_power"]
+    assert result["signals"]["efficiency"]["missing"] == [
+        "battery_soc",
+        "battery_charge_total",
+        "battery_discharge_total",
+    ]
+    assert result["signals"]["efficiency"]["months"] == {}
 
 
 async def test_health_command_caches_for_the_local_day(

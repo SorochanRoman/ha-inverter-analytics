@@ -79,7 +79,7 @@ is recorded here so a dip in the series is read with it in mind.
 
 ### 4.2 Round-trip efficiency, month by month
 
-Needs `battery_charge_total` and `battery_discharge_total`; uses
+Needs `battery_charge_total` and `battery_discharge_total`; needs
 `battery_soc` for the gate.
 
 The Battery tab's figure for the period, done for every month: discharged

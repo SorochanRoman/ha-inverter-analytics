@@ -263,9 +263,11 @@ def best_hour_by_month(
 
     In a ceiling hour the battery was full and the inverter cut the array back
     to what the house used, so its peak is the load, not the array. With a
-    ceiling, a month needs BEST_HOUR_MIN_HOURS candidate hours of real sun
-    (mean at or above CEILING_PV_MIN_W) before its best hour is read; below
-    that it is curtailed, with the count. Without one every hour is read, and
+    ceiling, the candidates are hours the three sensors saw and that were not
+    ceiling hours: an hour they did not see cannot be told apart from one at
+    the limit. A month needs BEST_HOUR_MIN_HOURS candidates of real sun (mean
+    at or above CEILING_PV_MIN_W) before its best hour is read; below that it
+    is curtailed, with the count. Without one every hour is read, and
     unconstrained_hours is None because nothing was left out.
     """
     months: dict[str, dict[str, Any]] = {}
@@ -277,7 +279,9 @@ def best_hour_by_month(
                 "unconstrained_hours": None,
             }
             continue
-        candidates = [row for row in rows if row.start not in ceiling.hours]
+        candidates = [
+            row for row in rows if row.start in ceiling.observed and row.start not in ceiling.hours
+        ]
         sunny = sum(1 for row in candidates if row.mean >= CEILING_PV_MIN_W)
         if sunny < BEST_HOUR_MIN_HOURS:
             months[key] = {"value": None, "reason": CURTAILED, "unconstrained_hours": sunny}
@@ -406,11 +410,11 @@ def build_health_payload(
     }
 
 
-# What each signal needs mapped. Efficiency only uses the charge for its gate:
-# without it every month is withheld as no_soc, which says why where it shows.
+# What each signal needs mapped. Efficiency needs the state of charge for its
+# gate; no_soc is left for a mapped sensor with no rows in a month.
 _SIGNAL_ROLES: dict[str, tuple[str, ...]] = {
     "capacity": ("battery_soc", "battery_discharge_total", "battery_charge_total"),
-    "efficiency": ("battery_charge_total", "battery_discharge_total"),
+    "efficiency": ("battery_soc", "battery_charge_total", "battery_discharge_total"),
     "solar_energy": ("pv_energy_total",),
     "best_hour": ("pv_power",),
     "inverter": ("load_power", "rated_power"),
