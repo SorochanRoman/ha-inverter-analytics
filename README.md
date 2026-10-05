@@ -78,7 +78,9 @@ beyond pointing the integration at the ones you already have.
   matching is the balance. Self-sufficiency and self-consumption with the
   arithmetic written out, and a day-by-day breakdown. Energy is read from
   Home Assistant's own hourly statistics, which is where counter resets are
-  already accounted for.
+  already accounted for. A Savings card prices what the house used and did
+  not buy from the grid, at the day and night prices set in the options —
+  the whole system's saving.
 - **Round-trip efficiency**, when the battery's charge and discharge
   counters are mapped. It is withheld for a period that ends at a very
   different state of charge, and says why: the gap between what went in and

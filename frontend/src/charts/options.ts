@@ -1,5 +1,6 @@
 import type { Messages } from "../i18n/en";
 import { partLabel } from "../roles";
+import { cumulative } from "../savings";
 import { LEGEND_GRID_TOP, SERIES, X_AXIS_NAME, YEAR_LINES, chartBaseOption } from "../theme";
 import type {
   BalanceDay,
@@ -475,6 +476,53 @@ export function dailyFlowsOption(
       // A day the counter has no accounting for stays a hole, not a zero.
       data: days.map((day) => (role in day.flows ? round(day.flows[role], 3) : null)),
     })),
+  };
+}
+
+/**
+ * What the system saved, a bar a day (or a month), with the running total on
+ * a second axis: a year's total would flatten the daily bars on a shared one.
+ */
+export function savingsOption(
+  bars: { label: string; value: number }[],
+  currency: string,
+  m: Messages,
+): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  return {
+    ...base,
+    legend: {
+      data: [m.balance.savingsSeries, m.balance.savingsRunning],
+      top: 0,
+      textStyle: base.textStyle,
+    },
+    grid: { ...(base.grid as Record<string, unknown>), top: LEGEND_GRID_TOP },
+    // A day label drops its year, as on the day-by-day chart; a month keeps it.
+    xAxis: {
+      ...axis,
+      type: "category",
+      data: bars.map((bar) => (bar.label.length === 10 ? bar.label.slice(5) : bar.label)),
+    },
+    yAxis: [
+      { ...axis, type: "value", name: currency },
+      { ...axis, type: "value", name: currency, splitLine: { show: false } },
+    ],
+    series: [
+      {
+        name: m.balance.savingsSeries,
+        type: "bar",
+        itemStyle: { color: SERIES.pv },
+        data: bars.map((bar) => round(bar.value, 0)),
+      },
+      {
+        name: m.balance.savingsRunning,
+        type: "line",
+        yAxisIndex: 1,
+        showSymbol: false,
+        itemStyle: { color: SERIES.load },
+        data: cumulative(bars.map((bar) => bar.value)).map((value) => round(value, 0)),
+      },
+    ],
   };
 }
 

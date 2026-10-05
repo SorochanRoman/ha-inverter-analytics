@@ -1,16 +1,20 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchBalance } from "../api";
-import { dailyFlowsOption, flowBarsOption, flowLabel } from "../charts/options";
+import { dailyFlowsOption, flowBarsOption, flowLabel, savingsOption } from "../charts/options";
 import "../charts/echart";
-import { describeError, formatEnergy, formatPercent } from "../format";
+import { describeError, formatCoverage, formatEnergy, formatPercent } from "../format";
 import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
+import { listRoles } from "../roles";
+import { coverageShare, formatMoney, savingsBars, savingsState } from "../savings";
 import type { BalancePayload, HomeAssistant } from "../types";
 
 const SOURCES = ["pv_energy_total", "grid_import_total", "battery_discharge_total"] as const;
 const SINKS = ["load_energy_total", "grid_export_total", "battery_charge_total"] as const;
 const ALL = [...SOURCES, ...SINKS];
+// The two counters the savings figure is computed from.
+const SAVINGS_ROLES = ["load_energy_total", "grid_import_total"] as const;
 
 @customElement("ia-balance-tab")
 export class IaBalanceTab extends LitElement {
@@ -157,6 +161,58 @@ export class IaBalanceTab extends LitElement {
     </div>`;
   }
 
+  private renderSavings(payload: BalancePayload) {
+    const m = this.i18n.m;
+    const locale = this.i18n.locale;
+    const block = payload.savings;
+    const state = savingsState(block);
+    // No block: a backend older than the card, so no card rather than an error.
+    if (!block || !state) return nothing;
+
+    if (state.kind === "withheld") {
+      let reason: string;
+      if (state.reason === "no_counters") {
+        const unmapped = SAVINGS_ROLES.filter((role) => !payload.mapped.includes(role));
+        const missing = unmapped.length ? unmapped : SAVINGS_ROLES;
+        reason = m.balance.savingsReasons.no_counters({
+          roles: listRoles(m, missing, true),
+          n: missing.length,
+        });
+      } else {
+        reason = m.balance.savingsReasons[state.reason];
+      }
+      return html`<section>
+        <h2>${m.balance.savingsTitle}</h2>
+        <p class="empty">${reason}</p>
+      </section>`;
+    }
+
+    const share = coverageShare(block);
+    // A year is read by the month; a day's bar would be a sliver among 365.
+    const bars = savingsBars(block.days, this.range === "year");
+    return html`<section>
+      <h2>${m.balance.savingsTitle}</h2>
+      <div class="kpi">
+        <div class="cell">
+          <span class="label">${m.balance.savingsSeries}</span>
+          <span class="value">${formatMoney(block.total ?? 0, block.currency, locale)}</span>
+          <span class="hint">
+            ${m.balance.savingsPerDay({
+              amount: formatMoney(block.per_day ?? 0, block.currency, locale),
+            })}
+          </span>
+        </div>
+      </div>
+      <ia-chart .option=${savingsOption(bars, block.currency, m)}></ia-chart>
+      ${share !== null
+        ? html`<p class="warn">
+            ${m.balance.savingsCoverage({ share: formatCoverage(share, locale) })}
+          </p>`
+        : nothing}
+      <p class="note">${m.balance.savingsNote({ twoZone: block.two_zone })}</p>
+    </section>`;
+  }
+
   protected render() {
     const m = this.i18n.m;
     if (this.error !== undefined) {
@@ -217,6 +273,8 @@ export class IaBalanceTab extends LitElement {
           : html`<p class="empty">${m.balance.noDays}</p>`}
         <p class="note">${m.balance.dayByDayNote}</p>
       </section>
+
+      ${this.renderSavings(payload)}
     `;
   }
 

@@ -111,3 +111,7 @@ quoted from the user's installation, and `code` fragments are not translated.
 | mean of the monthly figures | середнє місячних значень |
 | BMS (battery management system) | BMS (система керування батареєю) |
 | recalibration (BMS) | перекалібрування |
+| Savings (card) / Saved (series) | Економія / Зекономлено |
+| running total | наростаючим підсумком |
+| price (of a kWh) | ціна |
+| two-zone tariff / night zone | двозонний тариф / нічна зона |

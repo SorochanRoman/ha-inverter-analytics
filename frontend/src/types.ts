@@ -286,6 +286,29 @@ export interface BalancePayload {
   timezone: string;
   window: { start: string; end: string };
   clamped: boolean;
+  /** Absent from a backend older than the Savings card. */
+  savings?: SavingsBlock;
+}
+
+export type SavingsReason = "no_price" | "no_counters" | "no_hours";
+
+export interface SavingsDay {
+  day: string;
+  value: number;
+}
+
+/** What the system saved: the house's use less what it bought, at the set prices. */
+export interface SavingsBlock {
+  currency: string;
+  total: number | null;
+  /** The total over the days that have data, not over the calendar days. */
+  per_day: number | null;
+  days: SavingsDay[];
+  /** Hours both counters cover, against the hours in the window. */
+  hours: number;
+  window_hours: number;
+  two_zone: boolean;
+  reason: SavingsReason | null;
 }
 
 export type OutageSource = "sensor" | "inferred";

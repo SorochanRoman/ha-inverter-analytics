@@ -31,6 +31,7 @@ import {
   outageDaysOption,
   outageHoursOption,
   partsOption,
+  savingsOption,
   socBandsOption,
   socHistogramOption,
   yearLinesOption,
@@ -417,6 +418,35 @@ describe("balance charts", () => {
     for (const option of built) {
       expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
     }
+  });
+});
+
+describe("savings chart", () => {
+  it("draws savings as bars with a running total on a second axis", () => {
+    const option = savingsOption(
+      [{ label: "2026-09-01", value: 50 }, { label: "2026-09-02", value: -10 }],
+      "UAH",
+      en,
+    ) as any;
+    expect(option.yAxis).toHaveLength(2);
+    expect(option.series[0].type).toBe("bar");
+    expect(option.series[0].data).toEqual([50, -10]);
+    expect(option.series[1].type).toBe("line");
+    expect(option.series[1].yAxisIndex).toBe(1);
+    expect(option.series[1].data).toEqual([50, 40]);
+    expect(option.xAxis.data).toEqual(["09-01", "09-02"]);
+  });
+
+  it("keeps the year on a month's label", () => {
+    const option = savingsOption([{ label: "2026-09", value: 90 }], "UAH", en) as any;
+    expect(option.xAxis.data).toEqual(["2026-09"]);
+  });
+
+  it("names both series in the legend and leaves the axis names room", () => {
+    const option = savingsOption([], "UAH", uk) as any;
+    expect(option.legend.data).toEqual([uk.balance.savingsSeries, uk.balance.savingsRunning]);
+    expect(option.grid.top).toBeGreaterThanOrEqual(64);
+    expect(Object.keys(option).filter((k) => !SUPPORTED_OPTION_KEYS.has(k))).toEqual([]);
   });
 });
 

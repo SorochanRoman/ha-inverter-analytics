@@ -36,3 +36,31 @@ describe("the balance line", () => {
     expect(uk.balance.moreOutThanIn({ share: "4%" })).toBe("вийшло більше, ніж надійшло (4%).");
   });
 });
+
+describe("the savings card", () => {
+  it("names the prices it used: both on a two-zone tariff, one otherwise", () => {
+    expect(en.balance.savingsNote({ twoZone: true })).toContain("day and night");
+    expect(en.balance.savingsNote({ twoZone: false })).not.toContain("day and night");
+    expect(uk.balance.savingsNote({ twoZone: true })).toContain("нічною");
+    expect(uk.balance.savingsNote({ twoZone: false })).not.toContain("нічною");
+  });
+
+  it("names the missing counters in both languages", () => {
+    expect(en.balance.savingsReasons.no_counters({ roles: "X", n: 1 })).toContain("X");
+    expect(uk.balance.savingsReasons.no_counters({ roles: "X", n: 2 })).toContain("X");
+  });
+
+  it("says the daily figure is over the days counted", () => {
+    expect(en.balance.savingsPerDay({ amount: "40 UAH" })).toBe(
+      "40 UAH a day on average, over the days counted",
+    );
+    expect(uk.balance.savingsPerDay({ amount: "40 грн" })).toBe(
+      "у середньому 40 грн на день, за враховані дні",
+    );
+  });
+
+  it("states the coverage share", () => {
+    expect(en.balance.savingsCoverage({ share: "50%" })).toContain("50%");
+    expect(uk.balance.savingsCoverage({ share: "50%" })).toContain("50%");
+  });
+});

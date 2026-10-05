@@ -337,6 +337,29 @@ export const en = {
       "the same energy twice. Energy is read from Home Assistant's hourly statistics, which " +
       "is where counter resets are already accounted for. The current hour is compiled only " +
       "once it ends, so a period running up to now stops at the last completed hour.",
+    savingsTitle: "Savings",
+    // per_day is the total over the days that have data, not the calendar days.
+    savingsPerDay: (p: { amount: string }) => `${p.amount} a day on average, over the days counted`,
+    savingsSeries: "Saved",
+    savingsRunning: "Running total",
+    savingsCoverage: (p: { share: string }) =>
+      `Both counters cover ${p.share} of this period; the rest is not counted, so the figure reads low.`,
+    savingsNote: (p: { twoZone: boolean }) =>
+      "What the house used and did not buy from the grid, at " +
+      (p.twoZone ? "the day and night prices" : "the price") +
+      " set in the integration's options: the whole system's saving — the sun and the " +
+      "battery, a battery charged from the grid at night included. Today's prices are " +
+      "applied to the whole period, and money for energy sold to the grid is not counted.",
+    // Keyed by SavingsReason.
+    savingsReasons: {
+      no_price:
+        "No price is set. Add the price of a kWh in the integration's options " +
+        "(Settings → Devices & services → Inverter Analytics → Configure).",
+      no_counters: (p: { roles: string; n: number }) =>
+        `Savings need the ${p.roles} ${p.n === 1 ? "counter" : "counters"} mapped.`,
+      no_hours:
+        "The consumption and grid-import counters have no hour in common in this period.",
+    },
   },
   grid: {
     outages: "Outages",
