@@ -388,7 +388,9 @@ def withhold_partial_months(
     beside a whole month a year earlier, so it is measured against a whole
     month, not against the part that has elapsed. A month absent from
     month_hours is left as it is. Ratios — capacity and efficiency — do not go
-    through here: a share of half a month is still a share.
+    through here: a share of half a month is still a share. A withheld month
+    carries `coverage`, the share of the whole calendar month it covered, so
+    the panel can say how far short it fell.
     """
     seen: dict[str, set[datetime]] = defaultdict(set)
     for start in starts:
@@ -396,8 +398,14 @@ def withhold_partial_months(
     result: dict[str, dict[str, Any]] = {}
     for key, month in months.items():
         hours = month_hours.get(key)
-        if hours and len(seen.get(key, ())) < PARTIAL_MONTH_COVERAGE * hours:
-            result[key] = {**month, "value": None, "reason": PARTIAL_MONTH}
+        covered = len(seen.get(key, ()))
+        if hours and covered < PARTIAL_MONTH_COVERAGE * hours:
+            result[key] = {
+                **month,
+                "value": None,
+                "reason": PARTIAL_MONTH,
+                "coverage": covered / hours,
+            }
         else:
             result[key] = dict(month)
     return result

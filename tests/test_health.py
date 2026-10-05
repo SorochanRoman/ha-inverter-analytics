@@ -555,7 +555,12 @@ def test_a_month_below_the_coverage_share_is_partial_and_keeps_its_counts():
     assert kept == months
     withheld = withhold_partial_months(months, enough[:-1], {"2026-01": 744.0}, KYIV)
     assert withheld == {
-        "2026-01": {"value": None, "reason": "partial_month", "unconstrained_hours": 12}
+        "2026-01": {
+            "value": None,
+            "reason": "partial_month",
+            "unconstrained_hours": 12,
+            "coverage": pytest.approx(706 / 744),
+        }
     }
 
 
@@ -565,6 +570,7 @@ def test_coverage_counts_distinct_hours():
     months = {"2026-01": {"value": 5.0, "reason": None}}
     result = withhold_partial_months(months, twice, {"2026-01": 744.0}, KYIV)
     assert result["2026-01"]["reason"] == "partial_month"
+    assert result["2026-01"]["coverage"] == pytest.approx(700 / 744)
 
 
 # --- payload ---------------------------------------------------------------
@@ -723,7 +729,12 @@ def test_a_history_that_starts_mid_month_has_a_partial_first_month():
     hours = local_hours(2026, 1, from_day=20) + local_hours(2026, 2)
     pv = EnergySeries(tuple(EnergyRow(start, 1.0) for start in hours))
     months = payload(pv=pv)["signals"]["solar_energy"]["months"]
-    assert months["2026-01"] == {"value": None, "reason": "partial_month"}
+    # Twelve days of thirty-one.
+    assert months["2026-01"] == {
+        "value": None,
+        "reason": "partial_month",
+        "coverage": pytest.approx(12 / 31),
+    }
     assert months["2026-02"] == {"value": pytest.approx(28 * 24), "reason": None}
 
 

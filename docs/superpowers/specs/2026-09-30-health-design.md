@@ -217,7 +217,9 @@ a month with a third of its days reads as a worse month and pulls the
 twelve-against-twelve mean down with it. For these three signals a month is
 withheld with the reason `partial_month` when the signal's own distinct
 hourly rows in it are fewer than `PARTIAL_MONTH_COVERAGE = 0.95` of the
-month's hours. It is stricter than the Seasonality tab's
+month's hours, and carries `coverage: float` — those rows over the whole
+calendar month's hours — so the panel can say how far short it fell ("94.6% of
+the month has statistics; a month needs 95%"). It is stricter than the Seasonality tab's
 `INCOMPLETE_COVERAGE` (0.6) on purpose: that marks means, which do not
 scale with coverage, while a sum does — a month 60% covered would read up
 to 40% low. A missing 5% stays inside the noise a month's weather already
