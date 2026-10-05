@@ -243,10 +243,10 @@ it and will never offer an update. From the directory holding
 
 ```bash
 curl -L -o release.tar.gz \
-  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.9.2.tar.gz
+  https://github.com/SorochanRoman/ha-inverter-analytics/archive/refs/tags/v0.9.3.tar.gz
 rm -rf custom_components/inverter_analytics
 tar -xzf release.tar.gz --strip-components=2 -C custom_components \
-    ha-inverter-analytics-0.9.2/custom_components/inverter_analytics
+    ha-inverter-analytics-0.9.3/custom_components/inverter_analytics
 rm release.tar.gz
 ```
 

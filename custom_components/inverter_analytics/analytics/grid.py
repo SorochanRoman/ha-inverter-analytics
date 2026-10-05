@@ -270,7 +270,8 @@ def reserve_columns(episode: Mapping[str, Any], low_pct: float) -> dict[str, Any
     to get there; what the outage needed at its start is the mark plus that
     drop. Read in points of charge, never multiplied out of a nameplate
     capacity. Withheld with the reason when the outage cannot say: no charge
-    reading, an outage the period cuts, one the sun covered, or one too short
+    reading, an outage the period cuts, one too short to move the charge, one
+    whose charge never fell, or one whose fall was too short
     for its rate to mean anything.
     """
     start = episode.get("soc_start")
@@ -281,6 +282,10 @@ def reserve_columns(episode: Mapping[str, Any], low_pct: float) -> dict[str, Any
         return withheld | {"reserve_reason": "no_soc"}
     if episode["started_before_window"] or episode["ongoing"]:
         return withheld | {"reserve_reason": "cut"}
+    # An outage shorter than the shortest readable fall had no time to move a
+    # charge read in whole points; that it held says nothing about the sun.
+    if episode["seconds"] < RESERVE_MIN_SECONDS:
+        return withheld | {"reserve_reason": "too_short"}
     drop = start - lowest
     elapsed = (
         datetime.fromisoformat(lowest_at) - datetime.fromisoformat(episode["start"])
@@ -377,6 +382,11 @@ def _autonomy(
         # grid-powered dongle that goes unavailable for exactly the outage.
         # Distinct from too little evidence, which has some.
         return result | {"reason": "no_soc_in_outages"}
+    # Outages too brief, all told, to move a charge read in whole points say
+    # nothing either way: a charge that held through them is not the sun.
+    outage_hours = sum(item["seconds"] for item in episodes) / SECONDS_PER_HOUR
+    if outage_hours < AUTONOMY_MIN_HOURS:
+        return result | {"reason": "too_little_evidence"}
     # Before the hours: an outage whose lowest charge is its start fell for
     # no time at all, so the sun covering every outage would otherwise read as
     # too little evidence.

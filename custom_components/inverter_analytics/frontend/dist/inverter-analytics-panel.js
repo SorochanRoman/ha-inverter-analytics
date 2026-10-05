@@ -950,7 +950,7 @@ const Hb = {
     reserveReasons: {
       no_soc: "no charge data",
       cut: "cut by the period",
-      no_net_discharge: "sun covered it",
+      no_net_discharge: "the charge held",
       too_short: "too short to judge"
     },
     hardestOutageNeeds: "Hardest outage needs",
@@ -1473,7 +1473,7 @@ const Hb = {
     reserveReasons: {
       no_soc: "немає даних заряду",
       cut: "обрізане періодом",
-      no_net_discharge: "покрило сонце",
+      no_net_discharge: "заряд не впав",
       too_short: "закоротке для оцінки"
     },
     hardestOutageNeeds: "Найважче відключення потребує",

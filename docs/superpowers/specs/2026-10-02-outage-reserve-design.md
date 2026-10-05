@@ -56,8 +56,9 @@ Withheld — both figures `None` and `reserve_reason` set — in this order:
 |---|---|
 | `no_soc` | `soc_start`, `soc_min` or `soc_min_at` is `None` or absent |
 | `cut` | `started_before_window` or `ongoing`: the true drop is not visible |
+| `too_short` | `seconds < RESERVE_MIN_SECONDS`: the outage had no time to move a charge read in whole points, so a charge that held says nothing |
 | `no_net_discharge` | `drop ≤ 0`: the charge never fell below where it started; the sun or a charge covered the outage |
-| `too_short` | `elapsed < RESERVE_MIN_SECONDS` (1800) or `drop < RESERVE_MIN_DROP_PCT` (2): with a 1 % SoC step the rate is noise |
+| `too_short` (again) | `elapsed < RESERVE_MIN_SECONDS` (1800) or `drop < RESERVE_MIN_DROP_PCT` (2): with a 1 % SoC step the rate is noise |
 
 Otherwise `reserve_reason` is `None`. The returned dict always has the three
 keys `hours_left`, `needed_pct`, `reserve_reason` when a SoC sensor is

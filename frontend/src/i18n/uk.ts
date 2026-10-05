@@ -362,7 +362,7 @@ export const uk: Messages = {
     reserveReasons: {
       no_soc: "немає даних заряду",
       cut: "обрізане періодом",
-      no_net_discharge: "покрило сонце",
+      no_net_discharge: "заряд не впав",
       too_short: "закоротке для оцінки",
     },
     hardestOutageNeeds: "Найважче відключення потребує",

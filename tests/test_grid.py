@@ -336,6 +336,13 @@ def test_autonomy_is_withheld_when_the_sun_covered_the_outages():
     assert build(grid, soc=soc)["autonomy"]["reason"] == "no_net_discharge"
 
 
+def test_autonomy_from_brief_outages_alone_is_too_little_evidence():
+    """Two minutes without the grid cannot move the charge; that is not the sun."""
+    grid = grid_series((0, 1.0), (60, 0.0), (62, 1.0))
+    soc = soc_series((0, 82.0))
+    assert build(grid, soc=soc)["autonomy"]["reason"] == "too_little_evidence"
+
+
 def test_hours_from_now_is_absent_below_the_low_mark():
     grid = grid_series((0, 1.0), (60, 0.0), (180, 1.0))
     soc = soc_series((0, 60.0), (170, 15.0))
@@ -483,6 +490,16 @@ def test_no_net_discharge_is_judged_on_the_lowest_charge_not_the_end():
     assert reserve_columns(flat, 20.0)["reserve_reason"] == "no_net_discharge"
     ended_higher = outage(soc_min=60.0, soc_min_at=at(60).isoformat(), soc_end=90.0)
     assert reserve_columns(ended_higher, 20.0)["reserve_reason"] is None
+
+
+def test_a_short_outage_is_too_short_even_when_the_charge_held():
+    """Two minutes at 300 W moves a charge read in whole points by nothing.
+
+    That is not the sun covering the outage: there was no time for the charge
+    to fall, so the outage is too short to say anything.
+    """
+    brief = outage(seconds=120.0, soc_min=82.0, soc_start=82.0, soc_min_at=at(0).isoformat())
+    assert reserve_columns(brief, 20.0)["reserve_reason"] == "too_short"
 
 
 def test_the_charge_needed_may_exceed_a_full_battery():
