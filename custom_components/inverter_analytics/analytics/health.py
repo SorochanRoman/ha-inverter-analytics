@@ -534,8 +534,8 @@ async def async_health_analytics(hass: HomeAssistant, config: EntryConfig) -> di
     }
     if all(missing.values()):
         raise ValueError(
-            "health needs battery_charge_total with battery_discharge_total, "
-            "pv_energy_total, pv_power, or load_power with rated_power"
+            "health needs battery_soc with battery_charge_total and battery_discharge_total, "
+            "pv_energy_total, or load_power with rated_power"
         )
 
     now = dt_util.utcnow()

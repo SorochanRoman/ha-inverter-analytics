@@ -12,6 +12,7 @@ from custom_components.inverter_analytics.analytics.health import (
     CLEAN_HOURS_MIN,
     COMPARISON_MIN_MONTHS,
     HEALTH_MAX_YEARS,
+    async_health_analytics,
     best_hour_by_month,
     build_health_payload,
     capacity_by_month,
@@ -30,6 +31,7 @@ from custom_components.inverter_analytics.analytics.source import (
     HourlyRow,
     HourlySeries,
 )
+from custom_components.inverter_analytics.roles import EntryConfig
 
 KYIV = ZoneInfo("Europe/Kyiv")
 # Midday on the 10th, so no hour built from here strays across a local month edge.
@@ -742,3 +744,23 @@ def test_a_system_that_keeps_its_production_in_leaves_ceiling_hours_out():
     assert result["export_limited"] is True
     assert result["best_hour_mode"] == "unconstrained"
     assert result["signals"]["best_hour"]["months"]["2026-02"]["reason"] == "curtailed"
+
+
+async def test_the_error_names_the_sets_that_open_the_tab():
+    # The two battery counters alone open nothing: the battery set needs the charge too.
+    config = EntryConfig.from_dict(
+        {
+            "entities": {
+                "battery_charge_total": ["sensor.charged"],
+                "battery_discharge_total": ["sensor.discharged"],
+            },
+            "numbers": {},
+            "inverted": [],
+        }
+    )
+    with pytest.raises(ValueError) as raised:
+        await async_health_analytics(None, config)
+    assert str(raised.value) == (
+        "health needs battery_soc with battery_charge_total and battery_discharge_total, "
+        "pv_energy_total, or load_power with rated_power"
+    )
