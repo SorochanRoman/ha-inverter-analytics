@@ -16,7 +16,7 @@ import {
 } from "../format";
 import { I18nController } from "../i18n/controller";
 import { resolveRange, type RangeKey } from "../range";
-import { coveredCard, hardestCard, hoursLeftCell, neededCell } from "../reserve";
+import { coveredCard, hardestCard, hoursLeftCell, neededCell, showsReserve } from "../reserve";
 import { sectionStyles } from "../sections/shared-styles";
 import type {
   Autonomy,
@@ -429,7 +429,7 @@ export class IaGridTab extends LitElement {
       <section>
         <h2>${m.grid.autonomy}</h2>
         ${this.renderAutonomy(payload.autonomy, payload.low_pct)}
-        ${payload.has_soc ? this.renderReserve(payload.reserve, payload.low_pct) : nothing}
+        ${showsReserve(payload) ? this.renderReserve(payload.reserve, payload.low_pct) : nothing}
       </section>
     `;
   }

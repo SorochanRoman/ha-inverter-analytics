@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coveredCard, hardestCard, hoursLeftCell, neededCell } from "./reserve";
+import { coveredCard, hardestCard, hoursLeftCell, neededCell, showsReserve } from "./reserve";
 import type { OutageEpisode, ReserveSummary } from "./types";
 
 function episode(fields: Partial<OutageEpisode>): OutageEpisode {
@@ -110,5 +110,23 @@ describe("the covered card", () => {
       covered: 5,
       judged: 6,
     });
+  });
+});
+
+describe("the reserve cards", () => {
+  const one = [episode({})];
+
+  it("show when the battery is read and there were outages", () => {
+    expect(showsReserve({ has_soc: true, kpi: { count: 1 }, episodes: one })).toBe(true);
+  });
+
+  it("hide when there were no outages: the autonomy sentence says why", () => {
+    expect(showsReserve({ has_soc: true, kpi: { count: 0 }, episodes: [] })).toBe(false);
+    expect(showsReserve({ has_soc: true, kpi: { count: 0 }, episodes: one })).toBe(false);
+    expect(showsReserve({ has_soc: true, kpi: { count: 2 }, episodes: [] })).toBe(false);
+  });
+
+  it("hide without a charge sensor", () => {
+    expect(showsReserve({ has_soc: false, kpi: { count: 1 }, episodes: one })).toBe(false);
   });
 });

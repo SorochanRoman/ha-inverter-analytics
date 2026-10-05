@@ -25367,18 +25367,21 @@ function N$(e) {
 function B$(e) {
   return e.judged === 0 ? { kind: "none" } : { kind: "count", covered: e.covered, judged: e.judged };
 }
-var z$ = Object.defineProperty, F$ = Object.getOwnPropertyDescriptor, Vn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? F$(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+function z$(e) {
+  return e.has_soc && e.kpi.count > 0 && e.episodes.length > 0;
+}
+var F$ = Object.defineProperty, H$ = Object.getOwnPropertyDescriptor, Vn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? H$(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && z$(t, r, i), i;
+  return n && i && F$(t, r, i), i;
 };
 function _a(e, t) {
   return e === null ? it : Kt(e * 3600, t);
 }
-const H$ = 24 * 3600 * 1e3;
-function V$(e, t) {
+const V$ = 24 * 3600 * 1e3;
+function G$(e, t) {
   const r = new Date(e), n = new Date(new Date(t).getTime() - 1), i = (a) => new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
-  return Math.round((i(n) - i(r)) / H$) + 1;
+  return Math.round((i(n) - i(r)) / V$) + 1;
 }
 let _r = class extends Ht {
   constructor() {
@@ -25614,7 +25617,7 @@ let _r = class extends Ht {
       </div>`;
     if (!this.payload)
       return I`<div class="notice">${e.common.computing}</div>`;
-    const t = this.payload, r = this.i18n.locale, n = Wa(t.coverage, r), i = t.days.length === 0, a = V$(t.counted_from ?? t.window.start, t.window.end) - t.days.length, o = t.counted_from ? new Date(t.counted_from).toLocaleDateString(r) : null;
+    const t = this.payload, r = this.i18n.locale, n = Wa(t.coverage, r), i = t.days.length === 0, a = G$(t.counted_from ?? t.window.start, t.window.end) - t.days.length, o = t.counted_from ? new Date(t.counted_from).toLocaleDateString(r) : null;
     return I`
       <div class="status">
         <span class="badge">${ll(t.precision, t.boundary, r)}</span>
@@ -25653,7 +25656,7 @@ let _r = class extends Ht {
       <section>
         <h2>${e.grid.autonomy}</h2>
         ${this.renderAutonomy(t.autonomy, t.low_pct)}
-        ${t.has_soc ? this.renderReserve(t.reserve, t.low_pct) : O}
+        ${z$(t) ? this.renderReserve(t.reserve, t.low_pct) : O}
       </section>
     `;
   }
@@ -25736,7 +25739,7 @@ Vn([
 _r = Vn([
   xe("ia-grid-tab")
 ], _r);
-const G$ = 0.02, W$ = 3, eb = 20, U$ = 6, rb = 10, nb = 5, ib = 1, Y$ = 100, X$ = 0.8, q$ = 0.95, ty = [
+const W$ = 0.02, U$ = 3, eb = 20, Y$ = 6, rb = 10, nb = 5, ib = 1, X$ = 100, q$ = 0.8, Z$ = 0.95, ty = [
   { key: "capacity", signals: ["capacity"] },
   { key: "efficiency", signals: ["efficiency"] },
   { key: "solar", signals: ["solar_energy", "best_hour"] },
@@ -25745,11 +25748,11 @@ const G$ = 0.02, W$ = 3, eb = 20, U$ = 6, rb = 10, nb = 5, ib = 1, Y$ = 100, X$ 
 function Mc(e, t) {
   return e.months[t]?.value ?? null;
 }
-function Z$(e) {
+function K$(e) {
   const [t, r] = e.split("-");
   return `${Number(t) - 1}-${r}`;
 }
-function K$(e, t) {
+function j$(e, t) {
   const r = e.signals[t];
   return [...new Set(e.months.map((i) => Number(i.slice(0, 4))))].sort(
     (i, a) => i - a
@@ -25761,10 +25764,10 @@ function K$(e, t) {
     )
   })).filter((i) => i.values.some((a) => a !== null));
 }
-function j$(e, t) {
+function Q$(e, t) {
   const r = e.signals[t];
   return e.months.slice(-ab).map((n) => {
-    const i = Mc(r, n), a = Mc(r, Z$(n));
+    const i = Mc(r, n), a = Mc(r, K$(n));
     let o = null, s = null;
     return i !== null && a !== null && (o = i - a, a !== 0 && (s = o / a)), {
       key: n,
@@ -25776,13 +25779,13 @@ function j$(e, t) {
     };
   });
 }
-function Q$(e) {
+function J$(e) {
   const { recent_mean: t, previous_mean: r, change: n, recent_months: i, previous_months: a } = e.comparison;
   return t === null || r === null || n === null ? {
     kind: "notEnough",
     recent: i,
     previous: a,
-    needed: U$
+    needed: Y$
   } : {
     kind: "figure",
     recent: t,
@@ -25791,10 +25794,10 @@ function Q$(e) {
     share: r === 0 ? null : n / r
   };
 }
-function J$(e) {
+function tP(e) {
   return e.best_hour_mode === "all" && e.export_limited === !1 ? "exporting" : e.best_hour_mode;
 }
-function tP(e) {
+function eP(e) {
   return e.export_limited === !0 ? "household" : "array";
 }
 function fi(e, t, r) {
@@ -25834,8 +25837,8 @@ function ey(e, t, r, n) {
 function ry(e, t) {
   return e === null ? it : `${fi(e * 100, 1, t)}%`;
 }
-function eP(e, t, r) {
-  const n = K$(e, t), i = (a) => n.map((o) => ({
+function rP(e, t, r) {
+  const n = j$(e, t), i = (a) => n.map((o) => ({
     year: o.year,
     values: o.values.map((s) => s === null ? null : s * a)
   }));
@@ -25851,7 +25854,7 @@ function eP(e, t, r) {
       return { lines: n, unit: r.units.h };
   }
 }
-function rP(e, t, r, n) {
+function nP(e, t, r, n) {
   return t !== "capacity" || e.nameplate_kwh === null ? null : {
     value: e.nameplate_kwh,
     name: r.health.nameplate({ value: Pt(e.nameplate_kwh, n) })
@@ -25860,13 +25863,13 @@ function rP(e, t, r, n) {
 function As(e, t) {
   return new Intl.NumberFormat(t, { maximumFractionDigits: 2 }).format(e);
 }
-function nP(e) {
+function iP(e) {
   return Math.floor(e * 1e3) / 1e3;
 }
 function ny(e, t, r) {
   return t !== "efficiency" || r?.drift_corrected !== !0 ? null : e.health.driftCorrected;
 }
-function iP(e, t, r, n) {
+function aP(e, t, r, n) {
   const i = e.health.reasons;
   switch (t) {
     case "too_few_clean_hours":
@@ -25886,8 +25889,8 @@ function iP(e, t, r, n) {
       return i.too_little_throughput({ min: Pt(ib, n) });
     case "partial_month":
       return r?.coverage === void 0 ? i.partial_month : i.partialCoverage({
-        share: Xe(nP(r.coverage), n),
-        needed: Y(q$, n)
+        share: Xe(iP(r.coverage), n),
+        needed: Y(Z$, n)
       });
     case "curtailed":
       return i.curtailed({
@@ -25896,12 +25899,12 @@ function iP(e, t, r, n) {
       });
   }
 }
-function aP(e, t, r = !1) {
+function oP(e, t, r = !1) {
   const n = e.health.definitions;
   return {
     capacity: n.capacity({
-      charge: `${As(G$, t)} ${e.units.kwh}`,
-      drop: As(W$, t),
+      charge: `${As(W$, t)} ${e.units.kwh}`,
+      drop: As(U$, t),
       minHours: eb
     }),
     efficiency: n.efficiency({
@@ -25910,15 +25913,15 @@ function aP(e, t, r = !1) {
     }),
     solar: n.solar({
       minHours: rb,
-      minPower: ft(Y$, t)
+      minPower: ft(X$, t)
     }) + (r ? ` ${n.solarDerived}` : ""),
-    inverter: n.inverter({ share: Y(X$, t) })
+    inverter: n.inverter({ share: Y(q$, t) })
   };
 }
-var oP = Object.defineProperty, sP = Object.getOwnPropertyDescriptor, Zi = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? sP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var sP = Object.defineProperty, lP = Object.getOwnPropertyDescriptor, Zi = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? lP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && oP(t, r, i), i;
+  return n && i && sP(t, r, i), i;
 };
 let Ur = class extends Ht {
   constructor() {
@@ -25959,7 +25962,7 @@ let Ur = class extends Ht {
     </p>`;
   }
   renderComparison(e, t) {
-    const r = this.i18n.m, n = this.i18n.locale, i = Q$(e.signals[t]);
+    const r = this.i18n.m, n = this.i18n.locale, i = J$(e.signals[t]);
     return i.kind === "notEnough" ? I`<div class="figure">
         <span class="label">${r.health.lastTwelve}</span>
         <p class="note">
@@ -25987,7 +25990,7 @@ let Ur = class extends Ht {
     </div>`;
   }
   renderTable(e, t) {
-    const r = this.i18n.m, n = this.i18n.locale, i = j$(e, t), a = e.signals[t].months;
+    const r = this.i18n.m, n = this.i18n.locale, i = Q$(e, t), a = e.signals[t].months;
     return I`<div class="table-wrap">
       <table>
         <thead>
@@ -26006,7 +26009,7 @@ let Ur = class extends Ht {
               <td>${Ua(o.key, void 0, n)}</td>
               <td>
                 ${us(t, o.value, r, n)}
-                ${o.reason !== null ? I`<span class="hint">${iP(r, o.reason, s, n)}</span>` : O}
+                ${o.reason !== null ? I`<span class="hint">${aP(r, o.reason, s, n)}</span>` : O}
                 ${ny(r, t, s) !== null ? I`<span class="hint">${ny(r, t, s)}</span>` : O}
                 ${t === "inverter" && s?.measured_hours !== void 0 ? I`<span class="hint"
                       >${r.health.inverterHint({
@@ -26027,17 +26030,17 @@ let Ur = class extends Ht {
   /** The captions a signal's chart carries beneath it. */
   renderCaptions(e, t) {
     const r = this.i18n.m;
-    return t === "capacity" && e.nameplate_kwh !== null ? I`<p class="note">${r.health.nameplateNote}</p>` : t === "solar_energy" ? I`<p class="note">${r.health.energyCaption[tP(e)]}</p>` : t === "best_hour" ? I`<p class="note">${r.health.bestHourCaption[J$(e)]}</p>` : O;
+    return t === "capacity" && e.nameplate_kwh !== null ? I`<p class="note">${r.health.nameplateNote}</p>` : t === "solar_energy" ? I`<p class="note">${r.health.energyCaption[eP(e)]}</p>` : t === "best_hour" ? I`<p class="note">${r.health.bestHourCaption[tP(e)]}</p>` : O;
   }
   renderSignal(e, t, r) {
     const n = this.i18n.m, i = this.i18n.locale, a = e.signals[t], o = r ? I`<h3>${n.health.signals[t]}</h3>` : O;
     if (a.missing.length)
       return I`${o}${this.renderMissing(a.missing)}`;
-    const { lines: s, unit: l } = eP(e, t, n);
+    const { lines: s, unit: l } = rP(e, t, n);
     return I`
       ${o} ${this.renderComparison(e, t)}
       <ia-chart
-        .option=${Sw(s, l, n, rP(e, t, n, i))}
+        .option=${Sw(s, l, n, nP(e, t, n, i))}
         height="240px"
       ></ia-chart>
       ${this.renderCaptions(e, t)} ${this.renderTable(e, t)}
@@ -26059,7 +26062,7 @@ let Ur = class extends Ht {
       </div>`;
     if (!this.payload)
       return I`<div class="notice">${e.common.computing}</div>`;
-    const t = this.payload, r = this.i18n.locale, n = aP(e, r, t.pv_power_derived);
+    const t = this.payload, r = this.i18n.locale, n = oP(e, r, t.pv_power_derived);
     return I`
       <div class="status">
         <span class="badge"
@@ -26170,10 +26173,10 @@ Ur = Zi([
 function ob(e, t) {
   return t === void 0 || t <= e ? null : { shown: e, total: t };
 }
-var lP = Object.defineProperty, uP = Object.getOwnPropertyDescriptor, Gl = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? uP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var uP = Object.defineProperty, hP = Object.getOwnPropertyDescriptor, Gl = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? hP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && lP(t, r, i), i;
+  return n && i && uP(t, r, i), i;
 };
 let Ni = class extends Ht {
   constructor() {
@@ -26308,10 +26311,10 @@ Gl([
 Ni = Gl([
   xe("ia-phases-section")
 ], Ni);
-var hP = Object.defineProperty, cP = Object.getOwnPropertyDescriptor, Wl = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? cP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var cP = Object.defineProperty, fP = Object.getOwnPropertyDescriptor, Wl = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? fP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && hP(t, r, i), i;
+  return n && i && cP(t, r, i), i;
 };
 let Bi = class extends Ht {
   constructor() {
@@ -26364,10 +26367,10 @@ Wl([
 Bi = Wl([
   xe("ia-strings-section")
 ], Bi);
-var fP = Object.defineProperty, dP = Object.getOwnPropertyDescriptor, qr = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? dP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var dP = Object.defineProperty, vP = Object.getOwnPropertyDescriptor, qr = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? vP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && fP(t, r, i), i;
+  return n && i && dP(t, r, i), i;
 };
 let Je = class extends Ht {
   constructor() {
@@ -26599,10 +26602,10 @@ qr([
 Je = qr([
   xe("ia-load-tab")
 ], Je);
-var vP = Object.defineProperty, pP = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? pP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var pP = Object.defineProperty, gP = Object.getOwnPropertyDescriptor, Gn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? gP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && vP(t, r, i), i;
+  return n && i && pP(t, r, i), i;
 };
 let br = class extends Ht {
   constructor() {
@@ -26787,19 +26790,19 @@ function iy(e, t) {
 function ay(e, t, r, n) {
   return t === "battery" && r === "never_full" ? n === "ceiling" ? e.verdict.neverReachedLimit : e.verdict.neverFull : t === "solar" && r === "no_fill" ? e.verdict.noFill : e.verdict.noData[t];
 }
-function gP(e, t, r, n) {
+function yP(e, t, r, n) {
   return t === "battery" && r === "never_full" ? n === "ceiling" ? e.verdict.hintLimitNotReached : e.verdict.hintNeverFilled : t === "solar" && r === "no_fill" ? e.verdict.hintNoFill : e.verdict.hintNoData;
 }
-function yP(e) {
+function mP(e) {
   const t = e.period.solar;
   if (t) return typeof t.evidence.fill_share == "number";
   const r = e.cards.battery;
   return !r.missing.length && !r.thresholds_inverted;
 }
-function mP(e) {
-  return e.rules.export_limited === !0 ? e.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : yP(e) ? "with_fill" : "plain";
+function _P(e) {
+  return e.rules.export_limited === !0 ? e.rules.full_mode === "ceiling" ? "no_export" : "no_export_fixed" : mP(e) ? "with_fill" : "plain";
 }
-function _P(e, t, r, n) {
+function bP(e, t, r, n) {
   if (t === !0) {
     const a = r.fill_share;
     return a == null ? it : e.sizing.filledOnDays({ share: Y(a, n) });
@@ -26807,7 +26810,7 @@ function _P(e, t, r, n) {
   const i = r.production_share;
   return i == null ? it : e.sizing.ofLoad({ share: Y(i, n) });
 }
-function bP(e, t, r) {
+function wP(e, t, r) {
   if (t.cards.battery.missing.includes("battery_soc")) return null;
   const n = t.rules;
   if (n.full_mode === "ceiling") return e.sizing.fullModeCeiling;
@@ -26817,13 +26820,13 @@ function bP(e, t, r) {
   const a = n.ceiling_no_rows ?? [];
   return a.length ? e.sizing.fullModeNoRows({ full: r, roles: Rn(e, a, !0), n: a.length }) : e.sizing.fullModePlain({ full: r });
 }
-var wP = Object.defineProperty, SP = Object.getOwnPropertyDescriptor, Wn = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? SP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var SP = Object.defineProperty, xP = Object.getOwnPropertyDescriptor, Wn = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? xP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && wP(t, r, i), i;
+  return n && i && SP(t, r, i), i;
 };
-const xP = ["inverter", "battery", "solar"];
-function TP(e, t) {
+const TP = ["inverter", "battery", "solar"];
+function CP(e, t) {
   const [r, n] = e.split("-").map(Number);
   return new Date(r, n - 1, 1).toLocaleDateString(t, {
     month: "short",
@@ -26858,7 +26861,7 @@ let wr = class extends Ht {
     return e === "inverter" ? i.sizing.hoursAtRated({ hours: `${a.hours_at_rated ?? 0}` }) : e === "battery" ? i.sizing.daysOf({
       days: `${a.days_full_and_low ?? 0}`,
       total: a.days_with_data ?? 0
-    }) : _P(i, r.rules.export_limited, a, n);
+    }) : bP(i, r.rules.export_limited, a, n);
   }
   renderEvidence(e, t, r, n) {
     const i = this.i18n.m, a = t.evidence, o = (l, u) => i.sizing.countOf({ count: `${l ?? it}`, total: `${u ?? it}` }), s = (l, u) => I`<span class="row"><span>${l}</span><span>${u}</span></span>`;
@@ -26927,7 +26930,7 @@ let wr = class extends Ht {
         share: a(i.battery_short_share)
       });
     const o = a(i.solar_enough_share), s = a(i.solar_borderline_share);
-    switch (mP(t)) {
+    switch (_P(t)) {
       case "no_export":
         return n.sizing.solarRuleNoExport({
           fill: a(i.solar_fill_share),
@@ -27042,7 +27045,7 @@ let wr = class extends Ht {
         // rule working, a month with no statistics is missing data, and
         // "No verdict" alone reads the same for both.
         I`<span class="hint"
-              >${gP(t, i, o.reason ?? "no_data", e.rules.full_mode)}</span
+              >${yP(t, i, o.reason ?? "no_data", e.rules.full_mode)}</span
             >`
       ) : I`<span class="hint">${this.cellFigure(i, o, e, r)}</span>`}
         ${s ? I`<span class="hint"
@@ -27063,7 +27066,7 @@ let wr = class extends Ht {
         ${e.months.map(
       (i) => I`<tr class=${i.complete ? "" : "partial"}>
             <td>
-              ${TP(i.key, r)}
+              ${CP(i.key, r)}
               ${i.coverage === 0 ? I`<span class="hint">${t.verdict.hintNoData}</span>` : i.complete ? O : I`<span class="hint"
                       >${t.sizing.ofTheMonth({
         share: Xe(i.coverage, r)
@@ -27088,7 +27091,7 @@ let wr = class extends Ht {
     const t = this.payload, r = this.i18n.locale, n = (a) => e.sizing.ruleLine({
       part: e.sizing.parts[a],
       rule: this.ruleSentence(a, t, r)
-    }), i = bP(e, t, Y(t.rules.full_pct / 100, r));
+    }), i = wP(e, t, Y(t.rules.full_pct / 100, r));
     return I`
       <div class="status">
         <span class="badge">${e.balance.hourlyStatistics}</span>
@@ -27104,7 +27107,7 @@ let wr = class extends Ht {
       </div>
 
       <section>
-        <div class="cards">${xP.map((a) => this.renderCard(a, t))}</div>
+        <div class="cards">${TP.map((a) => this.renderCard(a, t))}</div>
       </section>
 
       <section>
@@ -27215,12 +27218,12 @@ Wn([
 wr = Wn([
   xe("ia-sizing-tab")
 ], wr);
-var CP = Object.defineProperty, MP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
-  for (var i = n > 1 ? void 0 : n ? MP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
+var MP = Object.defineProperty, DP = Object.getOwnPropertyDescriptor, Tr = (e, t, r, n) => {
+  for (var i = n > 1 ? void 0 : n ? DP(t, r) : t, a = e.length - 1, o; a >= 0; a--)
     (o = e[a]) && (i = (n ? o(t, r, i) : o(i)) || i);
-  return n && i && CP(t, r, i), i;
+  return n && i && MP(t, r, i), i;
 };
-const DP = "/inverter-analytics", oy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
+const AP = "/inverter-analytics", oy = ["load", "battery", "seasonal", "balance", "grid", "sizing", "health"];
 let ke = class extends Ht {
   constructor() {
     super(...arguments), this.narrow = !1, this.tab = "load", this.range = "30d", this.i18n = new Ne(this), this.readLocation = () => {
@@ -27249,7 +27252,7 @@ let ke = class extends Ht {
    * a filter before leaving the page.
    */
   writeLocation(e = !1) {
-    const t = nw(DP, {
+    const t = nw(AP, {
       tab: this.tab,
       range: this.range,
       entryId: this.entryId

@@ -5,7 +5,7 @@
  * choices that have to stay right live in pure functions and the element only
  * renders what they return.
  */
-import type { OutageEpisode, ReserveReason, ReserveSummary } from "./types";
+import type { GridPayload, OutageEpisode, ReserveReason, ReserveSummary } from "./types";
 
 export type HoursLeftCell =
   | { kind: "reason"; reason: ReserveReason }
@@ -54,4 +54,16 @@ export function coveredCard(reserve: ReserveSummary): CoveredCard {
   return reserve.judged === 0
     ? { kind: "none" }
     : { kind: "count", covered: reserve.covered, judged: reserve.judged };
+}
+
+/**
+ * Whether the reserve cards and their note appear at all. They need the
+ * battery's charge, and outages to read it over: with none, "hardest outage"
+ * and "outages covered" would be empty cards, and the autonomy sentence above
+ * them already says there were no outages.
+ */
+export function showsReserve(
+  payload: Pick<GridPayload, "has_soc" | "episodes"> & { kpi: Pick<GridPayload["kpi"], "count"> },
+): boolean {
+  return payload.has_soc && payload.kpi.count > 0 && payload.episodes.length > 0;
 }

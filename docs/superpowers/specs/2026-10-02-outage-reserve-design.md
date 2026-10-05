@@ -97,6 +97,9 @@ In the Autonomy section, two cards:
 And one note: the drop of an outage depends on the hour and the load, so a
 daytime outage says little about a night one.
 
+With no outages in the period, neither card nor the note is shown: the
+autonomy sentence above them already says there were none.
+
 All strings go into `en.ts` and `uk.ts`; types in `types.ts`
 (`OutageEpisode` gains the three optional fields, `GridPayload` gains
 `reserve`).
