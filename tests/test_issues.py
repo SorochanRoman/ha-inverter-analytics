@@ -4,6 +4,7 @@ An installation configured once has no reason to revisit the integration, so
 anything it needs to be told has to arrive somewhere it is already looking.
 """
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
@@ -202,6 +203,47 @@ async def test_an_orphaned_entity_is_reported_as_missing(
     entry = _entry({"load_power": [LOAD], "grid_connected": ["binary_sensor.grid_status"]})
     await _setup(hass, entry)
 
+    issue = _issue(hass, MISSING_ENTITIES, entry)
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "binary_sensor.grid_status"
+
+
+async def _restored_grid_status(hass: HomeAssistant, owner_state: ConfigEntryState):
+    """A grid sensor restored as unavailable, owned by a Solarman entry in owner_state."""
+    hass.states.async_set(
+        LOAD,
+        "800",
+        {"device_class": "power", "unit_of_measurement": "W", "state_class": "measurement"},
+    )
+    owner = MockConfigEntry(domain="solarman", title="Solarman")
+    owner.add_to_hass(hass)
+    owner.mock_state(hass, owner_state)
+    er.async_get(hass).async_get_or_create(
+        "binary_sensor",
+        "solarman",
+        "grid",
+        suggested_object_id="grid_status",
+        config_entry=owner,
+    )
+    hass.states.async_set("binary_sensor.grid_status", "unavailable", {"restored": True})
+    entry = _entry({"load_power": [LOAD], "grid_connected": ["binary_sensor.grid_status"]})
+    await _setup(hass, entry)
+    return entry
+
+
+async def test_a_restored_entity_whose_owner_is_retrying_is_not_missing(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """At start every entity without a state yet is restored, including a retrying entry's."""
+    entry = await _restored_grid_status(hass, ConfigEntryState.SETUP_RETRY)
+    assert _issue(hass, MISSING_ENTITIES, entry) is None
+
+
+async def test_a_restored_entity_whose_owner_loaded_without_it_is_missing(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant
+) -> None:
+    """The owner is up and still did not set it up: nothing answers to that name."""
+    entry = await _restored_grid_status(hass, ConfigEntryState.LOADED)
     issue = _issue(hass, MISSING_ENTITIES, entry)
     assert issue is not None
     assert issue.translation_placeholders["entities"] == "binary_sensor.grid_status"

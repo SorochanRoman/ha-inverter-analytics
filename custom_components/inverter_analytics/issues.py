@@ -14,7 +14,7 @@ importantly, withdraw from it the moment the reason is gone.
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -149,11 +149,31 @@ def _is_gone(hass: HomeAssistant, entity_id: str) -> bool:
     longer sets it up keeps its registry entry, and Home Assistant restores
     it as unavailable with `restored: true`. Nothing answers to that name
     either — the registry is only remembering it — so it counts as gone.
+    But Home Assistant writes that same mark at start for every registered
+    entity without a state yet, including those of an entry still setting up
+    or waiting to retry. So the mark counts only once the owner has had its
+    chance: see _owner_is_up.
     """
     state = hass.states.get(entity_id)
-    if state is not None:
-        return state.state == STATE_UNAVAILABLE and state.attributes.get("restored") is True
-    return er.async_get(hass).async_get(entity_id) is None
+    entry = er.async_get(hass).async_get(entity_id)
+    if state is None:
+        return entry is None
+    if state.state != STATE_UNAVAILABLE or state.attributes.get("restored") is not True:
+        return False
+    return entry is not None and _owner_is_up(hass, entry)
+
+
+def _owner_is_up(hass: HomeAssistant, entry: er.RegistryEntry) -> bool:
+    """Whether whatever should provide a registry entity has finished loading.
+
+    A config entry must be loaded; one retrying, failed or still setting up
+    may yet provide it. An entity with no config entry belongs to a platform,
+    and a platform that is not among the loaded components is gone.
+    """
+    if entry.config_entry_id:
+        owner = hass.config_entries.async_get_entry(entry.config_entry_id)
+        return owner is not None and owner.state is ConfigEntryState.LOADED
+    return entry.platform not in hass.config.components
 
 
 @callback
