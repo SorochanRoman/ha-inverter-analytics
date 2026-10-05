@@ -16,6 +16,15 @@ export const uk: Messages = {
     peak: "Пік",
     coversOfPeriod: (p) => `Дані покривають ${p.share} періоду`,
     meanLoad: "Середнє навантаження",
+    longestShown: (p: { shown: number; total: number }) =>
+      `Показано ${p.shown} ` +
+      plural("uk", p.shown, {
+        one: "найдовший епізод",
+        few: "найдовші епізоди",
+        many: "найдовших епізодів",
+        other: "найдовшого епізоду",
+      }) +
+      ` із ${p.total}, за порядком у часі.`,
     selfSufficiency: "Самозабезпечення",
   },
   units: {

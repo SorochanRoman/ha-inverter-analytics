@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { fetchLoad } from "../api";
+import { cappedListNote } from "../episodes";
 import { bandsOption, durationCurveOption, histogramOption } from "../charts/options";
 import "../charts/echart";
 import "../sections/phases-section";
@@ -143,6 +144,7 @@ export class IaLoadTab extends LitElement {
       return html`<p class="empty">${m.load.noOverloads}</p>`;
     }
     const locale = this.i18n.locale;
+    const capped = cappedListNote(payload.overloads.length, payload.overloads_total);
     return html`<table>
       <thead>
         <tr><th>${m.common.start}</th><th>${m.common.duration}</th><th>${m.common.peak}</th></tr>
@@ -156,7 +158,8 @@ export class IaLoadTab extends LitElement {
           </tr>`,
         )}
       </tbody>
-    </table>`;
+    </table>
+    ${capped ? html`<p class="note">${m.common.longestShown(capped)}</p>` : nothing}`;
   }
 
   protected render() {
@@ -276,6 +279,7 @@ export class IaLoadTab extends LitElement {
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); }
     .empty { color: var(--secondary-text-color); margin: 0; }
+    .note { font-size: 12px; color: var(--secondary-text-color); margin: 8px 0 0; }
     .notice { padding: 24px; color: var(--secondary-text-color); }
     button {
       background: var(--card-background-color);

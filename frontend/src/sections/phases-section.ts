@@ -2,6 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { imbalanceOption } from "../charts/options";
 import "../charts/echart";
+import { cappedListNote } from "../episodes";
 import { formatCoverage, formatDuration, formatPercent, formatPower } from "../format";
 import { I18nController } from "../i18n/controller";
 import { partLabel } from "../roles";
@@ -95,10 +96,11 @@ export class IaPhasesSection extends LitElement {
 
   private renderEpisodes() {
     const m = this.i18n.m;
-    const { episodes, per_phase } = this.phases;
+    const { episodes, episodes_total, per_phase } = this.phases;
     if (!episodes.length) {
       return html`<p class="empty">${m.sections.phases.noSustained}</p>`;
     }
+    const capped = cappedListNote(episodes.length, episodes_total);
     return html`<table>
       <thead>
         <tr>
@@ -118,7 +120,8 @@ export class IaPhasesSection extends LitElement {
           </tr>`,
         )}
       </tbody>
-    </table>`;
+    </table>
+    ${capped ? html`<p class="note">${m.common.longestShown(capped)}</p>` : nothing}`;
   }
 
   protected render() {

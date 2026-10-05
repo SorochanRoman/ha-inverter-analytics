@@ -26,6 +26,12 @@ export const en = {
     peak: "Peak",
     coversOfPeriod: (p: { share: string }) => `Covers ${p.share} of the period`,
     meanLoad: "Mean load",
+    // Under an episode table the backend capped at its longest entries.
+    longestShown: (p: { shown: number; total: number }) =>
+      plural("en", p.shown, {
+        one: `The longest of ${p.total} is shown.`,
+        other: `The ${p.shown} longest of ${p.total} are shown, in time order.`,
+      }),
     selfSufficiency: "Self-sufficiency",
   },
   units: {
