@@ -1,6 +1,6 @@
 import type { Messages } from "../i18n/en";
 import { partLabel } from "../roles";
-import { SERIES, chartBaseOption } from "../theme";
+import { SERIES, YEAR_LINES, chartBaseOption } from "../theme";
 import type {
   BalanceDay,
   Band,
@@ -220,15 +220,18 @@ export function socBandsOption(bands: Band[], m: Messages): Record<string, unkno
   };
 }
 
+/** The short name of a calendar month, 1 to 12: Mar, or бер. in Ukrainian. */
+function monthName(month: number, locale: string): string {
+  return new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString(locale, { month: "short" });
+}
+
 /**
  * Shortens 2026-03 to Mar (бер. in Ukrainian), keeping the year only where
  * it turns over.
  */
 export function monthLabel(key: string, previous: string | undefined, locale: string): string {
   const [year, month] = key.split("-").map(Number);
-  const name = new Date(Date.UTC(2000, month - 1, 1)).toLocaleDateString(locale, {
-    month: "short",
-  });
+  const name = monthName(month, locale);
   return previous && previous.slice(0, 4) === String(year) ? name : `${name} ${year}`;
 }
 
@@ -489,5 +492,51 @@ export function outageHoursOption(hours: GridHour[], m: Messages): Record<string
         itemStyle: { color: SERIES.overload },
       },
     ],
+  };
+}
+
+/**
+ * One line per year over the twelve months, so a winter is set beside a
+ * winter. A gap stays a gap: connecting across it would draw a month nobody
+ * measured. Symbols stay on, or a month alone between gaps would vanish.
+ */
+export function yearLinesOption(
+  lines: { year: number; values: (number | null)[] }[],
+  unit: string,
+  m: Messages,
+): Record<string, unknown> {
+  const { base, axis } = chartBaseOption();
+  const names = lines.map((line) => String(line.year));
+  const series = lines.map((line, index) => {
+    const age = lines.length - 1 - index;
+    const colour =
+      age === 0
+        ? YEAR_LINES.newest
+        : YEAR_LINES.older[Math.min(age - 1, YEAR_LINES.older.length - 1)];
+    return {
+      name: String(line.year),
+      type: "line",
+      connectNulls: false,
+      showSymbol: true,
+      symbolSize: age === 0 ? 6 : 4,
+      // Drawn over the older years rather than under them.
+      z: age === 0 ? 3 : 2,
+      lineStyle: { color: colour, width: age === 0 ? 2.5 : 1.5 },
+      itemStyle: { color: colour },
+      data: line.values.map((value) => (value === null ? null : round(value, 2))),
+    };
+  });
+  return {
+    ...base,
+    legend: { data: names, top: 0, textStyle: base.textStyle },
+    grid: { ...(base.grid as Record<string, unknown>), top: 48 },
+    xAxis: {
+      ...axis,
+      type: "category",
+      data: Array.from({ length: 12 }, (_, index) => monthName(index + 1, m.charts.locale)),
+    },
+    // The shape over the years is the point, not the distance from zero.
+    yAxis: { ...axis, type: "value", name: unit, scale: true },
+    series,
   };
 }

@@ -3,6 +3,7 @@ import type {
   BatteryPayload,
   ConfigResult,
   GridPayload,
+  HealthPayload,
   HomeAssistant,
   LoadPayload,
   SeasonalityPayload,
@@ -96,5 +97,13 @@ export function fetchSizing(
     entry_id: entryId,
     start: start.toISOString(),
     end: end.toISOString(),
+  });
+}
+
+/** No window: the server reads the whole history from long-term statistics. */
+export function fetchHealth(hass: HomeAssistant, entryId: string): Promise<HealthPayload> {
+  return hass.connection.sendMessagePromise<HealthPayload>({
+    type: "inverter_analytics/health",
+    entry_id: entryId,
   });
 }

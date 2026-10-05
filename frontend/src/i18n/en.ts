@@ -50,6 +50,7 @@ export const en = {
       balance: "Balance",
       grid: "Grid",
       sizing: "Sizing",
+      health: "Health",
     },
     // The notice on a tab whose sensors are not mapped. One role or several
     // changes more than a pronoun, so each is a whole paragraph.
@@ -84,6 +85,7 @@ export const en = {
     balance: "Energy balance",
     grid: "Grid outages",
     sizing: "Sizing",
+    health: "Health",
   },
   // The setup form's field labels; see roles.ts.
   roles: {
@@ -534,6 +536,125 @@ export const en = {
       "Every month is judged from hourly statistics — the peak and the floor of each hour, " +
       "not the mean — so a verdict for last winter is read the same way as one for last " +
       "week. Nothing here is a combined score: which part is short is the whole point.",
+  },
+  // health.ts and the Health tab. No verdicts anywhere: each figure is set
+  // beside the same month a year earlier and the reader decides.
+  health: {
+    tab: "Health",
+    cards: {
+      capacity: "Battery capacity",
+      efficiency: "Round-trip efficiency",
+      solar: "Solar production",
+      inverter: "Inverter load",
+    },
+    // Chart and table headings: the solar card holds two signals.
+    signals: {
+      capacity: "Usable capacity",
+      efficiency: "Round-trip efficiency",
+      solar_energy: "Energy",
+      best_hour: "Best hour",
+      inverter: "Hours near rated power",
+    },
+    columns: {
+      month: "Month",
+      value: "Figure",
+      previous: "A year earlier",
+      difference: "Difference",
+      share: "Change",
+    },
+    // The status badge, from the first month with a figure.
+    wholeHistory: (p: { month: string }) => `Whole history, from ${p.month}`,
+    wholeHistoryEmpty: "Whole history — no month has a figure yet",
+    // The figure above each card and its caption.
+    lastTwelve: "Last 12 months against the 12 before",
+    meanOfMonthly: "mean of the monthly figures",
+    notEnough: (p: { recent: number; previous: number }) =>
+      `Not enough months to compare: ${p.recent} of the 6 needed in the last 12, ` +
+      `${p.previous} of 6 in the 12 before.`,
+    // Why a month has no figure, keyed by the payload's reason.
+    reasons: {
+      too_few_clean_hours: (p: { n: number; minHours: number }) =>
+        `${plural("en", p.n, {
+          one: `Only ${p.n} clean discharge hour`,
+          other: `Only ${p.n} clean discharge hours`,
+        })} this month; it needs ${p.minHours}, or one strange hour moves the figure.`,
+      no_soc:
+        "No state of charge this month, so there is no telling whether the battery ended " +
+        "where it began.",
+      soc_partial:
+        "The state of charge covers only part of the hours the counters do, so the check " +
+        "that the battery ended where it began would not cover the same span.",
+      drift: (p: { points: string }) =>
+        `The charge ended more than ${p.points} points from where it began, so part of ` +
+        "what came out went in another month, or the reverse.",
+      too_little_throughput: (p: { min: string }) =>
+        `Less than ${p.min} went into the battery this month — too little to read an ` +
+        "efficiency from.",
+      curtailed: (p: { n: number; minHours: number }) =>
+        `${plural("en", p.n, {
+          one: `Only ${p.n} hour of sun`,
+          other: `Only ${p.n} hours of sun`,
+        })} the system could take in full; the best hour needs ${p.minHours}.`,
+    },
+    // bestHourCaption.
+    bestHourCaption: {
+      unconstrained:
+        "Hours when the battery was at its charge limit are left out: the inverter cut the " +
+        "array back to what the house used, so their peak is the load, not the array.",
+      all:
+        "Read from every hour. Without the state of charge, battery power and PV power, an " +
+        "hour the system could not take cannot be told apart, so a low month may be the " +
+        "house and not the array.",
+    },
+    // energyCaption.
+    energyCaption: {
+      household:
+        "This system does not export, so the energy is what the house used, not what the " +
+        "array could give: its difference from a year earlier measures the household. Read " +
+        "the best hour for the array.",
+      array:
+        "Energy carries the weather: a dull month is low for reasons of its own. The best " +
+        "hour carries much less of it.",
+    },
+    // The reference line on the capacity chart, and why it is not a target.
+    nameplate: (p: { value: string }) => `Nameplate ${p.value}`,
+    nameplateNote:
+      "The nameplate is what the maker printed; the line is what the battery delivered, " +
+      "read through the BMS's estimate of its charge. They are different quantities: watch " +
+      "the shape of the line over the years, not its distance from the nameplate.",
+    // The block at the foot of the tab.
+    howRead: "How these are read",
+    definitions: {
+      capacity: (p: { charge: string; drop: string; minHours: number }) =>
+        "Usable capacity comes from clean discharge hours: hours in which the charge counter " +
+        `moved by at most ${p.charge}, the discharge counter moved, and the state of charge ` +
+        `fell by at least ${p.drop} points. The discharge over the fall is the energy per ` +
+        `point; times a hundred, the capacity. A month needs ${p.minHours} such hours. A ` +
+        "recalibration by the BMS inside one can only pull a month's figure down.",
+      efficiency: (p: { points: string; min: string }) =>
+        "Round-trip efficiency is what came out of the battery over what went in, from the " +
+        "counters' monthly sums. A month has no figure when its charge ended more than " +
+        `${p.points} points from where it began, or when less than ${p.min} went in.`,
+      solar: (p: { minHours: number; minPower: string }) =>
+        "Solar production is the PV counter's energy per month. The best hour is the " +
+        "month's highest hourly peak of PV power — close to a clear-sky figure. Hours the " +
+        `system could not take are left out, and a month needs ${p.minHours} other hours of ` +
+        `sun at or above ${p.minPower}.`,
+      inverter: (p: { share: string }) =>
+        "Inverter load counts the hours whose peak reached rated power, and those whose peak " +
+        `reached ${p.share} of it. That is how the house is used, not the state of the ` +
+        "hardware: without a temperature or fault sensor the data can say nothing more about " +
+        "the inverter itself.",
+    },
+    caveats: {
+      bms:
+        "The state of charge is the battery management system's estimate, not a measurement. " +
+        "It drifts and is recalibrated, so one month can move for reasons that are not the " +
+        "battery.",
+      weather:
+        "A month's energy follows its weather: a dull year reads like a weaker array. The " +
+        "best hour carries much less of it.",
+    },
   },
   sections: {
     charge: {

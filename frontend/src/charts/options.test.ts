@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SERIES } from "../theme";
+import { SERIES, YEAR_LINES } from "../theme";
 import { en } from "../i18n/en";
 import { uk } from "../i18n/uk";
 import { SUPPORTED_OPTION_KEYS } from "./registry";
@@ -32,6 +32,7 @@ import {
   partsOption,
   socBandsOption,
   socHistogramOption,
+  yearLinesOption,
 } from "./options";
 
 const payload: LoadPayload = {
@@ -517,5 +518,68 @@ describe("chart words in Ukrainian", () => {
   it("writes decimals with a comma in Ukrainian", () => {
     const option = histogramOption(payload, "percent", uk) as any;
     expect(option.xAxis.data).toEqual(["0", "2,5"]);
+  });
+});
+
+describe("year lines", () => {
+  const lines = [
+    { year: 2023, values: [null, null, 10.4, 10.2, ...Array(8).fill(10)] },
+    { year: 2024, values: [9.9, null, 9.8, ...Array(9).fill(9.7)] },
+    { year: 2025, values: [9.5, 9.4, 9.3, ...Array(9).fill(null)] },
+  ];
+
+  it("draws one line per year with a legend by year", () => {
+    const option = yearLinesOption(lines, en.units.kwh, en) as any;
+    expect(option.series.map((series: any) => series.name)).toEqual(["2023", "2024", "2025"]);
+    expect(option.legend.data).toEqual(["2023", "2024", "2025"]);
+    expect(option.series.every((series: any) => series.type === "line")).toBe(true);
+    expect(option.yAxis.name).toBe("kWh");
+  });
+
+  it("keeps a gap a gap", () => {
+    const option = yearLinesOption(lines, en.units.kwh, en) as any;
+    expect(option.series.every((series: any) => series.connectNulls === false)).toBe(true);
+    expect(option.series[1].data[1]).toBeNull();
+    expect(option.series[2].data.slice(2, 4)).toEqual([9.3, null]);
+  });
+
+  it("gives the newest year the accent and older years quiet colours", () => {
+    const option = yearLinesOption(lines, en.units.kwh, en) as any;
+    const colours = option.series.map((series: any) => series.lineStyle.color);
+    expect(colours[2]).toBe(YEAR_LINES.newest);
+    expect(colours[1]).toBe(YEAR_LINES.older[0]);
+    expect(colours[0]).toBe(YEAR_LINES.older[1]);
+  });
+
+  it("names the twelve months in the panel's locale", () => {
+    const english = yearLinesOption(lines, en.units.kwh, en) as any;
+    expect(english.xAxis.data).toHaveLength(12);
+    expect(english.xAxis.data[0]).toBe("Jan");
+    expect(english.xAxis.data[11]).toBe("Dec");
+    const ukrainian = yearLinesOption(lines, uk.units.kwh, uk) as any;
+    expect(ukrainian.xAxis.data[2]).toBe(
+      new Date(Date.UTC(2000, 2, 1)).toLocaleDateString("uk", { month: "short" }),
+    );
+    expect(ukrainian.yAxis.name).toBe("кВт·год");
+  });
+
+  it("survives more years than quiet colours, and none at all", () => {
+    const many = Array.from({ length: 8 }, (_, index) => ({
+      year: 2018 + index,
+      values: Array(12).fill(1),
+    }));
+    const option = yearLinesOption(many, "h", en) as any;
+    expect(option.series.every((series: any) => typeof series.lineStyle.color === "string")).toBe(
+      true,
+    );
+    expect((yearLinesOption([], "h", en) as any).series).toEqual([]);
+  });
+
+  it("uses only keys a registered component can render", () => {
+    const option = yearLinesOption(lines, en.units.kwh, en);
+    const unsupported = Object.keys(option)
+      .filter((key) => option[key] !== undefined)
+      .filter((key) => !SUPPORTED_OPTION_KEYS.has(key));
+    expect(unsupported).toEqual([]);
   });
 });

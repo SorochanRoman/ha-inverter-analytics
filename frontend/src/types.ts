@@ -457,3 +457,67 @@ export interface SizingPayload {
   window: { start: string; end: string };
   clamped: boolean;
 }
+
+/** The five health signals, keyed as in analytics/health.py SIGNALS. */
+export type HealthSignalKey = "capacity" | "efficiency" | "solar_energy" | "best_hour" | "inverter";
+
+/**
+ * Why a month has no figure. Capacity: too_few_clean_hours. Efficiency:
+ * no_soc, soc_partial, drift, too_little_throughput. Best hour: curtailed.
+ * A month absent from a signal's months is a gap and has no reason at all.
+ */
+export type HealthReason =
+  | "too_few_clean_hours"
+  | "no_soc"
+  | "soc_partial"
+  | "drift"
+  | "too_little_throughput"
+  | "curtailed";
+
+/**
+ * One month of one signal. value is kWh for capacity and solar_energy, a
+ * share 0–1 for efficiency, W for best_hour, and hours above the high share
+ * of rated for inverter. The extra fields belong to one signal each.
+ */
+export interface HealthMonth {
+  value: number | null;
+  reason: HealthReason | null;
+  /** capacity: the clean discharge hours the month had. */
+  clean_hours?: number;
+  /** best_hour: sunny hours the system could take; null when nothing was left out. */
+  unconstrained_hours?: number | null;
+  /** inverter */
+  hours_at_rated?: number;
+  measured_hours?: number;
+}
+
+/** The last twelve months against the twelve before, as means of the monthly figures. */
+export interface HealthComparison {
+  recent_mean: number | null;
+  previous_mean: number | null;
+  change: number | null;
+  recent_months: number;
+  previous_months: number;
+}
+
+export interface HealthSignal {
+  /** Roles this signal needs that are not mapped; [] when it is available. */
+  missing: string[];
+  months: Record<string, HealthMonth>;
+  comparison: HealthComparison;
+}
+
+export interface HealthPayload {
+  timezone: string;
+  /** Every local month from the window start to now, ascending, "YYYY-MM". */
+  months: string[];
+  /** The first month in which any signal has a figure. */
+  first_month: string | null;
+  covered_end: string | null;
+  covers_now: boolean;
+  export_limited: boolean | null;
+  best_hour_mode: "unconstrained" | "all";
+  /** The battery_capacity option: a reference line, never multiplied in. */
+  nameplate_kwh: number | null;
+  signals: Record<HealthSignalKey, HealthSignal>;
+}

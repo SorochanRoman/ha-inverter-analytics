@@ -98,3 +98,14 @@ quoted from the user's installation, and `code` fragments are not translated.
 | with the sun up | поки світило сонце |
 | no export (a system that keeps production in) | без експорту |
 | no charge data (sizing month cell) | немає даних заряду |
+| Health (tab) | Стан |
+| usable capacity (battery, implied) | корисна ємність |
+| clean discharge hour | чиста година розряду |
+| best hour (PV, highest hourly peak) | найкраща година |
+| nameplate (capacity) | паспортна ємність |
+| Whole history (health badge) | Уся історія |
+| a year earlier (table column) | рік тому |
+| points (of state of charge) | в.п. |
+| mean of the monthly figures | середнє місячних значень |
+| BMS (battery management system) | BMS (система керування батареєю) |
+| recalibration (BMS) | перекалібрування |

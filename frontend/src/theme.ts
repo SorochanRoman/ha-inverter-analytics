@@ -14,6 +14,17 @@ export const SERIES = {
 } as const;
 
 /**
+ * The year-lines charts: the newest year in the accent, older years in greys
+ * that fade with age, so the year being read stands out and the ones behind
+ * it stay in order. Five greys cover the six calendar years five years of
+ * history can touch; an older year beyond them takes the last.
+ */
+export const YEAR_LINES = {
+  newest: SERIES.load,
+  older: ["#7d8590", "#a0a6ae", "#bcc1c8", "#d0d4d9", "#e0e3e7"],
+} as const;
+
+/**
  * Shared base for ECharts options: transparent background and colours taken
  * from the Home Assistant theme. Returns base and axis separately because
  * each chart defines its own axes, and the axis styles need to be merged

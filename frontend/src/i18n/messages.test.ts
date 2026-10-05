@@ -27,7 +27,15 @@ function leaves(node: unknown, path = ""): Leaf[] {
 
 // The numeric params are the fields typed `: number` in en.ts — the counts a
 // language inflects by. Every other param is an already-formatted string.
-const NUMERIC_PARAMS = new Set(["n", "total", "covered", "judged"]);
+const NUMERIC_PARAMS = new Set([
+  "n",
+  "total",
+  "covered",
+  "judged",
+  "recent",
+  "previous",
+  "minHours",
+]);
 
 // Counts that land on every plural branch either language has: 1 and 21 are
 // Ukrainian "one", 2 is "few", 0, 5 and 11 are "many" (11 despite ending in 1).
