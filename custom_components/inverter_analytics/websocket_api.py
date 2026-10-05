@@ -15,6 +15,7 @@ import voluptuous as vol
 from .analytics.balance import async_balance_analytics
 from .analytics.battery import async_battery_analytics
 from .analytics.grid import async_grid_analytics
+from .analytics.health import async_health_analytics
 from .analytics.load import async_load_analytics
 from .analytics.seasonality import async_seasonality_analytics
 from .analytics.sizing import async_sizing_analytics
@@ -58,6 +59,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_balance)
     websocket_api.async_register_command(hass, ws_grid)
     websocket_api.async_register_command(hass, ws_sizing)
+    websocket_api.async_register_command(hass, ws_health)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -219,3 +221,36 @@ async def ws_sizing(
 ) -> None:
     """Return the sizing verdicts for a window."""
     await _async_windowed_response(hass, connection, msg, "sizing", async_sizing_analytics)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/health", vol.Required("entry_id"): str}
+)
+@websocket_api.async_response
+async def ws_health(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the health signals over the whole history.
+
+    No window: the server reads HEALTH_MAX_YEARS back from long-term
+    statistics only, so the 400-day cap, which guards raw state queries, does
+    not apply. The result is cached for the local day.
+    """
+    domain_data = hass.data.get(DOMAIN, {})
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    # The same condition as the windowed commands: loaded, so its cache exists.
+    if entry is None or entry.domain != DOMAIN or entry.entry_id not in domain_data:
+        connection.send_error(msg["id"], "not_found", "Inverter not found or disabled")
+        return
+
+    cache = domain_data[entry.entry_id][DATA_CACHE]
+    key = ("health", entry.entry_id, dt_util.now().date().isoformat())
+    payload = cache.get(key)
+    if payload is None:
+        try:
+            payload = await async_health_analytics(hass, EntryConfig.from_entry(entry))
+        except ValueError as err:
+            connection.send_error(msg["id"], "invalid_config", str(err))
+            return
+        cache.set(key, payload, ttl=HISTORICAL_TTL)
+    connection.send_result(msg["id"], payload)

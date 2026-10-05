@@ -147,6 +147,18 @@ FEATURES: tuple[Feature, ...] = (
         ("load_power", "battery_soc", "pv_energy_total", "load_energy_total"),
         needs_all=False,
     ),
+    # Opens with any one of its sensor sets — the PV counter, the battery's
+    # two counters with its charge, or the load (rated_power is required of
+    # every entry) — and each card says what it is short of.
+    Feature(
+        "health",
+        "Health",
+        ("pv_energy_total",),
+        alternatives=(
+            ("battery_soc", "battery_charge_total", "battery_discharge_total"),
+            ("load_power",),
+        ),
+    ),
 )
 
 FEATURES_BY_KEY: dict[str, Feature] = {feature.key: feature for feature in FEATURES}

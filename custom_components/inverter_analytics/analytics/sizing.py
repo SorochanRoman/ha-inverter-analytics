@@ -619,7 +619,7 @@ def _ceiling(
     )
 
 
-def _signed_grid(config: EntryConfig, grid: HourlySeries | None) -> list[HourlyRow] | None:
+def signed_grid(config: EntryConfig, grid: HourlySeries | None) -> list[HourlyRow] | None:
     """Grid power hours with the configured sign applied, so that negative is export.
 
     Inverting a row swaps its extremes: the lowest raw reading is the highest signed one.
@@ -721,7 +721,7 @@ async def async_sizing_analytics(
     export = export_limited(
         pv_kwh=pv_series.total if pv_series is not None else 0.0,
         export=energy.get("grid_export_total"),
-        grid=_signed_grid(config, extremes.get(grid_id) if grid_id else None),
+        grid=signed_grid(config, extremes.get(grid_id) if grid_id else None),
         zero_w=config.number("grid_zero_w") or DEFAULT_GRID_ZERO_W,
     )
 

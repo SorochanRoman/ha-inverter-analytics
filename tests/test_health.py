@@ -12,15 +12,21 @@ from custom_components.inverter_analytics.analytics.health import (
     CLEAN_HOURS_MIN,
     COMPARISON_MIN_MONTHS,
     HEALTH_MAX_YEARS,
+    best_hour_by_month,
+    build_health_payload,
     capacity_by_month,
     clean_discharge_hours,
     comparison,
     efficiency_by_month,
+    inverter_by_month,
+    solar_energy_by_month,
 )
+from custom_components.inverter_analytics.analytics.sizing import Ceiling
 from custom_components.inverter_analytics.analytics.source import (
     EnergyRow,
     EnergySeries,
     HourlyRow,
+    HourlySeries,
 )
 
 KYIV = ZoneInfo("Europe/Kyiv")
@@ -341,3 +347,235 @@ def test_a_short_history_has_an_empty_previous_side():
     result = comparison(figures(keys, 1.0), keys)
     assert (result["recent_months"], result["previous_months"]) == (8, 0)
     assert result["change"] is None
+
+
+# --- solar energy ----------------------------------------------------------
+
+
+def test_solar_energy_sums_each_month_that_has_rows():
+    late = datetime(2026, 1, 31, 22, 30, tzinfo=UTC)
+    pv = EnergySeries((EnergyRow(at(0), 1.5), EnergyRow(at(1), 2.0), EnergyRow(late, 0.25)))
+    assert solar_energy_by_month(pv, KYIV) == {
+        "2026-01": {"value": pytest.approx(3.5), "reason": None},
+        "2026-02": {"value": pytest.approx(0.25), "reason": None},
+    }
+    assert solar_energy_by_month(EnergySeries(()), KYIV) == {}
+
+
+# --- best hour -------------------------------------------------------------
+
+
+def pv_hour(index: int, *, mean: float = 1500.0, peak: float = 3000.0) -> HourlyRow:
+    return HourlyRow(at(index), mean, 0.0, peak)
+
+
+def sunny_month(unconstrained: int) -> tuple[list[HourlyRow], Ceiling]:
+    """`unconstrained` free hours peaking at 3000 + index, and two ceiling hours at 9000."""
+    rows = [pv_hour(index, peak=3000.0 + index) for index in range(unconstrained)]
+    capped = [pv_hour(100 + index, peak=9000.0) for index in range(2)]
+    every = rows + capped
+    ceiling = Ceiling(frozenset(row.start for row in capped), frozenset(row.start for row in every))
+    return every, ceiling
+
+
+def test_the_best_hour_skips_ceiling_hours():
+    rows, ceiling = sunny_month(BEST_HOUR_MIN_HOURS)
+    month = best_hour_by_month(rows, KYIV, ceiling=ceiling)["2026-01"]
+    assert month == {
+        "value": 3000.0 + BEST_HOUR_MIN_HOURS - 1,
+        "reason": None,
+        "unconstrained_hours": BEST_HOUR_MIN_HOURS,
+    }
+
+
+def test_nine_unconstrained_hours_are_curtailed():
+    rows, ceiling = sunny_month(BEST_HOUR_MIN_HOURS - 1)
+    month = best_hour_by_month(rows, KYIV, ceiling=ceiling)["2026-01"]
+    assert month == {"value": None, "reason": "curtailed", "unconstrained_hours": 9}
+
+
+def test_hours_below_the_sun_floor_do_not_count_as_unconstrained():
+    rows, ceiling = sunny_month(BEST_HOUR_MIN_HOURS - 1)
+    rows.append(pv_hour(50, mean=99.0, peak=400.0))
+    month = best_hour_by_month(rows, KYIV, ceiling=ceiling)["2026-01"]
+    assert month["reason"] == "curtailed"
+    assert month["unconstrained_hours"] == 9
+
+
+def test_without_a_ceiling_the_best_hour_reads_every_hour():
+    rows, _ = sunny_month(3)
+    month = best_hour_by_month(rows, KYIV, ceiling=None)["2026-01"]
+    assert month == {"value": 9000.0, "reason": None, "unconstrained_hours": None}
+    assert best_hour_by_month([], KYIV, ceiling=None) == {}
+
+
+# --- inverter --------------------------------------------------------------
+
+
+def load_hour(when: datetime, peak: float) -> HourlyRow:
+    return HourlyRow(when, peak / 2, 0.0, peak)
+
+
+def test_the_inverter_counts_hours_near_and_at_rated_per_month():
+    late = datetime(2026, 1, 31, 22, 30, tzinfo=UTC)
+    rows = [
+        load_hour(at(0), 8000.0),
+        load_hour(at(1), 6400.0),
+        load_hour(at(2), 6399.0),
+        load_hour(late, 7000.0),
+    ]
+    assert inverter_by_month(rows, 8000.0, KYIV) == {
+        "2026-01": {"value": 2, "reason": None, "hours_at_rated": 1, "measured_hours": 3},
+        "2026-02": {"value": 1, "reason": None, "hours_at_rated": 0, "measured_hours": 1},
+    }
+    assert inverter_by_month([], 8000.0, KYIV) == {}
+
+
+# --- payload ---------------------------------------------------------------
+
+NOW = datetime(2026, 3, 15, 12, tzinfo=UTC)
+NO_MISSING = {
+    "capacity": [],
+    "efficiency": [],
+    "solar_energy": [],
+    "best_hour": [],
+    "inverter": [],
+}
+
+
+def payload(**overrides):
+    arguments = {
+        "now": NOW,
+        "tz": KYIV,
+        "soc": None,
+        "battery_power": None,
+        "pv_power": None,
+        "load": None,
+        "charge": None,
+        "discharge": None,
+        "pv": None,
+        "export": None,
+        "grid": None,
+        "rated_power": 8000.0,
+        "low_pct": 20.0,
+        "idle_w": 50.0,
+        "zero_w": 10.0,
+        "nameplate_kwh": None,
+        "missing": NO_MISSING,
+    }
+    return build_health_payload(**(arguments | overrides))
+
+
+def test_the_payload_has_exactly_the_contract_keys():
+    result = payload(
+        missing=NO_MISSING | {"capacity": ["battery_soc"], "best_hour": ["pv_power"]},
+        nameplate_kwh=10.0,
+    )
+    assert set(result) == {
+        "timezone",
+        "months",
+        "first_month",
+        "covered_end",
+        "covers_now",
+        "export_limited",
+        "best_hour_mode",
+        "nameplate_kwh",
+        "signals",
+    }
+    assert result["timezone"] == "Europe/Kyiv"
+    assert result["nameplate_kwh"] == 10.0
+    assert set(result["signals"]) == {
+        "capacity",
+        "efficiency",
+        "solar_energy",
+        "best_hour",
+        "inverter",
+    }
+    for signal in result["signals"].values():
+        assert set(signal) == {"missing", "months", "comparison"}
+        assert set(signal["comparison"]) == {
+            "recent_mean",
+            "previous_mean",
+            "change",
+            "recent_months",
+            "previous_months",
+        }
+
+
+def test_the_months_run_from_five_years_back_to_now():
+    months = payload()["months"]
+    assert months[0] == "2021-03"
+    assert months[-1] == "2026-03"
+    assert months == sorted(months)
+    assert len(months) == 61
+
+
+def test_a_signal_with_missing_roles_has_no_months():
+    pv = EnergySeries((EnergyRow(NOW - timedelta(days=40), 3.0),))
+    result = payload(pv=pv, missing=NO_MISSING | {"solar_energy": ["pv_energy_total"]})
+    signal = result["signals"]["solar_energy"]
+    assert signal["missing"] == ["pv_energy_total"]
+    assert signal["months"] == {}
+    assert signal["comparison"]["recent_months"] == 0
+
+
+def test_first_month_is_the_first_with_any_figure():
+    early = datetime(2024, 6, 10, 10, tzinfo=UTC)
+    later = datetime(2025, 2, 10, 10, tzinfo=UTC)
+    load = HourlySeries((load_hour(later, 7000.0),))
+    # A withheld best hour in an earlier month is not a figure.
+    pv_power = HourlySeries((HourlyRow(early - timedelta(days=60), 1500.0, 0.0, 3000.0),))
+    soc = HourlySeries((HourlyRow(early - timedelta(days=60), 85.0, 85.0, 85.0),))
+    battery = HourlySeries((HourlyRow(early - timedelta(days=60), 0.0, 0.0, 0.0),))
+    result = payload(
+        load=load,
+        pv=EnergySeries((EnergyRow(early, 2.0),)),
+        pv_power=pv_power,
+        soc=soc,
+        battery_power=battery,
+    )
+    assert result["signals"]["best_hour"]["months"]["2024-04"]["reason"] == "curtailed"
+    assert result["first_month"] == "2024-06"
+    assert result["best_hour_mode"] == "unconstrained"
+    assert result["signals"]["inverter"]["months"]["2025-02"]["value"] == 1
+
+
+def test_an_empty_history_has_no_first_month_and_does_not_cover_now():
+    result = payload()
+    assert result["first_month"] is None
+    assert result["covered_end"] is None
+    assert result["covers_now"] is False
+    assert result["export_limited"] is None
+    assert result["best_hour_mode"] == "all"
+
+
+def test_covered_end_is_the_last_hour_any_sensor_has():
+    hour = NOW.replace(minute=0) - timedelta(hours=2)
+    result = payload(load=HourlySeries((load_hour(hour, 1000.0),)))
+    assert result["covered_end"] == (hour + timedelta(hours=1)).isoformat()
+    assert result["covers_now"] is True
+    stale = payload(load=HourlySeries((load_hour(hour - timedelta(hours=2), 1000.0),)))
+    assert stale["covers_now"] is False
+
+
+def test_export_limited_is_passed_through():
+    pv = EnergySeries((EnergyRow(NOW - timedelta(days=3), 10.0),))
+    kept = payload(pv=pv, export=EnergySeries((EnergyRow(NOW - timedelta(days=3), 0.05),)))
+    fed = payload(pv=pv, export=EnergySeries((EnergyRow(NOW - timedelta(days=3), 4.0),)))
+    assert kept["export_limited"] is True
+    assert fed["export_limited"] is False
+    grid = HourlySeries((HourlyRow(NOW - timedelta(days=3), -800.0, -900.0, -500.0),))
+    assert payload(pv=pv, grid=grid)["export_limited"] is False
+
+
+def test_the_battery_signals_come_from_the_counters_and_the_charge():
+    hours = [NOW - timedelta(days=20, hours=index) for index in range(25)]
+    soc = HourlySeries(tuple(HourlyRow(start, 50.0, 45.0, 50.0) for start in sorted(hours)))
+    charge = EnergySeries(tuple(EnergyRow(start, 0.0) for start in sorted(hours)))
+    discharge = EnergySeries(tuple(EnergyRow(start, 0.5) for start in sorted(hours)))
+    result = payload(soc=soc, charge=charge, discharge=discharge)
+    capacity = result["signals"]["capacity"]["months"]["2026-02"]
+    assert capacity["value"] == pytest.approx(10.0)
+    assert capacity["clean_hours"] == 25
+    efficiency = result["signals"]["efficiency"]["months"]["2026-02"]
+    assert efficiency["reason"] == "too_little_throughput"

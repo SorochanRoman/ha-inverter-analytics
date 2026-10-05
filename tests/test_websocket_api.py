@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
+from custom_components.inverter_analytics.analytics.health import async_health_analytics
 from custom_components.inverter_analytics.analytics.load import async_load_analytics
 from custom_components.inverter_analytics.const import DOMAIN
 from custom_components.inverter_analytics.websocket_api import (
@@ -277,6 +278,7 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         "ws_balance",
         "ws_grid",
         "ws_sizing",
+        "ws_health",
     ]
 
 
@@ -1091,3 +1093,110 @@ async def test_sizing_falls_back_to_grid_power_when_the_export_counter_is_empty(
         states={},
     )
     assert result["rules"]["export_limited"] is True
+
+
+async def _health_entry(hass: HomeAssistant) -> MockConfigEntry:
+    await hass.config.async_update(time_zone="Europe/Kyiv")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deye 8kW",
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "pv_energy_total": ["sensor.pv_energy"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": [],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_health_command_takes_no_window_and_reads_five_years_back(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client, freezer
+) -> None:
+    entry = await _health_entry(hass)
+    # Connected first: a token issued before a jump in time is still accepted.
+    client = await hass_ws_client(hass)
+    freezer.move_to("2026-06-15 09:20:00+00:00")
+    now = dt_util.utcnow()
+    hour = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+    rows = {
+        "sensor.load_power": [{"start": hour, "mean": 3000.0, "min": 500.0, "max": 7000.0}],
+        "sensor.pv_energy": [{"start": hour, "change": 2.5}],
+    }
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ) as statistics:
+        await client.send_json_auto_id(
+            {"type": "inverter_analytics/health", "entry_id": entry.entry_id}
+        )
+        response = await client.receive_json()
+
+    assert response["success"], response
+    starts = {call.args[1] for call in statistics.call_args_list}
+    assert starts == {now - timedelta(days=5 * 365)}
+    result = response["result"]
+    assert "window" not in result
+    assert result["timezone"] == "Europe/Kyiv"
+    assert result["months"][0] == "2021-06"
+    assert result["months"][-1] == "2026-06"
+    assert result["first_month"] == "2026-06"
+    assert result["covers_now"] is True
+    assert result["signals"]["inverter"]["months"]["2026-06"]["value"] == 1
+    assert result["signals"]["solar_energy"]["months"]["2026-06"]["value"] == 2.5
+    assert result["signals"]["capacity"]["missing"] == [
+        "battery_soc",
+        "battery_discharge_total",
+        "battery_charge_total",
+    ]
+    assert result["signals"]["best_hour"]["missing"] == ["pv_power"]
+
+
+async def test_health_command_caches_for_the_local_day(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client, freezer
+) -> None:
+    entry = await _health_entry(hass)
+    client = await hass_ws_client(hass)
+    # 23:30 in Kyiv: an hour later is another local day, well inside the TTL.
+    freezer.move_to("2026-06-15 20:30:00+00:00")
+    message = {"type": "inverter_analytics/health", "entry_id": entry.entry_id}
+    with (
+        patch(
+            "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+            return_value={},
+        ),
+        patch(
+            "custom_components.inverter_analytics.websocket_api.async_health_analytics",
+            wraps=async_health_analytics,
+        ) as computed,
+    ):
+        await client.send_json_auto_id(message)
+        assert (await client.receive_json())["success"]
+        freezer.tick(timedelta(minutes=10))
+        await client.send_json_auto_id(message)
+        assert (await client.receive_json())["success"]
+        assert computed.call_count == 1
+        freezer.tick(timedelta(hours=1))
+        await client.send_json_auto_id(message)
+        assert (await client.receive_json())["success"]
+
+    assert computed.call_count == 2
+    assert hass.data[DOMAIN][entry.entry_id]["cache"].size == 2
+
+
+async def test_health_command_rejects_unknown_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await _health_entry(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "inverter_analytics/health", "entry_id": "does-not-exist"}
+    )
+    response = await client.receive_json()
+    assert response["success"] is False
+    assert response["error"]["code"] == "not_found"

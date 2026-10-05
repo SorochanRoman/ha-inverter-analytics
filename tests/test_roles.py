@@ -342,3 +342,32 @@ def test_battery_full_is_a_tuning_number():
     assert role.unit == "%"
     assert role.advanced is True
     assert "battery_full_pct" in tuning_role_keys()
+
+
+def _health(config: EntryConfig) -> dict:
+    return next(item for item in feature_availability(config) if item["key"] == "health")
+
+
+@pytest.mark.parametrize(
+    "entities",
+    [
+        {"pv_energy_total": "sensor.pv_energy"},
+        {
+            "battery_soc": "sensor.soc",
+            "battery_charge_total": "sensor.charge",
+            "battery_discharge_total": "sensor.discharge",
+        },
+        {"load_power": "sensor.load"},
+    ],
+)
+def test_the_health_feature_opens_on_any_one_of_its_sensor_sets(entities):
+    config = EntryConfig.from_dict({"entities": entities, "numbers": {"rated_power": 8000.0}})
+    assert _health(config)["available"] is True
+
+
+def test_the_charge_alone_does_not_open_the_health_feature():
+    config = EntryConfig.from_dict(
+        {"entities": {"battery_soc": "sensor.soc"}, "numbers": {"rated_power": 8000.0}}
+    )
+    assert _health(config)["available"] is False
+    assert _health(config)["missing"] == ["pv_energy_total"]
