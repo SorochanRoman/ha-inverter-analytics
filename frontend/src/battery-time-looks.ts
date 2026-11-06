@@ -224,6 +224,20 @@ export interface BatteryTimeView {
   locale: string;
 }
 
+/** Battery power: watts below a kilowatt, kilowatts with one decimal from it. */
+export function formatCardPower(watts: number | null, locale: string, m: CardMessages): string {
+  if (watts === null || Number.isNaN(watts)) return DASH;
+  // Round first, then choose the unit: 999.6 W is "1.0 kW", not "1,000 W".
+  if (Math.abs(Math.round(watts)) >= 1000) {
+    const kw = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(watts / 1000);
+    return `${kw} ${m.units.kw}`;
+  }
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(watts)} ${m.units.w}`;
+}
+
 /** The SoC as the faces show it: a whole percentage, or the dash. */
 export function socText(soc: number | null, locale: string): string {
   if (soc === null) return DASH;
@@ -299,4 +313,81 @@ export function ringGeometry(
   if (dischargeTo !== null) ticks.push({ at: angle(dischargeTo), kind: "discharge" });
   const fillDash = soc === null ? 0 : (circumference * clampPct(soc)) / 100;
   return { circumference, fillDash, ticks };
+}
+
+/** A target as a mark's label shows it: "85%", up to one decimal. */
+export function pctLabel(value: number, locale: string): string {
+  return `${pct(value, locale)}%`;
+}
+
+/**
+ * The target and the arrival: "to 85% · ≈16:40" under the ring, "to 85% at
+ * 16:40" in the tile. Without an arrival only the target; without a
+ * target, nothing.
+ */
+export function targetLine(view: BatteryTimeView, form: "approx" | "at"): string | null {
+  const { m, locale } = view;
+  if (view.target === null) return null;
+  const to = m.toTarget({ t: pct(view.target, locale) });
+  const arrival = view.eta?.arrival;
+  if (!arrival) return to;
+  const time = clockTime(arrival, locale);
+  return form === "approx" ? `${to} · ${m.approx({ time })}` : `${to} ${m.atTime({ time })}`;
+}
+
+/**
+ * The power pill: the power without its sign, an arrow for the direction
+ * (none when it rounds to nothing). No pill while loading or with no power.
+ */
+export function powerPill(view: BatteryTimeView): { icon: string | null; text: string } | null {
+  const { powerW } = view;
+  if (view.state.kind === "loading" || powerW === null || Number.isNaN(powerW)) return null;
+  const rounded = Math.round(powerW);
+  const icon = rounded > 0 ? "mdi:arrow-up" : rounded < 0 ? "mdi:arrow-down" : null;
+  return { icon, text: formatCardPower(Math.abs(powerW), view.locale, view.m) };
+}
+
+/** The tile's first line: "62% · 2 h 10 min"; "— · —" where nothing is known. */
+export function tilePrimary(view: BatteryTimeView): string {
+  const kind = view.state.kind;
+  if (kind === "unmapped" || kind === "unavailable" || kind === "loading") {
+    return `${DASH} · ${DASH}`;
+  }
+  return badgeText(view, "full").primary;
+}
+
+/** What a screen reader says for a face: the SoC, the status and the signed power. */
+export function faceSentence(view: BatteryTimeView): string {
+  const { m, locale } = view;
+  return m.sentence({
+    soc: socText(view.soc, locale),
+    status: view.status,
+    power: formatCardPower(view.powerW, locale, m),
+  });
+}
+
+/** One field of the card editor's ha-form. */
+export type EditorField =
+  | {
+      name: "layout";
+      selector: { select: { mode: "dropdown"; options: { value: Layout; label: string }[] } };
+    }
+  | { name: "entry_id" | "charge_to" | "discharge_to"; selector: { text: Record<string, never> } };
+
+/** The card editor's form, worded in the language: the layout, then the three targets. */
+export function editorSchema(m: CardMessages): EditorField[] {
+  return [
+    {
+      name: "layout",
+      selector: {
+        select: {
+          mode: "dropdown",
+          options: LAYOUTS.map((value) => ({ value, label: m.layouts[value] })),
+        },
+      },
+    },
+    { name: "entry_id", selector: { text: {} } },
+    { name: "charge_to", selector: { text: {} } },
+    { name: "discharge_to", selector: { text: {} } },
+  ];
 }

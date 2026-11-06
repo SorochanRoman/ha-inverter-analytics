@@ -5,10 +5,16 @@ import {
   batteryIcon,
   cardSize,
   describeView,
+  editorSchema,
   etaParts,
+  faceSentence,
   gridOptions,
   layoutOf,
+  pctLabel,
+  powerPill,
   ringGeometry,
+  targetLine,
+  tilePrimary,
   styleOf,
   tone,
   type BatteryTimeView,
@@ -564,5 +570,93 @@ describe("the ring's geometry", () => {
       { at: 0, kind: "discharge" },
     ]);
     expect(ringGeometry(50, 50, null, radius).ticks).toEqual([{ at: 180, kind: "charge" }]);
+  });
+});
+
+describe("the card editor's schema", () => {
+  it("offers the three layouts first, worded in the language", () => {
+    for (const m of [cardEn, cardUk]) {
+      const schema = editorSchema(m);
+      expect(schema.map((field) => field.name)).toEqual([
+        "layout",
+        "entry_id",
+        "charge_to",
+        "discharge_to",
+      ]);
+      expect(schema[0].selector).toEqual({
+        select: {
+          mode: "dropdown",
+          options: [
+            { value: "ring", label: m.layouts.ring },
+            { value: "bar", label: m.layouts.bar },
+            { value: "tile", label: m.layouts.tile },
+          ],
+        },
+      });
+      for (const field of schema.slice(1)) expect(field.selector).toEqual({ text: {} });
+    }
+    expect(editorSchema(cardUk)[0].selector).not.toEqual(editorSchema(cardEn)[0].selector);
+  });
+});
+
+describe("the faces' lines", () => {
+  const en = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardEn, "en", state, fields);
+  const uk = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardUk, "uk", state, fields);
+
+  it("words the target and the arrival, two ways", () => {
+    expect(targetLine(en(charging), "approx")).toBe("to 85% · ≈16:40");
+    expect(targetLine(en(charging), "at")).toBe("to 85% at 16:40");
+    expect(targetLine(uk(charging), "approx")).toBe("до 85% · ≈16:40");
+    expect(targetLine(uk(charging), "at")).toBe("до 85% о 16:40");
+  });
+
+  it("drops the arrival when there is none, and the line with no target", () => {
+    const far = { kind: "charging", target: 85, minutes: 50 * 60 } as const;
+    expect(targetLine(en(far), "approx")).toBe("to 85%");
+    expect(targetLine(en({ kind: "idle" }), "at")).toBeNull();
+    expect(targetLine(en(noCapacityHours, { target: 85 }), "at")).toBe("to 85%");
+  });
+
+  it("shows the power without its sign, the arrow giving the direction", () => {
+    expect(powerPill(en(charging, { powerW: 1800 }))).toEqual({
+      icon: "mdi:arrow-up",
+      text: "1.8 kW",
+    });
+    expect(powerPill(uk(discharging, { powerW: -650 }))).toEqual({
+      icon: "mdi:arrow-down",
+      text: "650 Вт",
+    });
+    expect(powerPill(en({ kind: "idle" }, { powerW: 0.3 }))).toEqual({ icon: null, text: "0 W" });
+  });
+
+  it("shows no power pill while loading or with no power", () => {
+    expect(powerPill(en({ kind: "loading" }, { powerW: null }))).toBeNull();
+    expect(powerPill(en({ kind: "unavailable", entity: "sensor.p" }, { powerW: null }))).toBeNull();
+  });
+
+  it("words the tile's first line, dashes where nothing is known", () => {
+    expect(tilePrimary(en(charging))).toBe("62% · 2 h 10 min");
+    expect(tilePrimary(uk({ kind: "idle" }))).toBe("62% · простій");
+    expect(tilePrimary(en({ kind: "unavailable", entity: "sensor.p" }))).toBe("— · —");
+    expect(tilePrimary(en({ kind: "unmapped" }))).toBe("— · —");
+    expect(tilePrimary(en({ kind: "loading" }, { soc: null }))).toBe("— · —");
+  });
+
+  it("says the whole state for a screen reader", () => {
+    expect(faceSentence(en(charging, { powerW: 1800 }))).toBe(
+      "Battery at 62%. Charging to 85% · 2 h 10 min (≈16:40). Battery power 1.8 kW.",
+    );
+    expect(faceSentence(en({ kind: "loading" }, { soc: null, powerW: null }))).toBe(
+      "Battery at —. —. Battery power —.",
+    );
+    expect(faceSentence(uk(discharging, { powerW: -650 }))).toContain("-650 Вт");
+  });
+
+  it("labels a target mark with up to one decimal", () => {
+    expect(pctLabel(20, "en")).toBe("20%");
+    expect(pctLabel(85.25, "en")).toBe("85.3%");
+    expect(pctLabel(85.5, "uk")).toBe("85,5%");
   });
 });

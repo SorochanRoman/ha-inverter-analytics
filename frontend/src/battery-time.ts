@@ -5,11 +5,18 @@
  * points left to the target, over the current battery power. It assumes the
  * power holds, which is why the card says "at the current power".
  */
-import { DASH, etaParts, etaText, type BadgeStyle, type Layout } from "./battery-time-looks";
+import {
+  DASH,
+  etaParts,
+  etaText,
+  formatCardPower,
+  type BadgeStyle,
+  type Layout,
+} from "./battery-time-looks";
 import type { CardMessages } from "./i18n/card-en";
 import type { BatteryEtaBasis } from "./types";
 
-export { DASH };
+export { DASH, formatCardPower };
 export const SMOOTHING_SPAN_MS = 120_000;
 
 export interface PowerSample {
@@ -151,20 +158,6 @@ export function cardState(input: {
  */
 export function formatEta(minutes: number, now: Date, locale: string, m: CardMessages): string {
   return etaText(etaParts(minutes, now, locale, m), locale, m);
-}
-
-/** Battery power: watts below a kilowatt, kilowatts with one decimal from it. */
-export function formatCardPower(watts: number | null, locale: string, m: CardMessages): string {
-  if (watts === null || Number.isNaN(watts)) return DASH;
-  // Round first, then choose the unit: 999.6 W is "1.0 kW", not "1,000 W".
-  if (Math.abs(Math.round(watts)) >= 1000) {
-    const kw = new Intl.NumberFormat(locale, {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    }).format(watts / 1000);
-    return `${kw} ${m.units.kw}`;
-  }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(watts)} ${m.units.w}`;
 }
 
 /** The card's own config keys; anything else in the config belongs to Home Assistant. */
