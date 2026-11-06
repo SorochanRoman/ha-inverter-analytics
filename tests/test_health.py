@@ -22,6 +22,7 @@ from custom_components.inverter_analytics.analytics.health import (
     comparison,
     efficiency_by_month,
     inverter_by_month,
+    pooled_capacity,
     solar_energy_by_month,
     withhold_partial_months,
 )
@@ -151,6 +152,14 @@ def test_months_are_local_and_empty_months_are_absent():
     months = capacity_by_month([(late, 0.5, 5.0)], KYIV)
     assert list(months) == ["2026-02"]
     assert capacity_by_month([], KYIV) == {}
+
+
+def test_pooled_capacity_needs_twenty_clean_hours_and_pools_them():
+    start = datetime(2026, 9, 1, tzinfo=UTC)
+    hours = [(start + timedelta(hours=i), 0.31, 1.0) for i in range(20)]
+    assert pooled_capacity(hours) == (pytest.approx(31.0), 20)
+    assert pooled_capacity(hours[:19]) == (None, 19)
+    assert pooled_capacity([]) == (None, 0)
 
 
 # --- efficiency ------------------------------------------------------------

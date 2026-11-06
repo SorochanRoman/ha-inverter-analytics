@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
+from custom_components.inverter_analytics.analytics.battery_eta import async_battery_eta
 from custom_components.inverter_analytics.analytics.health import async_health_analytics
 from custom_components.inverter_analytics.analytics.load import async_load_analytics
 from custom_components.inverter_analytics.const import DOMAIN
@@ -279,6 +280,7 @@ async def test_the_commands_are_registered_once_for_the_whole_instance(
         "ws_grid",
         "ws_sizing",
         "ws_health",
+        "ws_battery_eta",
     ]
 
 
@@ -1371,3 +1373,158 @@ async def test_health_command_rejects_unknown_entry(
     response = await client.receive_json()
     assert response["success"] is False
     assert response["error"]["code"] == "not_found"
+
+
+def _battery_eta_entry(title: str = "Deye 8kW") -> MockConfigEntry:
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title=title,
+        data={
+            "entities": {
+                "load_power": ["sensor.load_power"],
+                "battery_soc": ["sensor.battery_soc"],
+                "battery_power": ["sensor.battery_power"],
+                "battery_charge_total": ["sensor.battery_charged"],
+                "battery_discharge_total": ["sensor.battery_discharged"],
+            },
+            "numbers": {"rated_power": 8000.0},
+            "inverted": ["battery_power"],
+        },
+    )
+
+
+async def _set_up(hass: HomeAssistant, *entries: MockConfigEntry) -> None:
+    for entry in entries:
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_battery_eta_without_an_entry_id_serves_the_only_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client, freezer
+) -> None:
+    entry = _battery_eta_entry()
+    await _set_up(hass, entry)
+    client = await hass_ws_client(hass)
+    freezer.move_to("2026-11-06 12:00:00+00:00")
+    now = dt_util.utcnow()
+    starts = [now - timedelta(days=5) + timedelta(hours=index) for index in range(20)]
+    rows = {
+        "sensor.battery_soc": [
+            {"start": start, "mean": 48.5, "min": 47.0, "max": 50.0} for start in starts
+        ],
+        "sensor.battery_charged": [{"start": start, "change": 0.0} for start in starts],
+        "sensor.battery_discharged": [{"start": start, "change": 0.93} for start in starts],
+    }
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value=rows,
+    ):
+        await client.send_json_auto_id({"type": "inverter_analytics/battery_eta"})
+        response = await client.receive_json()
+
+    assert response["success"], response
+    result = response["result"]
+    assert result["capacity_kwh"] == pytest.approx(31.0)
+    assert result["clean_hours"] == 20
+    assert result["soc_entity"] == "sensor.battery_soc"
+    assert result["battery_power_inverted"] is True
+    assert result["window_days"] == 60
+
+
+async def test_battery_eta_with_an_entry_id_serves_that_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    first, second = _battery_eta_entry("One"), _battery_eta_entry("Two")
+    await _set_up(hass, first, second)
+    client = await hass_ws_client(hass)
+    with patch(
+        "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+        return_value={},
+    ):
+        await client.send_json_auto_id(
+            {"type": "inverter_analytics/battery_eta", "entry_id": second.entry_id}
+        )
+        response = await client.receive_json()
+
+    assert response["success"], response
+    assert response["result"]["capacity_reason"] == "too_few_clean_hours"
+
+
+async def test_battery_eta_with_several_entries_and_no_id_asks_for_one(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await _set_up(hass, _battery_eta_entry("One"), _battery_eta_entry("Two"))
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "inverter_analytics/battery_eta"})
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "entry_required"
+    assert response["error"]["message"] == "Several inverters are configured; pass entry_id"
+
+
+async def test_battery_eta_with_no_loaded_entry_is_not_found(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = _battery_eta_entry()
+    await _set_up(hass, entry)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "inverter_analytics/battery_eta"})
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "not_found"
+
+
+async def test_battery_eta_rejects_an_unknown_entry(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    await _set_up(hass, _battery_eta_entry())
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "inverter_analytics/battery_eta", "entry_id": "does-not-exist"}
+    )
+    response = await client.receive_json()
+
+    assert response["success"] is False
+    assert response["error"]["code"] == "not_found"
+
+
+async def test_battery_eta_is_cached_for_six_hours(
+    recorder_mock, enable_custom_integrations, hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Two requests, one computation; the entry is stored under its key for six hours.
+
+    ResultCache keeps time with time.monotonic, which freezer does not move,
+    so the lifetime is read from the call that stored it.
+    """
+    entry = _battery_eta_entry()
+    await _set_up(hass, entry)
+    client = await hass_ws_client(hass)
+    cache = hass.data[DOMAIN][entry.entry_id]["cache"]
+    message = {"type": "inverter_analytics/battery_eta"}
+    with (
+        patch(
+            "custom_components.inverter_analytics.analytics.source.statistics_during_period",
+            return_value={},
+        ),
+        patch(
+            "custom_components.inverter_analytics.websocket_api.async_battery_eta",
+            wraps=async_battery_eta,
+        ) as computed,
+        patch.object(cache, "set", wraps=cache.set) as stored,
+    ):
+        await client.send_json_auto_id(message)
+        first = await client.receive_json()
+        await client.send_json_auto_id(message | {"entry_id": entry.entry_id})
+        second = await client.receive_json()
+
+    assert first["success"] and second["success"]
+    assert first["result"] == second["result"]
+    assert computed.call_count == 1
+    assert stored.call_count == 1
+    assert stored.call_args.args[0] == ("battery_eta", entry.entry_id)
+    assert stored.call_args.kwargs["ttl"] == 6 * 3600

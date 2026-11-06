@@ -14,6 +14,7 @@ import voluptuous as vol
 
 from .analytics.balance import async_balance_analytics
 from .analytics.battery import async_battery_analytics
+from .analytics.battery_eta import async_battery_eta
 from .analytics.grid import async_grid_analytics
 from .analytics.health import async_health_analytics
 from .analytics.load import async_load_analytics
@@ -27,6 +28,9 @@ MAX_WINDOW_DAYS = 400
 FRESH_TTL = 60.0
 HISTORICAL_TTL = 86400.0
 FRESH_MARGIN = timedelta(minutes=5)
+# The card's capacity moves over weeks; an options change reloads the entry,
+# which drops its cache, so a stale idle or low threshold is not served.
+BATTERY_ETA_TTL = 6 * 3600
 
 _DATA_WS_REGISTERED = "ws_registered"
 
@@ -60,6 +64,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_grid)
     websocket_api.async_register_command(hass, ws_sizing)
     websocket_api.async_register_command(hass, ws_health)
+    websocket_api.async_register_command(hass, ws_battery_eta)
     domain_data[_DATA_WS_REGISTERED] = True
 
 
@@ -253,4 +258,47 @@ async def ws_health(
             connection.send_error(msg["id"], "invalid_config", str(err))
             return
         cache.set(key, payload, ttl=HISTORICAL_TTL)
+    connection.send_result(msg["id"], payload)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "inverter_analytics/battery_eta", vol.Optional("entry_id"): str}
+)
+@websocket_api.async_response
+async def ws_battery_eta(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the battery time card's basis: the measured capacity and its settings.
+
+    The only command whose entry_id is optional: a dashboard card with one
+    inverter should not need it. Without it the single loaded entry is used;
+    with several loaded the caller must say which.
+    """
+    domain_data = hass.data.get(DOMAIN, {})
+    entry_id = msg.get("entry_id")
+    if entry_id is None:
+        loaded = [
+            entry
+            for entry in hass.config_entries.async_entries(DOMAIN)
+            if entry.entry_id in domain_data
+        ]
+        if len(loaded) > 1:
+            connection.send_error(
+                msg["id"], "entry_required", "Several inverters are configured; pass entry_id"
+            )
+            return
+        entry = loaded[0] if loaded else None
+    else:
+        entry = hass.config_entries.async_get_entry(entry_id)
+    # The same condition as the other commands: loaded, so its cache exists.
+    if entry is None or entry.domain != DOMAIN or entry.entry_id not in domain_data:
+        connection.send_error(msg["id"], "not_found", "Inverter not found or disabled")
+        return
+
+    cache = domain_data[entry.entry_id][DATA_CACHE]
+    key = ("battery_eta", entry.entry_id)
+    payload = cache.get(key)
+    if payload is None:
+        payload = await async_battery_eta(hass, EntryConfig.from_entry(entry))
+        cache.set(key, payload, ttl=BATTERY_ETA_TTL)
     connection.send_result(msg["id"], payload)

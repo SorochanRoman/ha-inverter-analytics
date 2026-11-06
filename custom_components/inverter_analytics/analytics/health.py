@@ -126,27 +126,39 @@ def clean_discharge_hours(
     return hours
 
 
+def pooled_capacity(
+    hours: Iterable[tuple[datetime, float, float]],
+) -> tuple[float | None, int]:
+    """Implied usable capacity in kWh from clean hours, pooled, and how many there were.
+
+    Energy per point, the hours' discharge over their drops, times a hundred.
+    None below CLEAN_HOURS_MIN: with fewer, one strange hour moves the figure.
+    Never the nameplate.
+    """
+    items = list(hours)
+    count = len(items)
+    if count < CLEAN_HOURS_MIN:
+        return None, count
+    return 100 * sum(item[1] for item in items) / sum(item[2] for item in items), count
+
+
 def capacity_by_month(
     hours: Iterable[tuple[datetime, float, float]], tz: tzinfo
 ) -> dict[str, dict[str, Any]]:
     """Implied usable capacity per local month, in kWh, from its clean hours.
 
     Energy per point — the clean hours' discharge over their drops — times a
-    hundred. Never multiplied by the nameplate, which is a reference line only.
+    hundred, pooled over the month by pooled_capacity. Never multiplied by the
+    nameplate, which is a reference line only.
     """
-    grouped: dict[str, list[tuple[float, float]]] = defaultdict(list)
-    for start, out, drop in hours:
-        grouped[_month(start, tz)].append((out, drop))
+    grouped: dict[str, list[tuple[datetime, float, float]]] = defaultdict(list)
+    for hour in hours:
+        grouped[_month(hour[0], tz)].append(hour)
     months: dict[str, dict[str, Any]] = {}
     for key in sorted(grouped):
-        items = grouped[key]
-        count = len(items)
-        if count < CLEAN_HOURS_MIN:
-            months[key] = {"value": None, "reason": TOO_FEW_CLEAN_HOURS, "clean_hours": count}
-            continue
-        out = sum(item[0] for item in items)
-        drop = sum(item[1] for item in items)
-        months[key] = {"value": 100 * out / drop, "reason": None, "clean_hours": count}
+        value, count = pooled_capacity(grouped[key])
+        reason = TOO_FEW_CLEAN_HOURS if value is None else None
+        months[key] = {"value": value, "reason": reason, "clean_hours": count}
     return months
 
 
