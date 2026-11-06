@@ -34,7 +34,31 @@ export const cardEn = {
     battery_discharge_total: "battery discharge total",
   } as Record<string, string>,
   units: { w: "W", kw: "kW" },
+  // One-word state labels, under the ring's SoC and in the tile and badge.
+  // Unmapped, unavailable and loading show the dash instead.
+  words: {
+    charging: "charging",
+    discharging: "discharging",
+    idle: "idle",
+    atLimit: "at limit",
+    atFloor: "at floor",
+  },
+  // "to 85%" beside the time; "at 16:40" in the tile; "≈16:40" in the ring and badge.
+  toTarget: (p: { t: string }) => `to ${p.t}%`,
+  atTime: (p: { time: string }) => `at ${p.time}`,
+  approx: (p: { time: string }) => `≈${p.time}`,
+  // What a screen reader says for the ring, the bar and the badge.
+  sentence: (p: { soc: string; status: string; power: string }) =>
+    `Battery at ${p.soc}. ${p.status}. Battery power ${p.power}.`,
+  layouts: { ring: "Ring", bar: "Bar", tile: "Tile" },
+  styles: { full: "Full", ring: "Ring", time: "Time" },
+  badge: {
+    name: "Battery time",
+    description: "Battery charge and the time to its target, at the current power.",
+  },
   editor: {
+    layout: "Layout",
+    style: "Style",
     entryId: "Inverter",
     entryIdHint: "The inverter's entry id; leave empty if there is only one",
     chargeTo: "Charge to",

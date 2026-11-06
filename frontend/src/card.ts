@@ -13,7 +13,6 @@ import {
   basisIsStale,
   cardState,
   formatCardPower,
-  formatEta,
   mergeEditorConfig,
   readNumber,
   resolveTarget,
@@ -22,9 +21,9 @@ import {
   watchedEntities,
   watchedStatesChanged,
   type CardConfig,
-  type CardState,
   type PowerSample,
 } from "./battery-time";
+import { describeView, etaParts } from "./battery-time-looks";
 import { cardEn, type CardMessages } from "./i18n/card-en";
 import { cardUk } from "./i18n/card-uk";
 import { currentLang, currentLocale, noteHaLanguage, subscribe } from "./i18n/lang-store";
@@ -57,12 +56,6 @@ function errorText(error: unknown): string {
     return String((error as { message: unknown }).message);
   }
   return String(error);
-}
-
-function joinRoles(roles: string[], m: CardMessages): string {
-  const names = roles.map((role) => m.roles[role] ?? role);
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} ${m.and} ${names[names.length - 1]}`;
 }
 
 class InverterAnalyticsBatteryTime extends LitElement {
@@ -208,7 +201,17 @@ class InverterAnalyticsBatteryTime extends LitElement {
     const basis = this.basis;
 
     if (!hass || !basis) {
-      return this.frame(null, DASH, this.basisError ?? null, null);
+      const { status, note } = describeView({
+        state: { kind: "loading" },
+        soc: null,
+        powerW: null,
+        target: null,
+        eta: null,
+        basisError: this.basisError ?? null,
+        m,
+        locale,
+      });
+      return this.frame(null, status, note, null);
     }
 
     const socEntity = basis.soc_entity;
@@ -237,48 +240,21 @@ class InverterAnalyticsBatteryTime extends LitElement {
       capacityKwh: basis.capacity_kwh,
       basis,
     });
-    const [status, note] = this.describe(result, powerW, chargeTo.value, dischargeTo.value, m, locale);
+    const charging = (powerW ?? 0) > 0;
+    const { status, note } = describeView({
+      state: result,
+      soc,
+      powerW,
+      target: charging ? chargeTo.value : dischargeTo.value,
+      eta:
+        result.kind === "charging" || result.kind === "discharging"
+          ? etaParts(result.minutes, new Date(), locale, m)
+          : null,
+      basisError: this.basisError ?? null,
+      m,
+      locale,
+    });
     return this.frame(soc, status, note, formatCardPower(powerW, locale, m));
-  }
-
-  private describe(
-    result: CardState,
-    powerW: number | null,
-    chargeTo: number | null,
-    dischargeTo: number | null,
-    m: CardMessages,
-    locale: string,
-  ): [string, string | null] {
-    const pct = (value: number) =>
-      new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
-    switch (result.kind) {
-      case "unmapped":
-        return [DASH, m.unmapped];
-      case "unavailable":
-        return [DASH, result.entity ? m.unavailable({ entity: result.entity }) : null];
-      case "at_limit":
-        return [m.atLimit({ t: pct(result.target) }), null];
-      case "at_floor":
-        return [m.atFloor({ t: pct(result.target) }), null];
-      case "idle":
-        return [m.idle, null];
-      case "no_capacity": {
-        const charging = (powerW ?? 0) > 0;
-        const target = charging ? chargeTo : dischargeTo;
-        const direction = charging ? m.chargingTo : m.dischargingTo;
-        const reason =
-          result.reason === "missing_roles"
-            ? m.capacityNeedsRoles({ roles: joinRoles(result.missing_roles, m) })
-            : m.capacityNotMeasured({ n: result.clean_hours, min: result.clean_hours_min });
-        return [m.withEta({ status: direction({ t: pct(target ?? 0) }), eta: DASH }), reason];
-      }
-      case "charging":
-      case "discharging": {
-        const direction = result.kind === "charging" ? m.chargingTo : m.dischargingTo;
-        const eta = formatEta(result.minutes, new Date(), locale, m);
-        return [m.withEta({ status: direction({ t: pct(result.target) }), eta }), null];
-      }
-    }
   }
 
   private frame(soc: number | null, status: string, note: string | null, power: string | null) {

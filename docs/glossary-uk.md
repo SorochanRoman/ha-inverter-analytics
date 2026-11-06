@@ -123,3 +123,9 @@ quoted from the user's installation, and `code` fragments are not translated.
 | Charge to / Discharge to (card editor) | Заряджати до / Розряджати до |
 | over 2 days | понад 2 доби |
 | unavailable (entity) | недоступна |
+| charging / discharging / idle (one-word card label) | заряд / розряд / простій |
+| at limit / at floor (one-word card label) | на ліміті / на нижній межі |
+| Layout (card editor): Ring / Bar / Tile | Вигляд: Кільце / Смуга / Плитка |
+| Style (badge editor): Full / Ring / Time | Стиль: Повний / Кільце / Час |
+| to 85% / at 16:40 (target, arrival) | до 85% / о 16:40 |
+| target (charge or discharge) | ціль |

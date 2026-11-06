@@ -1,0 +1,568 @@
+import { describe, expect, it } from "vitest";
+import type { CardState } from "./battery-time";
+import {
+  badgeText,
+  batteryIcon,
+  cardSize,
+  describeView,
+  etaParts,
+  gridOptions,
+  layoutOf,
+  ringGeometry,
+  styleOf,
+  tone,
+  type BatteryTimeView,
+  type EtaParts,
+  type ViewState,
+} from "./battery-time-looks";
+import { cardEn, type CardMessages } from "./i18n/card-en";
+import { cardUk } from "./i18n/card-uk";
+
+// Local time, so the clock time does not depend on the test machine's zone.
+const now = new Date(2026, 10, 6, 14, 30);
+const at = (h: number, min: number) => new Date(2026, 10, 6, h, min);
+
+describe("the parts of the time", () => {
+  it("gives minutes under an hour, now with the arrival", () => {
+    expect(etaParts(45, now, "en", cardEn)).toEqual({
+      duration: "45 min",
+      arrival: at(15, 15),
+      over2Days: false,
+    });
+    expect(etaParts(0.2, now, "en", cardEn)).toEqual({
+      duration: "1 min",
+      arrival: at(14, 31),
+      over2Days: false,
+    });
+  });
+
+  it("gives hours and minutes from an hour, rounded to five minutes", () => {
+    expect(etaParts(60, now, "en", cardEn)).toEqual({
+      duration: "1 h",
+      arrival: at(15, 30),
+      over2Days: false,
+    });
+    expect(etaParts(128, now, "en", cardEn)).toEqual({
+      duration: "2 h 10 min",
+      arrival: at(16, 40),
+      over2Days: false,
+    });
+    expect(etaParts(122, now, "en", cardEn).duration).toBe("2 h");
+  });
+
+  it("still has an arrival at 47 h 55 min", () => {
+    const parts = etaParts(47 * 60 + 55, now, "en", cardEn);
+    expect(parts.duration).toBe("47 h 55 min");
+    expect(parts.arrival).toEqual(new Date(now.getTime() + (47 * 60 + 55) * 60_000));
+    expect(parts.over2Days).toBe(false);
+  });
+
+  it("says over 2 days from 48 h, with no arrival", () => {
+    expect(etaParts(48 * 60, now, "en", cardEn)).toEqual({
+      duration: "over 2 days",
+      arrival: null,
+      over2Days: true,
+    });
+  });
+
+  it("chooses the form from the rounded value", () => {
+    expect(etaParts(59.4, now, "en", cardEn).duration).toBe("59 min");
+    expect(etaParts(59.6, now, "en", cardEn).duration).toBe("1 h");
+    expect(etaParts(47 * 60 + 58, now, "en", cardEn).over2Days).toBe(true);
+  });
+
+  it("words the duration in Ukrainian", () => {
+    expect(etaParts(45, now, "uk", cardUk).duration).toBe("45 хв");
+    expect(etaParts(128, now, "uk", cardUk).duration).toBe("2 год 10 хв");
+    expect(etaParts(48 * 60, now, "uk", cardUk).duration).toBe("понад 2 доби");
+  });
+});
+
+const charging: CardState = { kind: "charging", target: 85, minutes: 128 };
+const discharging: CardState = { kind: "discharging", target: 20, minutes: 45 };
+const noCapacityHours: CardState = {
+  kind: "no_capacity",
+  reason: "too_few_clean_hours",
+  clean_hours: 12,
+  clean_hours_min: 20,
+  missing_roles: [],
+};
+const noCapacityRoles: CardState = {
+  kind: "no_capacity",
+  reason: "missing_roles",
+  clean_hours: 0,
+  clean_hours_min: 20,
+  missing_roles: ["battery_soc", "battery_charge_total", "battery_discharge_total"],
+};
+
+function describeIn(
+  m: CardMessages,
+  locale: string,
+  state: ViewState,
+  fields: { powerW?: number | null; target?: number | null; basisError?: string | null } = {},
+) {
+  const eta =
+    state.kind === "charging" || state.kind === "discharging"
+      ? etaParts(state.minutes, now, locale, m)
+      : null;
+  return describeView({
+    state,
+    soc: 62,
+    powerW: fields.powerW ?? 1800,
+    target: fields.target ?? null,
+    eta,
+    basisError: fields.basisError ?? null,
+    m,
+    locale,
+  });
+}
+
+describe("the worded view, in English", () => {
+  const d = (state: ViewState, fields?: Parameters<typeof describeIn>[3]) =>
+    describeIn(cardEn, "en", state, fields);
+
+  it("charging and discharging carry the time and its clock time", () => {
+    expect(d(charging, { target: 85 })).toEqual({
+      word: "charging",
+      status: "Charging to 85% · 2 h 10 min (≈16:40)",
+      note: null,
+    });
+    expect(d(discharging, { powerW: -1800, target: 20 })).toEqual({
+      word: "discharging",
+      status: "Discharging to 20% · 45 min (≈15:15)",
+      note: null,
+    });
+  });
+
+  it("at the limit, at the floor and idle", () => {
+    expect(d({ kind: "at_limit", target: 85 })).toEqual({
+      word: "at limit",
+      status: "At limit 85%",
+      note: null,
+    });
+    expect(d({ kind: "at_floor", target: 20 })).toEqual({
+      word: "at floor",
+      status: "At floor 20%",
+      note: null,
+    });
+    expect(d({ kind: "idle" })).toEqual({ word: "idle", status: "Idle", note: null });
+  });
+
+  it("a target with a fraction keeps one decimal", () => {
+    expect(d({ kind: "at_limit", target: 85.25 }).status).toBe("At limit 85.3%");
+  });
+
+  it("no capacity keeps the direction and names the reason", () => {
+    expect(d(noCapacityHours, { powerW: 1800, target: 85 })).toEqual({
+      word: "charging",
+      status: "Charging to 85% · —",
+      note: "Capacity not measured yet (12 of 20 clean discharge hours)",
+    });
+    expect(d(noCapacityRoles, { powerW: -1800, target: 20 })).toEqual({
+      word: "discharging",
+      status: "Discharging to 20% · —",
+      note: "Capacity needs battery SoC, battery charge total and battery discharge total mapped",
+    });
+  });
+
+  it("names a single missing role without a list", () => {
+    const one: CardState = { ...noCapacityRoles, missing_roles: ["battery_soc"] } as CardState;
+    expect(d(one, { powerW: 1800, target: 85 }).note).toBe("Capacity needs battery SoC mapped");
+  });
+
+  it("unmapped and unavailable have a dash and say why", () => {
+    expect(d({ kind: "unmapped" })).toEqual({
+      word: "—",
+      status: "—",
+      note: "Map battery SoC and battery power in Inverter Analytics",
+    });
+    expect(d({ kind: "unavailable", entity: "sensor.soc" })).toEqual({
+      word: "—",
+      status: "—",
+      note: "sensor.soc is unavailable",
+    });
+    expect(d({ kind: "unavailable", entity: "" })).toEqual({ word: "—", status: "—", note: null });
+  });
+
+  it("loading has a dash, and the basis error when the fetch failed", () => {
+    expect(d({ kind: "loading" })).toEqual({ word: "—", status: "—", note: null });
+    expect(d({ kind: "loading" }, { basisError: "Unknown command." })).toEqual({
+      word: "—",
+      status: "—",
+      note: "Unknown command.",
+    });
+  });
+});
+
+describe("the worded view, in Ukrainian", () => {
+  const d = (state: ViewState, fields?: Parameters<typeof describeIn>[3]) =>
+    describeIn(cardUk, "uk", state, fields);
+
+  it("words every state", () => {
+    expect(d(charging, { target: 85 })).toEqual({
+      word: "заряд",
+      status: "Заряд до 85% · 2 год 10 хв (≈16:40)",
+      note: null,
+    });
+    expect(d(discharging, { powerW: -1800, target: 20 })).toEqual({
+      word: "розряд",
+      status: "Розряд до 20% · 45 хв (≈15:15)",
+      note: null,
+    });
+    expect(d({ kind: "at_limit", target: 85 })).toEqual({
+      word: "на ліміті",
+      status: "Досягла ліміту 85%",
+      note: null,
+    });
+    expect(d({ kind: "at_floor", target: 20 })).toEqual({
+      word: "на нижній межі",
+      status: "Досягла нижньої межі 20%",
+      note: null,
+    });
+    expect(d({ kind: "idle" })).toEqual({ word: "простій", status: "Простій", note: null });
+    expect(d(noCapacityHours, { powerW: 1800, target: 85 })).toEqual({
+      word: "заряд",
+      status: "Заряд до 85% · —",
+      note: "Ємність ще не виміряна (12 з 20 чистих годин розряду)",
+    });
+    expect(d(noCapacityRoles, { powerW: -1800, target: 20 })).toEqual({
+      word: "розряд",
+      status: "Розряд до 20% · —",
+      note:
+        "Для ємності вкажіть рівень заряду батареї, лічильник заряду батареї і " +
+        "лічильник розряду батареї",
+    });
+    expect(d({ kind: "unmapped" })).toEqual({
+      word: "—",
+      status: "—",
+      note: "Вкажіть рівень заряду й потужність батареї в Inverter Analytics",
+    });
+    expect(d({ kind: "unavailable", entity: "sensor.soc" })).toEqual({
+      word: "—",
+      status: "—",
+      note: "Сутність sensor.soc недоступна",
+    });
+    expect(d({ kind: "loading" })).toEqual({ word: "—", status: "—", note: null });
+    expect(d({ kind: "loading" }, { basisError: "Помилка" }).note).toBe("Помилка");
+  });
+
+  it("formats a fractional target the Ukrainian way", () => {
+    expect(d({ kind: "at_limit", target: 85.5 }).status).toBe("Досягла ліміту 85,5%");
+  });
+});
+
+describe("the tone", () => {
+  const idle = 50;
+
+  it("follows the state's kind", () => {
+    expect(tone(charging, 1800, idle)).toBe("charge");
+    expect(tone(discharging, -1800, idle)).toBe("discharge");
+    expect(tone({ kind: "at_floor", target: 20 }, 0, idle)).toBe("low");
+    expect(tone({ kind: "at_limit", target: 85 }, 0, idle)).toBe("rest");
+    expect(tone({ kind: "idle" }, 10, idle)).toBe("rest");
+    expect(tone({ kind: "unmapped" }, null, idle)).toBe("rest");
+    expect(tone({ kind: "unavailable", entity: "sensor.soc" }, null, idle)).toBe("rest");
+    expect(tone({ kind: "loading" }, null, idle)).toBe("rest");
+  });
+
+  it("is charge for a battery charging below its floor", () => {
+    // cardState calls that charging, not at_floor: the tone follows.
+    expect(tone({ kind: "charging", target: 85, minutes: 600 }, 1800, idle)).toBe("charge");
+  });
+
+  it("follows the power's sign without a measured capacity", () => {
+    expect(tone(noCapacityHours, 1800, idle)).toBe("charge");
+    expect(tone(noCapacityHours, -1800, idle)).toBe("discharge");
+    // At exactly the idle power cardState no longer calls the battery idle.
+    expect(tone(noCapacityHours, 50, idle)).toBe("charge");
+    expect(tone(noCapacityHours, -50, idle)).toBe("discharge");
+    expect(tone(noCapacityHours, 49, idle)).toBe("rest");
+    expect(tone(noCapacityHours, -49, idle)).toBe("rest");
+    expect(tone(noCapacityHours, null, idle)).toBe("rest");
+  });
+});
+
+describe("the battery icon", () => {
+  it("steps by tens while not charging", () => {
+    expect(batteryIcon(0, false)).toBe("mdi:battery-outline");
+    expect(batteryIcon(4, false)).toBe("mdi:battery-outline");
+    expect(batteryIcon(5, false)).toBe("mdi:battery-10");
+    expect(batteryIcon(62, false)).toBe("mdi:battery-60");
+    expect(batteryIcon(94, false)).toBe("mdi:battery-90");
+    expect(batteryIcon(95, false)).toBe("mdi:battery");
+    expect(batteryIcon(100, false)).toBe("mdi:battery");
+  });
+
+  it("steps by tens while charging", () => {
+    expect(batteryIcon(0, true)).toBe("mdi:battery-charging-outline");
+    expect(batteryIcon(4, true)).toBe("mdi:battery-charging-outline");
+    expect(batteryIcon(5, true)).toBe("mdi:battery-charging-10");
+    expect(batteryIcon(66, true)).toBe("mdi:battery-charging-70");
+    expect(batteryIcon(94, true)).toBe("mdi:battery-charging-90");
+    expect(batteryIcon(95, true)).toBe("mdi:battery-charging-100");
+    expect(batteryIcon(100, true)).toBe("mdi:battery-charging-100");
+  });
+
+  it("is unknown with no SoC", () => {
+    expect(batteryIcon(null, false)).toBe("mdi:battery-unknown");
+    expect(batteryIcon(null, true)).toBe("mdi:battery-unknown");
+  });
+});
+
+function view(
+  m: CardMessages,
+  locale: string,
+  state: ViewState,
+  fields: Partial<BatteryTimeView> = {},
+): BatteryTimeView {
+  const eta: EtaParts | null =
+    state.kind === "charging" || state.kind === "discharging"
+      ? etaParts(state.minutes, now, locale, m)
+      : null;
+  const target =
+    state.kind === "charging" || state.kind === "discharging" ? state.target : null;
+  const soc = "soc" in fields ? (fields.soc ?? null) : 62;
+  const powerW = fields.powerW ?? 1800;
+  const words = describeView({
+    state,
+    soc,
+    powerW,
+    target,
+    eta,
+    basisError: null,
+    m,
+    locale,
+  });
+  return {
+    state,
+    soc,
+    powerW,
+    chargeTo: 85,
+    dischargeTo: 20,
+    target,
+    eta,
+    tone: tone(state, powerW, 50),
+    ...words,
+    m,
+    locale,
+    ...fields,
+  };
+}
+
+const badgeStates: [string, ViewState][] = [
+  ["charging", charging],
+  ["discharging", discharging],
+  ["at_limit", { kind: "at_limit", target: 85 }],
+  ["at_floor", { kind: "at_floor", target: 20 }],
+  ["idle", { kind: "idle" }],
+  ["no_capacity", noCapacityHours],
+  ["unmapped", { kind: "unmapped" }],
+  ["unavailable", { kind: "unavailable", entity: "sensor.soc" }],
+  ["loading", { kind: "loading" }],
+];
+
+describe("the badge's text, in English", () => {
+  const v = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardEn, "en", state, fields);
+  const expected: Record<string, Record<"full" | "ring" | "time", object>> = {
+    charging: {
+      full: { primary: "62% · 2 h 10 min" },
+      ring: { primary: "62% · to 85%", secondary: "2 h 10 min" },
+      time: { primary: "≈16:40" },
+    },
+    discharging: {
+      full: { primary: "62% · 45 min" },
+      ring: { primary: "62% · to 20%", secondary: "45 min" },
+      time: { primary: "≈15:15" },
+    },
+    at_limit: {
+      full: { primary: "62% · at limit" },
+      ring: { primary: "62%", secondary: "at limit" },
+      time: { primary: "at limit" },
+    },
+    at_floor: {
+      full: { primary: "62% · at floor" },
+      ring: { primary: "62%", secondary: "at floor" },
+      time: { primary: "at floor" },
+    },
+    idle: {
+      full: { primary: "62% · idle" },
+      ring: { primary: "62%", secondary: "idle" },
+      time: { primary: "idle" },
+    },
+    no_capacity: {
+      full: { primary: "62% · charging" },
+      ring: { primary: "62%", secondary: "charging" },
+      time: { primary: "charging" },
+    },
+    unmapped: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+    unavailable: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+    loading: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+  };
+
+  for (const [name, state] of badgeStates) {
+    it(`words ${name} in each style`, () => {
+      const noSoc = ["unmapped", "unavailable", "loading"].includes(name);
+      const vw = v(state, noSoc ? { soc: null } : {});
+      for (const style of ["full", "ring", "time"] as const) {
+        expect(badgeText(vw, style), `${name} ${style}`).toEqual(expected[name][style]);
+      }
+    });
+  }
+
+  it("says over 2 days in the time style past 48 h", () => {
+    const vw = v({ kind: "charging", target: 85, minutes: 50 * 60 });
+    expect(badgeText(vw, "time")).toEqual({ primary: "over 2 days" });
+    expect(badgeText(vw, "full")).toEqual({ primary: "62% · over 2 days" });
+  });
+
+  it("reads a dash and the word with no SoC, whatever the state", () => {
+    expect(badgeText(v({ kind: "idle" }, { soc: null }), "full")).toEqual({ primary: "— · idle" });
+  });
+
+  it("names the target in the ring style whenever the view has one", () => {
+    expect(badgeText(v({ kind: "at_limit", target: 85 }, { target: 85 }), "ring")).toEqual({
+      primary: "62% · to 85%",
+      secondary: "at limit",
+    });
+  });
+});
+
+describe("the badge's text, in Ukrainian", () => {
+  const v = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardUk, "uk", state, fields);
+  const expected: Record<string, Record<"full" | "ring" | "time", object>> = {
+    charging: {
+      full: { primary: "62% · 2 год 10 хв" },
+      ring: { primary: "62% · до 85%", secondary: "2 год 10 хв" },
+      time: { primary: "≈16:40" },
+    },
+    discharging: {
+      full: { primary: "62% · 45 хв" },
+      ring: { primary: "62% · до 20%", secondary: "45 хв" },
+      time: { primary: "≈15:15" },
+    },
+    at_limit: {
+      full: { primary: "62% · на ліміті" },
+      ring: { primary: "62%", secondary: "на ліміті" },
+      time: { primary: "на ліміті" },
+    },
+    at_floor: {
+      full: { primary: "62% · на нижній межі" },
+      ring: { primary: "62%", secondary: "на нижній межі" },
+      time: { primary: "на нижній межі" },
+    },
+    idle: {
+      full: { primary: "62% · простій" },
+      ring: { primary: "62%", secondary: "простій" },
+      time: { primary: "простій" },
+    },
+    no_capacity: {
+      full: { primary: "62% · заряд" },
+      ring: { primary: "62%", secondary: "заряд" },
+      time: { primary: "заряд" },
+    },
+    unmapped: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+    unavailable: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+    loading: {
+      full: { primary: "— · —" },
+      ring: { primary: "—", secondary: "—" },
+      time: { primary: "—" },
+    },
+  };
+
+  for (const [name, state] of badgeStates) {
+    it(`words ${name} in each style`, () => {
+      const noSoc = ["unmapped", "unavailable", "loading"].includes(name);
+      const vw = v(state, noSoc ? { soc: null } : {});
+      for (const style of ["full", "ring", "time"] as const) {
+        expect(badgeText(vw, style), `${name} ${style}`).toEqual(expected[name][style]);
+      }
+    });
+  }
+
+  it("says over 2 days in the time style past 48 h", () => {
+    const vw = v({ kind: "charging", target: 85, minutes: 50 * 60 });
+    expect(badgeText(vw, "time")).toEqual({ primary: "понад 2 доби" });
+  });
+});
+
+describe("the layout's size", () => {
+  it("matches the height budgets", () => {
+    expect(gridOptions("ring")).toEqual({ rows: 5, columns: 6, min_rows: 5 });
+    expect(gridOptions("bar")).toEqual({ rows: 3, columns: 6, min_rows: 3 });
+    expect(gridOptions("tile")).toEqual({ rows: 2, columns: 6, min_rows: 2 });
+    expect(cardSize("ring")).toBe(6);
+    expect(cardSize("bar")).toBe(3);
+    expect(cardSize("tile")).toBe(2);
+  });
+});
+
+describe("the layout and the style from the config", () => {
+  it("keep a known value", () => {
+    expect(layoutOf("ring")).toBe("ring");
+    expect(layoutOf("bar")).toBe("bar");
+    expect(layoutOf("tile")).toBe("tile");
+    expect(styleOf("full")).toBe("full");
+    expect(styleOf("ring")).toBe("ring");
+    expect(styleOf("time")).toBe("time");
+  });
+
+  it("fall back to ring and full", () => {
+    for (const value of [undefined, null, "", "donut", 3, "RING", {}]) {
+      expect(layoutOf(value)).toBe("ring");
+      expect(styleOf(value)).toBe("full");
+    }
+    expect(styleOf("bar")).toBe("full");
+    expect(layoutOf("time")).toBe("ring");
+  });
+});
+
+describe("the ring's geometry", () => {
+  const radius = 55;
+  const circumference = 2 * Math.PI * radius;
+
+  it("fills nothing at 0, half at 50, all at 100", () => {
+    expect(ringGeometry(0, null, null, radius)).toEqual({ circumference, fillDash: 0, ticks: [] });
+    expect(ringGeometry(50, null, null, radius).fillDash).toBeCloseTo(circumference / 2);
+    expect(ringGeometry(100, null, null, radius).fillDash).toBeCloseTo(circumference);
+  });
+
+  it("clamps the SoC, and fills nothing with none", () => {
+    expect(ringGeometry(120, null, null, radius).fillDash).toBeCloseTo(circumference);
+    expect(ringGeometry(-5, null, null, radius).fillDash).toBe(0);
+    expect(ringGeometry(null, null, null, radius).fillDash).toBe(0);
+  });
+
+  it("places the targets' ticks clockwise from the top", () => {
+    expect(ringGeometry(50, 85, 20, radius).ticks).toEqual([
+      { at: 306, kind: "charge" },
+      { at: 72, kind: "discharge" },
+    ]);
+    expect(ringGeometry(50, 100, 0, radius).ticks).toEqual([
+      { at: 360, kind: "charge" },
+      { at: 0, kind: "discharge" },
+    ]);
+    expect(ringGeometry(50, 50, null, radius).ticks).toEqual([{ at: 180, kind: "charge" }]);
+  });
+});

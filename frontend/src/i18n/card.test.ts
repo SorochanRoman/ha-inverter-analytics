@@ -75,4 +75,59 @@ describe("the card's dictionaries", () => {
     expect(cardEn.editor.chargeTo).toBe("Charge to");
     expect(cardEn.editor.dischargeTo).toBe("Discharge to");
   });
+
+  it("name the looks for the editors", () => {
+    expect(cardEn.editor.layout).toBe("Layout");
+    expect(cardEn.editor.style).toBe("Style");
+    expect(cardEn.layouts).toEqual({ ring: "Ring", bar: "Bar", tile: "Tile" });
+    expect(cardEn.styles).toEqual({ full: "Full", ring: "Ring", time: "Time" });
+    expect(cardUk.editor.layout).toBe("Вигляд");
+    expect(cardUk.editor.style).toBe("Стиль");
+    expect(cardUk.layouts).toEqual({ ring: "Кільце", bar: "Смуга", tile: "Плитка" });
+    expect(cardUk.styles).toEqual({ full: "Повний", ring: "Кільце", time: "Час" });
+  });
+
+  it("have a one-word label for each state", () => {
+    expect(cardEn.words).toEqual({
+      charging: "charging",
+      discharging: "discharging",
+      idle: "idle",
+      atLimit: "at limit",
+      atFloor: "at floor",
+    });
+    expect(cardUk.words).toEqual({
+      charging: "заряд",
+      discharging: "розряд",
+      idle: "простій",
+      atLimit: "на ліміті",
+      atFloor: "на нижній межі",
+    });
+  });
+
+  it("interpolate the target, the clock time and the accessible sentence", () => {
+    expect(cardEn.toTarget({ t: "85" })).toBe("to 85%");
+    expect(cardEn.atTime({ time: "16:40" })).toBe("at 16:40");
+    expect(cardEn.approx({ time: "16:40" })).toBe("≈16:40");
+    expect(cardUk.toTarget({ t: "85" })).toBe("до 85%");
+    expect(cardUk.atTime({ time: "16:40" })).toBe("о 16:40");
+    expect(cardUk.approx({ time: "16:40" })).toBe("≈16:40");
+    const sentence = { soc: "62%", status: "Charging to 85% · 2 h", power: "1.8 kW" };
+    expect(cardEn.sentence(sentence)).toBe(
+      "Battery at 62%. Charging to 85% · 2 h. Battery power 1.8 kW.",
+    );
+    expect(cardUk.sentence({ ...sentence, status: "Заряд до 85% · 2 год", power: "1,8 кВт" })).toBe(
+      "Батарея на 62%. Заряд до 85% · 2 год. Потужність батареї 1,8 кВт.",
+    );
+  });
+
+  it("name and describe the badge", () => {
+    expect(cardEn.badge.name).toBe("Battery time");
+    expect(cardEn.badge.description).toBe(
+      "Battery charge and the time to its target, at the current power.",
+    );
+    expect(cardUk.badge.name).toBe("Час батареї");
+    expect(cardUk.badge.description).toBe(
+      "Заряд батареї й час до цілі за поточної потужності.",
+    );
+  });
 });

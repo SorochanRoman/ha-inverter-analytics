@@ -232,8 +232,8 @@ describe("formatting the time", () => {
   // Local time, so the clock time does not depend on the test machine's zone.
   const now = new Date(2026, 10, 6, 14, 30);
 
-  it("shows minutes under an hour", () => {
-    expect(formatEta(59, now, "en", cardEn)).toBe("59 min");
+  it("shows minutes under an hour, with the clock time", () => {
+    expect(formatEta(59, now, "en", cardEn)).toBe("59 min (≈15:29)");
   });
 
   it("shows hours, minutes and the clock time from an hour", () => {
@@ -254,7 +254,7 @@ describe("formatting the time", () => {
   });
 
   it("chooses the form from the rounded value", () => {
-    expect(formatEta(59.4, now, "en", cardEn)).toBe("59 min");
+    expect(formatEta(59.4, now, "en", cardEn)).toBe("59 min (≈15:29)");
     expect(formatEta(59.6, now, "en", cardEn)).toBe("1 h (≈15:30)");
     expect(formatEta(47 * 60 + 58, now, "en", cardEn)).toBe("over 2 days");
   });
@@ -276,7 +276,7 @@ describe("formatting the power", () => {
 });
 
 describe("the editor's config", () => {
-  it("keeps keys it does not own, such as Home Assistant's layout and visibility", () => {
+  it("keeps keys it does not own, such as Home Assistant's grid_options and visibility", () => {
     const config = {
       type: "custom:inverter-analytics-battery-time",
       charge_to: 85,
@@ -303,6 +303,23 @@ describe("the editor's config", () => {
       { type: "t", discharge_to: 20, other: 1 },
     );
     expect(config.entry_id).toBe("abc");
+  });
+
+  it("sets the card's layout and the badge's style, and removes them when empty", () => {
+    const config = { type: "t", grid_options: { rows: 5 } };
+    expect(mergeEditorConfig(config, { layout: "bar" })).toEqual({
+      type: "t",
+      layout: "bar",
+      grid_options: { rows: 5 },
+    });
+    expect(mergeEditorConfig(config, { style: "time" })).toEqual({
+      type: "t",
+      style: "time",
+      grid_options: { rows: 5 },
+    });
+    expect(
+      mergeEditorConfig({ ...config, layout: "tile", style: "ring" }, { layout: "", style: "" }),
+    ).toEqual({ type: "t", grid_options: { rows: 5 } });
   });
 });
 

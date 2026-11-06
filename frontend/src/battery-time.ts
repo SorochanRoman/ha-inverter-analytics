@@ -5,10 +5,11 @@
  * points left to the target, over the current battery power. It assumes the
  * power holds, which is why the card says "at the current power".
  */
+import { DASH, etaParts, etaText, type BadgeStyle, type Layout } from "./battery-time-looks";
 import type { CardMessages } from "./i18n/card-en";
 import type { BatteryEtaBasis } from "./types";
 
-export const DASH = "—";
+export { DASH };
 export const SMOOTHING_SPAN_MS = 120_000;
 
 export interface PowerSample {
@@ -145,30 +146,11 @@ export function cardState(input: {
 }
 
 /**
- * The time to the target: minutes under an hour; hours and minutes, rounded
- * to five minutes, with the clock time of arrival under two days; past
- * that, "over 2 days" and no clock time, which would mislead by then.
+ * The time to the target as one string: "45 min (≈15:15)", "2 h 10 min
+ * (≈16:40)", or "over 2 days" with no clock time. etaParts has the rules.
  */
 export function formatEta(minutes: number, now: Date, locale: string, m: CardMessages): string {
-  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
-  // Round first, then choose the form: 59.6 min is "1 h", 47 h 58 is "over 2 days".
-  const whole = Math.max(1, Math.round(minutes));
-  if (whole < 60) return m.minutes({ m: number.format(whole) });
-  const rounded = Math.round(minutes / 5) * 5;
-  if (rounded >= 48 * 60) return m.over2Days;
-  const h = Math.floor(rounded / 60);
-  const rest = rounded % 60;
-  const duration =
-    rest === 0
-      ? m.hours({ h: number.format(h) })
-      : m.hoursMinutes({ h: number.format(h), m: number.format(rest) });
-  const arrival = new Date(now.getTime() + rounded * 60_000);
-  const time = new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(arrival);
-  return `${duration} ${m.arrival({ time })}`;
+  return etaText(etaParts(minutes, now, locale, m), locale, m);
 }
 
 /** Battery power: watts below a kilowatt, kilowatts with one decimal from it. */
@@ -191,6 +173,10 @@ export interface CardConfig {
   entry_id?: string;
   charge_to?: number | string;
   discharge_to?: number | string;
+  /** The card's layout; read through layoutOf. */
+  layout?: Layout;
+  /** The badge's style; read through styleOf. */
+  style?: BadgeStyle;
   [key: string]: unknown;
 }
 
@@ -204,19 +190,21 @@ function configValue(value: unknown): number | string | undefined {
 }
 
 /**
- * The config after the editor's form changed: the three fields set or
- * removed, every other key — grid_options, visibility, card_mod — kept.
+ * The config after the editor's form changed: its fields set or removed,
+ * every other key — grid_options, visibility, card_mod — kept. A field the
+ * form did not hand back counts as left empty, as before: the card's editor
+ * has no style and the badge's no layout, so neither keeps the other's.
  */
 export function mergeEditorConfig(
   config: CardConfig,
   values: Record<string, unknown>,
 ): CardConfig {
   const next: CardConfig = { ...config };
-  for (const key of ["entry_id", "charge_to", "discharge_to"] as const) {
+  for (const key of ["entry_id", "charge_to", "discharge_to", "layout", "style"] as const) {
     const value = configValue(values[key]);
     if (value === undefined) delete next[key];
-    else if (key === "entry_id") next.entry_id = String(value);
-    else next[key] = value;
+    else if (key === "charge_to" || key === "discharge_to") next[key] = value;
+    else next[key] = String(value) as never;
   }
   return next;
 }
