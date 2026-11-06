@@ -149,6 +149,35 @@ writes its numbers and units the Ukrainian way. The setup and options forms
 are rendered by Home Assistant itself, so they follow the profile language
 only, whatever the switch says.
 
+### Battery time card
+
+A dashboard card, in the style of a portable power station's display: a ring
+with the battery's state of charge, one line saying how long until the battery
+reaches its charge target or its discharge floor at the current power —
+"Charging to 85% · 2 h 10 min (≈16:40)" — and the battery power, smoothed
+over the last two minutes. At the target it says "At limit" or "At floor",
+and inside the battery's idle band "Idle". It ships with the integration and
+appears in the dashboard's card picker as **Battery time**, with a visual
+editor:
+
+```yaml
+type: custom:inverter-analytics-battery-time
+entry_id: ...            # optional; needed only with more than one inverter
+charge_to: 85            # number (%) or an entity id; default 100
+discharge_to: sensor.x   # number (%) or an entity id; default: the low battery charge
+```
+
+The low battery charge is the one set in the integration's options. A target given as an
+entity — a `number.*` charge limit the inverter exposes, say — is read live,
+so a seasonal change of the limit shows at once.
+
+The time uses the battery's **measured** usable capacity, the same figure as
+on the Health tab, pooled over the last 60 days — never the nameplate
+capacity. Until there are 20 clean discharge hours in those 60 days, or while
+the state of charge or a battery energy counter is not mapped, the time reads
+"—" with the reason beside it. The card follows the panel's language choice,
+or your Home Assistant profile's language until one is made.
+
 ## What it will not pretend to know
 
 The interface refuses to show confident numbers it cannot substantiate,

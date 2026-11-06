@@ -564,3 +564,21 @@ export interface HealthPayload {
   pv_power_derived: boolean;
   signals: Record<HealthSignalKey, HealthSignal>;
 }
+
+/** inverter_analytics/battery_eta: what the Battery time card works from. */
+export interface BatteryEtaBasis {
+  /** Measured usable capacity over the window; never the nameplate. */
+  capacity_kwh: number | null;
+  capacity_reason: "too_few_clean_hours" | "missing_roles" | null;
+  /** The roles behind "missing_roles", else []. */
+  missing_roles: string[];
+  clean_hours: number;
+  clean_hours_min: number;
+  window_days: number;
+  computed_at: string;
+  soc_entity: string | null;
+  battery_power_entity: string | null;
+  battery_power_inverted: boolean;
+  idle_w: number;
+  low_pct: number;
+}

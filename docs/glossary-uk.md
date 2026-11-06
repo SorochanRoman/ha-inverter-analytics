@@ -1,6 +1,7 @@
 # Ukrainian glossary
 
-The Ukrainian strings in `frontend/src/i18n/uk.ts` and
+The Ukrainian strings in `frontend/src/i18n/uk.ts`,
+`frontend/src/i18n/card-uk.ts` and
 `custom_components/inverter_analytics/translations/uk.json` follow this
 glossary. A new term is added here in the same commit as its first use; for a
 term not listed, use the word Home Assistant's own Ukrainian translation uses.
@@ -115,3 +116,10 @@ quoted from the user's installation, and `code` fragments are not translated.
 | running total | наростаючим підсумком |
 | price (of a kWh) | ціна |
 | two-zone tariff / night zone | двозонний тариф / нічна зона |
+| Battery time (card) | Час батареї |
+| Charging to / Discharging to (card status) | Заряд до / Розряд до |
+| At limit (card status) | Досягла ліміту |
+| floor (discharge target) / At floor | нижня межа / Досягла нижньої межі |
+| Charge to / Discharge to (card editor) | Заряджати до / Розряджати до |
+| over 2 days | понад 2 доби |
+| unavailable (entity) | недоступна |

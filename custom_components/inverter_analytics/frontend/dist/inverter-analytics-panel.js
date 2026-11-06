@@ -1203,7 +1203,57 @@ const Vb = {
       compare: "A string consistently below its neighbour points at shading, a different orientation or a fault. Compare mean rather than peak: peaks coincide, averages do not."
     }
   }
-}, Gb = {
+}, Gb = ["en", "uk"], vy = "inverter-analytics.lang";
+function py(e) {
+  return e === "en" || e === "uk";
+}
+function Rc(e) {
+  return (e ?? "").toLowerCase().startsWith("uk");
+}
+function Wb(e, t) {
+  return py(e) ? e : Rc(t) ? "uk" : "en";
+}
+function Ub(e, t) {
+  return e === "uk" ? "uk" : !t || Rc(t) ? "en" : t;
+}
+let ba, Ls;
+const ph = /* @__PURE__ */ new Set();
+function Yb() {
+  if (ba === void 0)
+    try {
+      const e = globalThis.localStorage?.getItem(vy) ?? null;
+      ba = py(e) ? e : null;
+    } catch {
+      ba = null;
+    }
+  return ba;
+}
+function gy() {
+  for (const e of ph) e();
+}
+function gh() {
+  return Wb(Yb(), Ls);
+}
+function yh() {
+  return Ub(gh(), Ls);
+}
+function Xb(e) {
+  ba = e;
+  try {
+    globalThis.localStorage?.setItem(vy, e);
+  } catch {
+  }
+  gy();
+}
+function qb(e) {
+  if (e === Ls) return;
+  const t = yh();
+  Ls = e, yh() !== t && gy();
+}
+function Zb(e) {
+  return ph.add(e), () => ph.delete(e);
+}
+const Kb = {
   common: {
     and: "і",
     quoted: (e) => `«${e.text}»`,
@@ -1711,61 +1761,12 @@ const Vb = {
       compare: "Стрінг, що постійно видає менше за сусідній, вказує на затінення, іншу орієнтацію або несправність. Порівнюйте середнє, а не пік: піки збігаються, середні — ні."
     }
   }
-}, Wb = ["en", "uk"], vy = "inverter-analytics.lang", Ub = { en: Vb, uk: Gb };
-function py(e) {
-  return e === "en" || e === "uk";
-}
-function Rc(e) {
-  return (e ?? "").toLowerCase().startsWith("uk");
-}
-function Yb(e, t) {
-  return py(e) ? e : Rc(t) ? "uk" : "en";
-}
-function Xb(e, t) {
-  return e === "uk" ? "uk" : !t || Rc(t) ? "en" : t;
-}
-function gy(e) {
-  return Ub[e];
+}, jb = { en: Vb, uk: Kb };
+function yy(e) {
+  return jb[e];
 }
 function co(e) {
-  return gy(Rc(e) ? "uk" : "en");
-}
-let ba, Ls;
-const ph = /* @__PURE__ */ new Set();
-function qb() {
-  if (ba === void 0)
-    try {
-      const e = globalThis.localStorage?.getItem(vy) ?? null;
-      ba = py(e) ? e : null;
-    } catch {
-      ba = null;
-    }
-  return ba;
-}
-function yy() {
-  for (const e of ph) e();
-}
-function gh() {
-  return Yb(qb(), Ls);
-}
-function yh() {
-  return Xb(gh(), Ls);
-}
-function Zb(e) {
-  ba = e;
-  try {
-    globalThis.localStorage?.setItem(vy, e);
-  } catch {
-  }
-  yy();
-}
-function Kb(e) {
-  if (e === Ls) return;
-  const t = yh();
-  Ls = e, yh() !== t && yy();
-}
-function jb(e) {
-  return ph.add(e), () => ph.delete(e);
+  return yy(Rc(e) ? "uk" : "en");
 }
 const et = "—";
 function ft(e, t) {
@@ -1870,7 +1871,7 @@ class Be {
     this.host = t, t.addController(this);
   }
   hostConnected() {
-    this.unsubscribe = jb(() => this.host.requestUpdate());
+    this.unsubscribe = Zb(() => this.host.requestUpdate());
   }
   hostDisconnected() {
     this.unsubscribe?.(), this.unsubscribe = void 0;
@@ -1879,7 +1880,7 @@ class Be {
     return gh();
   }
   get m() {
-    return gy(gh());
+    return yy(gh());
   }
   get locale() {
     return yh();
@@ -27395,7 +27396,7 @@ let Ne = class extends Ht {
     window.removeEventListener("popstate", this.readLocation), super.disconnectedCallback();
   }
   willUpdate(e) {
-    e.has("hass") && Kb(this.hass?.locale?.language), e.has("hass") && this.hass && !this.config && this.error === void 0 && this.loadConfig();
+    e.has("hass") && qb(this.hass?.locale?.language), e.has("hass") && this.hass && !this.config && this.error === void 0 && this.loadConfig();
   }
   /**
    * Changing tab is a navigation, so it goes on the history stack and the
@@ -27470,11 +27471,11 @@ let Ne = class extends Ht {
     )}
             </select>` : O}
         <div class="langs" role="group" aria-label=${e.panel.language}>
-          ${Wb.map(
+          ${Gb.map(
       (t) => I`<button
               class=${t === this.i18n.lang ? "active" : ""}
               aria-pressed=${t === this.i18n.lang ? "true" : "false"}
-              @click=${() => Zb(t)}
+              @click=${() => Xb(t)}
             >${t.toUpperCase()}</button>`
     )}
         </div>

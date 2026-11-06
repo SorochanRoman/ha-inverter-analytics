@@ -464,3 +464,17 @@ it; the last three are limits of what the counters themselves can tell:
 - **An hour is priced by the local hour its start falls in.** That is exact
   only in whole-hour time zones; in a half-hour zone a statistics hour
   straddles two local hours and takes the price of the first.
+
+## 8. What the Battery time card does not account for
+
+- **Not verified live.** The time has not yet been checked on a real Home
+  Assistant against the inverter's own figures for the same charge or
+  discharge; until it is, it is arithmetic that the unit tests prove, not a
+  measurement anyone has compared.
+- **The time assumes the current power holds.** It is the measured capacity
+  times the points left, over the battery power smoothed across two minutes.
+  A kettle, a cloud or the charger tapering near full changes the answer, and
+  the card says "at the current power" for that reason.
+- **The state of charge moves in whole points.** Most inverters report it in
+  1% steps, so the points left — and with them the time — jump by a point's
+  worth at a time, which near the target is a large share of what is left.

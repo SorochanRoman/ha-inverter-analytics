@@ -1,20 +1,411 @@
-import { LitElement, html } from "lit";
+/**
+ * The Battery time dashboard card and its editor.
+ *
+ * It loads on every dashboard, so it imports neither ECharts nor the
+ * panel's dictionaries: its words are in card-en.ts / card-uk.ts and the
+ * language comes from lang-store.ts, the store without the dictionaries.
+ */
+import { LitElement, css, html, nothing, svg } from "lit";
+import { state } from "lit/decorators.js";
+import {
+  DASH,
+  cardState,
+  formatCardPower,
+  formatEta,
+  readNumber,
+  resolveTarget,
+  smoothedPower,
+  trimSamples,
+  type CardState,
+  type PowerSample,
+} from "./battery-time";
+import { cardEn, type CardMessages } from "./i18n/card-en";
+import { cardUk } from "./i18n/card-uk";
+import { currentLang, currentLocale, noteHaLanguage, subscribe } from "./i18n/lang-store";
+import type { BatteryEtaBasis } from "./types";
+
+const CARD_TYPE = "inverter-analytics-battery-time";
+const EDITOR_TYPE = "inverter-analytics-battery-time-editor";
+const BASIS_REFRESH_MS = 3600_000;
+const DEFAULT_CHARGE_TO = 100;
+
+interface EntityState {
+  state: string;
+  last_updated?: string;
+}
+
+interface CardHass {
+  states: Record<string, EntityState>;
+  locale?: { language?: string };
+  callWS<T>(message: Record<string, unknown>): Promise<T>;
+}
+
+interface CardConfig {
+  type?: string;
+  entry_id?: string;
+  charge_to?: number | string;
+  discharge_to?: number | string;
+}
+
+function messages(): CardMessages {
+  return currentLang() === "uk" ? cardUk : cardEn;
+}
+
+function errorText(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return String(error);
+}
+
+function joinRoles(roles: string[], m: CardMessages): string {
+  const names = roles.map((role) => m.roles[role] ?? role);
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} ${m.and} ${names[names.length - 1]}`;
+}
 
 class InverterAnalyticsBatteryTime extends LitElement {
-  setConfig(): void {}
-  render() {
-    return html`<ha-card>Battery time</ha-card>`;
+  @state() private config: CardConfig = {};
+  @state() private basis?: BatteryEtaBasis;
+  @state() private basisError?: string;
+  private _hass?: CardHass;
+  private samples: PowerSample[] = [];
+  private lastPower?: EntityState;
+  private timer?: ReturnType<typeof setInterval>;
+  private unsubscribeLang?: () => void;
+  private fetchedFor?: string;
+
+  static getConfigElement(): HTMLElement {
+    return document.createElement(EDITOR_TYPE);
   }
+
+  static getStubConfig(): CardConfig {
+    return { charge_to: 100 };
+  }
+
+  setConfig(config: CardConfig): void {
+    const next: CardConfig = {
+      entry_id: config.entry_id || undefined,
+      charge_to: config.charge_to,
+      discharge_to: config.discharge_to,
+    };
+    const entryChanged = next.entry_id !== this.config.entry_id;
+    this.config = next;
+    if (entryChanged && this._hass && this.fetchedFor !== undefined) {
+      // Another inverter: its own entities, so start the power buffer again.
+      this.samples = [];
+      this.lastPower = undefined;
+      this.basis = undefined;
+      void this.fetchBasis();
+    }
+  }
+
+  getCardSize(): number {
+    return 3;
+  }
+
+  set hass(hass: CardHass) {
+    this._hass = hass;
+    noteHaLanguage(hass.locale?.language);
+    this.notePower(hass);
+    if (this.fetchedFor === undefined) void this.fetchBasis();
+    if (this.isConnected) this.startTimer();
+    this.requestUpdate();
+  }
+
+  get hass(): CardHass | undefined {
+    return this._hass;
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.unsubscribeLang = subscribe(() => this.requestUpdate());
+    if (this._hass) this.startTimer();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.unsubscribeLang?.();
+    if (this.timer !== undefined) clearInterval(this.timer);
+    this.timer = undefined;
+  }
+
+  private startTimer(): void {
+    if (this.timer !== undefined) return;
+    this.timer = setInterval(() => void this.fetchBasis(), BASIS_REFRESH_MS);
+  }
+
+  private async fetchBasis(): Promise<void> {
+    const hass = this._hass;
+    if (!hass) return;
+    const entryId = this.config.entry_id;
+    this.fetchedFor = entryId ?? "";
+    const message: Record<string, unknown> = { type: "inverter_analytics/battery_eta" };
+    if (entryId) message.entry_id = entryId;
+    try {
+      this.basis = await hass.callWS<BatteryEtaBasis>(message);
+      this.basisError = undefined;
+    } catch (error) {
+      this.basis = undefined;
+      this.basisError = errorText(error);
+    }
+  }
+
+  /** Keeps the last 120 s of battery power the card has seen, sign corrected. */
+  private notePower(hass: CardHass): void {
+    const entity = this.basis?.battery_power_entity;
+    if (!entity) return;
+    const current = hass.states[entity];
+    if (current === this.lastPower) return;
+    this.lastPower = current;
+    const now = Date.now();
+    const value = readNumber(current?.state);
+    if (value === null) {
+      this.samples = [];
+      return;
+    }
+    const sign = this.basis?.battery_power_inverted ? -1 : 1;
+    this.samples = trimSamples([...this.samples, { t: now, w: value * sign }], now);
+  }
+
+  protected willUpdate(): void {
+    // The basis may have arrived after the last hass: take the power now.
+    if (this._hass && this.basis && this.lastPower === undefined) this.notePower(this._hass);
+  }
+
+  render() {
+    const m = messages();
+    const locale = currentLocale();
+    const hass = this._hass;
+    const basis = this.basis;
+
+    if (!hass || !basis) {
+      return this.frame(null, DASH, this.basisError ?? null, null);
+    }
+
+    const socEntity = basis.soc_entity;
+    const powerEntity = basis.battery_power_entity;
+    const mapped = Boolean(socEntity && powerEntity);
+    const soc = socEntity ? readNumber(hass.states[socEntity]?.state) : null;
+    const powerNow = powerEntity ? readNumber(hass.states[powerEntity]?.state) : null;
+    const powerW = powerNow === null ? null : smoothedPower(this.samples, Date.now());
+    const chargeTo = resolveTarget(this.config.charge_to, hass.states, DEFAULT_CHARGE_TO);
+    const dischargeTo = resolveTarget(this.config.discharge_to, hass.states, basis.low_pct);
+
+    let unavailable: string | null = null;
+    if (mapped) {
+      if (soc === null) unavailable = socEntity;
+      else if (powerW === null) unavailable = powerEntity;
+      else unavailable = chargeTo.unavailable ?? dischargeTo.unavailable;
+    }
+
+    const result = cardState({
+      soc,
+      powerW,
+      chargeTo: chargeTo.value,
+      dischargeTo: dischargeTo.value,
+      unavailable,
+      mapped,
+      capacityKwh: basis.capacity_kwh,
+      basis,
+    });
+    const [status, note] = this.describe(result, powerW, chargeTo.value, dischargeTo.value, m, locale);
+    return this.frame(soc, status, note, formatCardPower(powerW, locale, m));
+  }
+
+  private describe(
+    result: CardState,
+    powerW: number | null,
+    chargeTo: number | null,
+    dischargeTo: number | null,
+    m: CardMessages,
+    locale: string,
+  ): [string, string | null] {
+    const pct = (value: number) =>
+      new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
+    switch (result.kind) {
+      case "unmapped":
+        return [DASH, m.unmapped];
+      case "unavailable":
+        return [DASH, result.entity ? m.unavailable({ entity: result.entity }) : null];
+      case "at_limit":
+        return [m.atLimit({ t: pct(result.target) }), null];
+      case "at_floor":
+        return [m.atFloor({ t: pct(result.target) }), null];
+      case "idle":
+        return [m.idle, null];
+      case "no_capacity": {
+        const charging = (powerW ?? 0) > 0;
+        const target = charging ? chargeTo : dischargeTo;
+        const direction = charging ? m.chargingTo : m.dischargingTo;
+        const reason =
+          result.reason === "missing_roles"
+            ? m.capacityNeedsRoles({ roles: joinRoles(result.missing_roles, m) })
+            : m.capacityNotMeasured({ n: result.clean_hours, min: result.clean_hours_min });
+        return [m.withEta({ status: direction({ t: pct(target ?? 0) }), eta: DASH }), reason];
+      }
+      case "charging":
+      case "discharging": {
+        const direction = result.kind === "charging" ? m.chargingTo : m.dischargingTo;
+        const eta = formatEta(result.minutes, new Date(), locale, m);
+        return [m.withEta({ status: direction({ t: pct(result.target) }), eta }), null];
+      }
+    }
+  }
+
+  private frame(soc: number | null, status: string, note: string | null, power: string | null) {
+    const radius = 42;
+    const circumference = 2 * Math.PI * radius;
+    const share = soc === null ? 0 : Math.min(100, Math.max(0, soc)) / 100;
+    const centre =
+      soc === null
+        ? DASH
+        : `${new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 0 }).format(soc)}%`;
+    return html`<ha-card>
+      <div class="body">
+        <svg class="ring" viewBox="0 0 100 100" width="100" height="100" role="img">
+          ${svg`<circle class="track" cx="50" cy="50" r=${radius}></circle>
+            <circle
+              class="fill"
+              cx="50"
+              cy="50"
+              r=${radius}
+              stroke-dasharray=${`${circumference * share} ${circumference}`}
+              transform="rotate(-90 50 50)"
+            ></circle>
+            <text class="soc" x="50" y="50" text-anchor="middle" dominant-baseline="central">
+              ${centre}
+            </text>`}
+        </svg>
+        <div class="status">${status}</div>
+        ${note ? html`<div class="note">${note}</div>` : nothing}
+        ${power ? html`<div class="power">${power}</div>` : nothing}
+      </div>
+    </ha-card>`;
+  }
+
+  static styles = css`
+    .body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 16px;
+      text-align: center;
+    }
+    .ring {
+      margin-bottom: 8px;
+    }
+    .track,
+    .fill {
+      fill: none;
+      stroke-width: 8;
+    }
+    .track {
+      stroke: var(--divider-color);
+    }
+    .fill {
+      stroke: var(--primary-color);
+      stroke-linecap: round;
+    }
+    .soc {
+      fill: var(--primary-text-color);
+      font-size: 22px;
+      font-weight: 500;
+    }
+    .status {
+      color: var(--primary-text-color);
+      font-size: 16px;
+    }
+    .note,
+    .power {
+      color: var(--secondary-text-color);
+      font-size: 14px;
+    }
+  `;
 }
 
-if (!customElements.get("inverter-analytics-battery-time")) {
-  customElements.define("inverter-analytics-battery-time", InverterAnalyticsBatteryTime);
+interface FormSchema {
+  name: keyof CardConfig;
+  selector: { text: Record<string, never> };
+}
+
+const EDITOR_SCHEMA: FormSchema[] = [
+  { name: "entry_id", selector: { text: {} } },
+  { name: "charge_to", selector: { text: {} } },
+  { name: "discharge_to", selector: { text: {} } },
+];
+
+/** Text from the form back into a config value: a number stays a number. */
+function configValue(value: unknown): number | string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  if (text === "") return undefined;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : text;
+}
+
+class InverterAnalyticsBatteryTimeEditor extends LitElement {
+  @state() private config: CardConfig = {};
+  @state() public hass?: CardHass;
+
+  setConfig(config: CardConfig): void {
+    this.config = config;
+  }
+
+  render() {
+    const m = messages();
+    const labels: Record<string, [string, string]> = {
+      entry_id: [m.editor.entryId, m.editor.entryIdHint],
+      charge_to: [m.editor.chargeTo, m.editor.chargeToHint],
+      discharge_to: [m.editor.dischargeTo, m.editor.dischargeToHint],
+    };
+    const data = {
+      entry_id: this.config.entry_id ?? "",
+      charge_to: this.config.charge_to === undefined ? "" : String(this.config.charge_to),
+      discharge_to: this.config.discharge_to === undefined ? "" : String(this.config.discharge_to),
+    };
+    return html`<p class="description">${m.description}</p>
+      <ha-form
+        .hass=${this.hass}
+        .data=${data}
+        .schema=${EDITOR_SCHEMA}
+        .computeLabel=${(field: FormSchema) => labels[field.name][0]}
+        .computeHelper=${(field: FormSchema) => labels[field.name][1]}
+        @value-changed=${this.changed}
+      ></ha-form>`;
+  }
+
+  private changed(event: CustomEvent<{ value: Record<string, unknown> }>): void {
+    event.stopPropagation();
+    const value = event.detail.value;
+    const config: CardConfig = { type: this.config.type ?? `custom:${CARD_TYPE}` };
+    const entryId = configValue(value.entry_id);
+    if (entryId !== undefined) config.entry_id = String(entryId);
+    const chargeTo = configValue(value.charge_to);
+    if (chargeTo !== undefined) config.charge_to = chargeTo;
+    const dischargeTo = configValue(value.discharge_to);
+    if (dischargeTo !== undefined) config.discharge_to = dischargeTo;
+    this.config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),
+    );
+  }
+
+  static styles = css`
+    .description {
+      color: var(--secondary-text-color);
+      margin: 0 0 16px;
+    }
+  `;
+}
+
+if (!customElements.get(CARD_TYPE)) customElements.define(CARD_TYPE, InverterAnalyticsBatteryTime);
+if (!customElements.get(EDITOR_TYPE)) {
+  customElements.define(EDITOR_TYPE, InverterAnalyticsBatteryTimeEditor);
 }
 const cards = ((window as any).customCards ??= []);
-if (!cards.some((card: { type: string }) => card.type === "inverter-analytics-battery-time")) {
-  cards.push({
-    type: "inverter-analytics-battery-time",
-    name: "Battery time",
-    description: "Time until the battery is full or reaches its floor, at the current power.",
-  });
+if (!cards.some((card: { type: string }) => card.type === CARD_TYPE)) {
+  const m = messages();
+  cards.push({ type: CARD_TYPE, name: m.name, description: m.description, preview: true });
 }
