@@ -24,8 +24,13 @@ so it is current and cheap to compute.
 - At least `CLEAN_HOURS_MIN` (20) clean hours in the 60 days, or no figure:
   reason `too_few_clean_hours`, with the count found.
 - Missing `battery_soc`, `battery_charge_total` or `battery_discharge_total`
-  → no figure, reason names the missing role.
+  → no figure, reason `missing_roles` with the roles listed.
 - No fallback to the nameplate, ever.
+
+- The pooled arithmetic is one shared helper in `analytics/health.py`,
+  `pooled_capacity(hours) -> tuple[float | None, int]` (kWh or None, clean
+  hours counted), applying `CLEAN_HOURS_MIN` and `100 × Σ out / Σ drop`.
+  `capacity_by_month` calls it per month, so the formula exists once.
 
 ## 3. Backend
 
@@ -35,14 +40,16 @@ New WebSocket command `inverter_analytics/battery_eta` in
 copying them.
 
 Request: optional `entry_id` (defaults to the only entry; with several
-entries and none given, an error asking for one).
+entries and none given, an error asking for one). This is new: every other
+command requires `entry_id`.
 
 Response:
 
 ```
 {
   "capacity_kwh": float | null,
-  "capacity_reason": str | null,       # e.g. "too_few_clean_hours", "missing_role:battery_soc"
+  "capacity_reason": str | null,       # "too_few_clean_hours" | "missing_roles"
+  "missing_roles": [str],              # the roles behind "missing_roles", else []
   "clean_hours": int,
   "clean_hours_min": 20,
   "window_days": 60,
@@ -56,15 +63,28 @@ Response:
 ```
 
 - Reads 60 days of hourly LTS only (not the 5 years Health reads).
-- Cached per entry for 6 hours with the existing `analytics/cache.py`.
+- Cached per entry for 6 hours in the entry's existing `ResultCache`
+  (`domain_data[entry_id][DATA_CACHE]`), key `("battery_eta", entry_id)`.
+  An options change reloads the entry, which drops its cache.
 
 ## 4. Frontend
 
-A second Vite entry producing `inverter-analytics-card.js` in the same
-`frontend/dist/`, without ECharts. Served from the existing static path and
-loaded on every dashboard with `frontend.add_extra_js_url`, URL carrying a
-content fingerprint (same reason as the panel bundle, see `panel.py`).
-Registered in `window.customCards` as **Battery time** with a visual editor.
+A second bundle, `inverter-analytics-card.js`, in the same `frontend/dist/`,
+without ECharts.
+
+- **Build.** A second Vite config (`vite.card.config.ts`, library mode, entry
+  `src/card.ts`, `emptyOutDir: false`), run after the panel build by
+  `npm run build`. Two separate builds, not two entries in one: a
+  multi-entry library build splits the shared `lit` into a chunk, which CI's
+  "no untracked files in dist" check rejects, and the panel build's
+  `emptyOutDir: true` must run first. dist then holds exactly the two files,
+  and CI's existing diff check covers both.
+- **Loading.** Served from the existing static path. `panel.py`'s
+  fingerprint helper takes the file name, and the card URL carries its own
+  fingerprint. Registered once per Home Assistant with
+  `frontend.add_extra_js_url` behind a `hass.data` flag, as the panel is;
+  removed with `frontend.remove_extra_js_url` when the last entry unloads.
+- Registered in `window.customCards` as **Battery time** with a visual editor.
 
 Card config:
 
@@ -88,8 +108,13 @@ positive after correction = charging.
 
 - A ring showing SoC with the percentage in the centre.
 - Below it one status line (§5) and the smoothed battery power, e.g. "1.8 kW".
-- Language from the HA profile (`hass.locale.language`), strings in the
-  existing `en.ts` / `uk.ts` (typed, so missing keys fail typecheck).
+- Language from the shared store in `i18n/lang.ts`: the panel's EN/UK
+  choice if one was made, otherwise Home Assistant's language
+  (`noteHaLanguage(hass.locale.language)` on every `hass`).
+- Strings in two small dictionaries of their own, `i18n/card-en.ts` and
+  `i18n/card-uk.ts` (typed: `card-uk.ts` satisfies the type of
+  `card-en.ts`), not in `en.ts` / `uk.ts`: the card loads on every
+  dashboard, and the panel dictionaries are about 100 KB.
 - HA theme variables only; works in light and dark.
 
 ## 5. Arithmetic and states
@@ -125,6 +150,7 @@ card says "at current power" in the editor description, not on the face.
 
 - pytest: `battery_eta` — enough / too few clean hours, missing roles,
   inverted power flag passed through, cache hit, multiple entries.
+- pytest: `pooled_capacity`, and `capacity_by_month` unchanged through it.
 - vitest: smoothing (uneven intervals, single point), every state in §5 in
   order, both directions, entity targets, formatting boundaries
   (59 min, 1 h, 47 h 55 min, 48 h).
