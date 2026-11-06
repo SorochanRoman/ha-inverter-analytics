@@ -13,6 +13,9 @@ PANEL_ICON: Final = "mdi:chart-box-outline"
 STATIC_URL_BASE: Final = "/inverter_analytics_static"
 PANEL_BUNDLE: Final = "inverter-analytics-panel.js"
 PANEL_ELEMENT: Final = "inverter-analytics-panel"
+# The dashboard card's own bundle, loaded on every dashboard, so kept apart
+# from the panel's: no ECharts.
+CARD_BUNDLE: Final = "inverter-analytics-card.js"
 
 DATA_CACHE: Final = "cache"
 
