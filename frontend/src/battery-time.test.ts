@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   cardState,
   formatCardPower,
+  basisIsStale,
   formatEta,
+  mergeEditorConfig,
   resolveTarget,
   smoothedPower,
   trimSamples,
+  watchedEntities,
+  watchedStatesChanged,
 } from "./battery-time";
 import { cardEn } from "./i18n/card-en";
 import type { BatteryEtaBasis } from "./types";
@@ -248,6 +252,12 @@ describe("formatting the time", () => {
   it("says over 2 days from 48 h, with no clock time", () => {
     expect(formatEta(48 * 60, now, "en", cardEn)).toBe("over 2 days");
   });
+
+  it("chooses the form from the rounded value", () => {
+    expect(formatEta(59.4, now, "en", cardEn)).toBe("59 min");
+    expect(formatEta(59.6, now, "en", cardEn)).toBe("1 h (≈15:30)");
+    expect(formatEta(47 * 60 + 58, now, "en", cardEn)).toBe("over 2 days");
+  });
 });
 
 describe("formatting the power", () => {
@@ -256,5 +266,73 @@ describe("formatting the power", () => {
     expect(formatCardPower(1800, "en", cardEn)).toBe("1.8 kW");
     expect(formatCardPower(-2350, "en", cardEn)).toBe("-2.4 kW");
     expect(formatCardPower(null, "en", cardEn)).toBe("—");
+  });
+
+  it("chooses the unit from the rounded value", () => {
+    expect(formatCardPower(999.4, "en", cardEn)).toBe("999 W");
+    expect(formatCardPower(999.6, "en", cardEn)).toBe("1.0 kW");
+    expect(formatCardPower(-999.6, "en", cardEn)).toBe("-1.0 kW");
+  });
+});
+
+describe("the editor's config", () => {
+  it("keeps keys it does not own, such as Home Assistant's layout and visibility", () => {
+    const config = {
+      type: "custom:inverter-analytics-battery-time",
+      charge_to: 85,
+      grid_options: { columns: 6 },
+      visibility: [{ condition: "screen" }],
+      card_mod: { style: "x" },
+    };
+    expect(
+      mergeEditorConfig(config, { entry_id: "abc", charge_to: "90", discharge_to: "sensor.x" }),
+    ).toEqual({
+      type: "custom:inverter-analytics-battery-time",
+      entry_id: "abc",
+      charge_to: 90,
+      discharge_to: "sensor.x",
+      grid_options: { columns: 6 },
+      visibility: [{ condition: "screen" }],
+      card_mod: { style: "x" },
+    });
+  });
+
+  it("removes a field the form left empty, and does not touch the original", () => {
+    const config = { type: "t", entry_id: "abc", charge_to: 85, discharge_to: 20, other: 1 };
+    expect(mergeEditorConfig(config, { entry_id: "", charge_to: " ", discharge_to: "20" })).toEqual(
+      { type: "t", discharge_to: 20, other: 1 },
+    );
+    expect(config.entry_id).toBe("abc");
+  });
+});
+
+describe("what the card watches", () => {
+  const b = basis();
+
+  it("is the SoC and power entities and any entity target", () => {
+    expect(watchedEntities(b, { charge_to: "number.limit", discharge_to: 20 })).toEqual([
+      "sensor.soc",
+      "sensor.battery_power",
+      "number.limit",
+    ]);
+    expect(watchedEntities(b, { charge_to: "85" })).toEqual(["sensor.soc", "sensor.battery_power"]);
+    expect(watchedEntities(undefined, { charge_to: "number.limit" })).toEqual(["number.limit"]);
+  });
+
+  it("has changed only when one of those state objects did", () => {
+    const soc = { state: "50" };
+    const power = { state: "100" };
+    expect(watchedStatesChanged(undefined, [soc, power])).toBe(true);
+    expect(watchedStatesChanged([soc, power], [soc, power])).toBe(false);
+    expect(watchedStatesChanged([soc, power], [soc, { state: "100" }])).toBe(true);
+    expect(watchedStatesChanged([soc], [soc, power])).toBe(true);
+  });
+});
+
+describe("the basis's age", () => {
+  it("is stale when missing or older than an hour", () => {
+    expect(basisIsStale(undefined, 10_000_000)).toBe(true);
+    expect(basisIsStale(0, 3_600_000)).toBe(false);
+    expect(basisIsStale(0, 3_600_001)).toBe(true);
   });
 });

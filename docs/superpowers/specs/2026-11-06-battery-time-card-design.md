@@ -135,8 +135,10 @@ Pure functions in `frontend/src/battery-time.ts`, unit-tested.
   4. SoC ≤ discharge target and not charging (`P < idle_w`) → "At floor 20%",
      no time.
   5. `|P| < idle_w` → "Idle", no time.
-  6. `capacity_kwh` null → "—", reason; for `too_few_clean_hours`
-     "Capacity not measured yet (12 of 20 clean hours)".
+  6. `capacity_kwh` null → the direction stays shown with "—" for the
+     time, and the reason under it: "Charging to 85% · —" over, for
+     `too_few_clean_hours`, "Capacity not measured yet (12 of 20 clean
+     discharge hours)".
   7. Otherwise `t = capacity_kwh × (target − SoC) / 100 / |P_kW|`
      with the target matching the direction.
 - **Formatting.** `< 1 h` → minutes; `< 48 h` → "h + min" rounded to 5 min

@@ -151,9 +151,11 @@ export function cardState(input: {
  */
 export function formatEta(minutes: number, now: Date, locale: string, m: CardMessages): string {
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
-  if (minutes < 60) return m.minutes({ m: number.format(Math.max(1, Math.round(minutes))) });
-  if (minutes >= 48 * 60) return m.over2Days;
+  // Round first, then choose the form: 59.6 min is "1 h", 47 h 58 is "over 2 days".
+  const whole = Math.max(1, Math.round(minutes));
+  if (whole < 60) return m.minutes({ m: number.format(whole) });
   const rounded = Math.round(minutes / 5) * 5;
+  if (rounded >= 48 * 60) return m.over2Days;
   const h = Math.floor(rounded / 60);
   const rest = rounded % 60;
   const duration =
@@ -172,7 +174,8 @@ export function formatEta(minutes: number, now: Date, locale: string, m: CardMes
 /** Battery power: watts below a kilowatt, kilowatts with one decimal from it. */
 export function formatCardPower(watts: number | null, locale: string, m: CardMessages): string {
   if (watts === null || Number.isNaN(watts)) return DASH;
-  if (Math.abs(watts) >= 1000) {
+  // Round first, then choose the unit: 999.6 W is "1.0 kW", not "1,000 W".
+  if (Math.abs(Math.round(watts)) >= 1000) {
     const kw = new Intl.NumberFormat(locale, {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
@@ -180,4 +183,73 @@ export function formatCardPower(watts: number | null, locale: string, m: CardMes
     return `${kw} ${m.units.kw}`;
   }
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(watts)} ${m.units.w}`;
+}
+
+/** The card's own config keys; anything else in the config belongs to Home Assistant. */
+export interface CardConfig {
+  type?: string;
+  entry_id?: string;
+  charge_to?: number | string;
+  discharge_to?: number | string;
+  [key: string]: unknown;
+}
+
+/** Text from the form back into a config value: a number stays a number, empty is unset. */
+function configValue(value: unknown): number | string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  if (text === "") return undefined;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : text;
+}
+
+/**
+ * The config after the editor's form changed: the three fields set or
+ * removed, every other key — grid_options, visibility, card_mod — kept.
+ */
+export function mergeEditorConfig(
+  config: CardConfig,
+  values: Record<string, unknown>,
+): CardConfig {
+  const next: CardConfig = { ...config };
+  for (const key of ["entry_id", "charge_to", "discharge_to"] as const) {
+    const value = configValue(values[key]);
+    if (value === undefined) delete next[key];
+    else if (key === "entry_id") next.entry_id = String(value);
+    else next[key] = value;
+  }
+  return next;
+}
+
+function isEntityTarget(value: number | string | undefined): value is string {
+  return typeof value === "string" && value.trim() !== "" && !Number.isFinite(Number(value));
+}
+
+/** The entities whose state the card shows: SoC, power, and any entity target. */
+export function watchedEntities(
+  basis: BatteryEtaBasis | undefined,
+  config: Pick<CardConfig, "charge_to" | "discharge_to">,
+): string[] {
+  const ids: string[] = [];
+  if (basis?.soc_entity) ids.push(basis.soc_entity);
+  if (basis?.battery_power_entity) ids.push(basis.battery_power_entity);
+  if (isEntityTarget(config.charge_to)) ids.push(config.charge_to);
+  if (isEntityTarget(config.discharge_to)) ids.push(config.discharge_to);
+  return ids;
+}
+
+/** Home Assistant replaces a state object when it changes, so identity is enough. */
+export function watchedStatesChanged(
+  previous: readonly unknown[] | undefined,
+  next: readonly unknown[],
+): boolean {
+  if (!previous || previous.length !== next.length) return true;
+  return next.some((value, i) => value !== previous[i]);
+}
+
+export const BASIS_REFRESH_MS = 3600_000;
+
+/** The basis is fetched again when missing or older than an hour. */
+export function basisIsStale(fetchedAt: number | undefined, now: number): boolean {
+  return fetchedAt === undefined || now - fetchedAt > BASIS_REFRESH_MS;
 }

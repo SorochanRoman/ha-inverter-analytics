@@ -53,7 +53,7 @@ describe("the card's dictionaries", () => {
   it("interpolate the reasons", () => {
     expect(cardEn.unavailable({ entity: "sensor.soc" })).toBe("sensor.soc is unavailable");
     expect(cardEn.capacityNotMeasured({ n: 12, min: 20 })).toBe(
-      "Capacity not measured yet (12 of 20 clean hours)",
+      "Capacity not measured yet (12 of 20 clean discharge hours)",
     );
     expect(cardEn.capacityNeedsRoles({ roles: "battery SoC" })).toBe(
       "Capacity needs battery SoC mapped",

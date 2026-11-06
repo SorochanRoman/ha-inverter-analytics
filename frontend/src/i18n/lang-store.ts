@@ -71,6 +71,13 @@ export function currentLocale(): string {
   return localeFor(currentLang(), haLanguage);
 }
 
+/**
+ * The panel and the Battery time card are separate bundles, each with its
+ * own copy of this store, so a switch is announced on window for the other
+ * copies on the page, and other tabs hear of it through the storage event.
+ */
+const LANG_EVENT = "inverter-analytics-lang";
+
 export function setLang(lang: Lang): void {
   stored = lang;
   try {
@@ -79,7 +86,23 @@ export function setLang(lang: Lang): void {
     // The choice still holds for this page; it just will not outlive it.
   }
   notify();
+  globalThis.window?.dispatchEvent(new CustomEvent(LANG_EVENT, { detail: lang }));
 }
+
+/** A choice made elsewhere; one that matches ours is our own echo, or no change. */
+function adopt(value: unknown): void {
+  if (!isLang(value) || value === stored) return;
+  stored = value;
+  notify();
+}
+
+globalThis.window?.addEventListener(LANG_EVENT, (event) => {
+  adopt((event as CustomEvent<unknown>).detail);
+});
+globalThis.window?.addEventListener("storage", (event) => {
+  const { key, newValue } = event as StorageEvent;
+  if (key === STORAGE_KEY) adopt(newValue);
+});
 
 /** Called by the panel whenever Home Assistant hands it a new hass. */
 export function noteHaLanguage(language: string | undefined): void {

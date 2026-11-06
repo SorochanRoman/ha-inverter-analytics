@@ -478,3 +478,12 @@ it; the last three are limits of what the counters themselves can tell:
 - **The state of charge moves in whole points.** Most inverters report it in
   1% steps, so the points left — and with them the time — jump by a point's
   worth at a time, which near the target is a large share of what is left.
+- **The power sensor is read as watts**, as the rest of the integration reads
+  it. A battery power sensor reported in kW would make every time a thousand
+  times too long.
+- **Near the charge cap some inverters hover at ±50–150 W.** With
+  `battery_idle_w` below that hover the card can flip between "At limit" and
+  "Discharging"; set it above the hover.
+- **`charge_to` defaults to 100.** Leave it there only if the inverter really
+  charges to 100%; otherwise set it to the cap, or to the entity that holds
+  it, or the card counts down to a charge that never comes.

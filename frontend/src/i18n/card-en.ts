@@ -24,7 +24,7 @@ export const cardEn = {
   unmapped: "Map battery SoC and battery power in Inverter Analytics",
   unavailable: (p: { entity: string }) => `${p.entity} is unavailable`,
   capacityNotMeasured: (p: { n: number; min: number }) =>
-    `Capacity not measured yet (${p.n} of ${p.min} clean hours)`,
+    `Capacity not measured yet (${p.n} of ${p.min} clean discharge hours)`,
   capacityNeedsRoles: (p: { roles: string }) => `Capacity needs ${p.roles} mapped`,
   and: "and",
   // The roles the measured capacity needs, as capacityNeedsRoles names them.

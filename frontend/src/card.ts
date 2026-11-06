@@ -8,14 +8,20 @@
 import { LitElement, css, html, nothing, svg } from "lit";
 import { state } from "lit/decorators.js";
 import {
+  BASIS_REFRESH_MS,
   DASH,
+  basisIsStale,
   cardState,
   formatCardPower,
   formatEta,
+  mergeEditorConfig,
   readNumber,
   resolveTarget,
   smoothedPower,
   trimSamples,
+  watchedEntities,
+  watchedStatesChanged,
+  type CardConfig,
   type CardState,
   type PowerSample,
 } from "./battery-time";
@@ -26,7 +32,9 @@ import type { BatteryEtaBasis } from "./types";
 
 const CARD_TYPE = "inverter-analytics-battery-time";
 const EDITOR_TYPE = "inverter-analytics-battery-time-editor";
-const BASIS_REFRESH_MS = 3600_000;
+// The smoothed power and the clock time move with time alone, between
+// state changes: render again this often while the card is on screen.
+const TICK_MS = 20_000;
 const DEFAULT_CHARGE_TO = 100;
 
 interface EntityState {
@@ -38,13 +46,6 @@ interface CardHass {
   states: Record<string, EntityState>;
   locale?: { language?: string };
   callWS<T>(message: Record<string, unknown>): Promise<T>;
-}
-
-interface CardConfig {
-  type?: string;
-  entry_id?: string;
-  charge_to?: number | string;
-  discharge_to?: number | string;
 }
 
 function messages(): CardMessages {
@@ -72,6 +73,9 @@ class InverterAnalyticsBatteryTime extends LitElement {
   private samples: PowerSample[] = [];
   private lastPower?: EntityState;
   private timer?: ReturnType<typeof setInterval>;
+  private tick?: ReturnType<typeof setInterval>;
+  private watched?: unknown[];
+  private fetchedAt?: number;
   private unsubscribeLang?: () => void;
   private fetchedFor?: string;
 
@@ -91,6 +95,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
     };
     const entryChanged = next.entry_id !== this.config.entry_id;
     this.config = next;
+    this.watched = undefined;
     if (entryChanged && this._hass && this.fetchedFor !== undefined) {
       // Another inverter: its own entities, so start the power buffer again.
       this.samples = [];
@@ -106,11 +111,18 @@ class InverterAnalyticsBatteryTime extends LitElement {
 
   set hass(hass: CardHass) {
     this._hass = hass;
+    // A change of language reaches the card through its subscription.
     noteHaLanguage(hass.locale?.language);
     this.notePower(hass);
     if (this.fetchedFor === undefined) void this.fetchBasis();
-    if (this.isConnected) this.startTimer();
-    this.requestUpdate();
+    if (this.isConnected) this.startTimers();
+    // Home Assistant hands over a new hass on every state change in the
+    // house; render only when one the card shows has changed.
+    const watched = watchedEntities(this.basis, this.config).map((id) => hass.states[id]);
+    if (watchedStatesChanged(this.watched, watched)) {
+      this.watched = watched;
+      this.requestUpdate();
+    }
   }
 
   get hass(): CardHass | undefined {
@@ -120,19 +132,29 @@ class InverterAnalyticsBatteryTime extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this.unsubscribeLang = subscribe(() => this.requestUpdate());
-    if (this._hass) this.startTimer();
+    if (this._hass) {
+      this.startTimers();
+      // Back on screen after a while away: the hourly refresh did not run.
+      if (this.fetchedFor !== undefined && basisIsStale(this.fetchedAt, Date.now())) {
+        void this.fetchBasis();
+      }
+    }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.unsubscribeLang?.();
     if (this.timer !== undefined) clearInterval(this.timer);
+    if (this.tick !== undefined) clearInterval(this.tick);
     this.timer = undefined;
+    this.tick = undefined;
   }
 
-  private startTimer(): void {
-    if (this.timer !== undefined) return;
-    this.timer = setInterval(() => void this.fetchBasis(), BASIS_REFRESH_MS);
+  private startTimers(): void {
+    if (this.timer === undefined) {
+      this.timer = setInterval(() => void this.fetchBasis(), BASIS_REFRESH_MS);
+    }
+    if (this.tick === undefined) this.tick = setInterval(() => this.requestUpdate(), TICK_MS);
   }
 
   private async fetchBasis(): Promise<void> {
@@ -142,13 +164,19 @@ class InverterAnalyticsBatteryTime extends LitElement {
     this.fetchedFor = entryId ?? "";
     const message: Record<string, unknown> = { type: "inverter_analytics/battery_eta" };
     if (entryId) message.entry_id = entryId;
+    let basis: BatteryEtaBasis | undefined;
+    let basisError: string | undefined;
     try {
-      this.basis = await hass.callWS<BatteryEtaBasis>(message);
-      this.basisError = undefined;
+      basis = await hass.callWS<BatteryEtaBasis>(message);
     } catch (error) {
-      this.basis = undefined;
-      this.basisError = errorText(error);
+      basisError = errorText(error);
     }
+    // The inverter was changed in the editor while this was on its way.
+    if (this.config.entry_id !== entryId) return;
+    this.basis = basis;
+    this.basisError = basisError;
+    this.fetchedAt = Date.now();
+    this.watched = undefined;
   }
 
   /** Keeps the last 120 s of battery power the card has seen, sign corrected. */
@@ -326,7 +354,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
 }
 
 interface FormSchema {
-  name: keyof CardConfig;
+  name: "entry_id" | "charge_to" | "discharge_to";
   selector: { text: Record<string, never> };
 }
 
@@ -335,15 +363,6 @@ const EDITOR_SCHEMA: FormSchema[] = [
   { name: "charge_to", selector: { text: {} } },
   { name: "discharge_to", selector: { text: {} } },
 ];
-
-/** Text from the form back into a config value: a number stays a number. */
-function configValue(value: unknown): number | string | undefined {
-  if (value === undefined || value === null) return undefined;
-  const text = String(value).trim();
-  if (text === "") return undefined;
-  const number = Number(text);
-  return Number.isFinite(number) ? number : text;
-}
 
 class InverterAnalyticsBatteryTimeEditor extends LitElement {
   @state() private config: CardConfig = {};
@@ -378,14 +397,7 @@ class InverterAnalyticsBatteryTimeEditor extends LitElement {
 
   private changed(event: CustomEvent<{ value: Record<string, unknown> }>): void {
     event.stopPropagation();
-    const value = event.detail.value;
-    const config: CardConfig = { type: this.config.type ?? `custom:${CARD_TYPE}` };
-    const entryId = configValue(value.entry_id);
-    if (entryId !== undefined) config.entry_id = String(entryId);
-    const chargeTo = configValue(value.charge_to);
-    if (chargeTo !== undefined) config.charge_to = chargeTo;
-    const dischargeTo = configValue(value.discharge_to);
-    if (dischargeTo !== undefined) config.discharge_to = dischargeTo;
+    const config = mergeEditorConfig(this.config, event.detail.value);
     this.config = config;
     this.dispatchEvent(
       new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),

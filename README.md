@@ -169,7 +169,10 @@ discharge_to: sensor.x   # number (%) or an entity id; default: the low battery 
 
 The low battery charge is the one set in the integration's options. A target given as an
 entity — a `number.*` charge limit the inverter exposes, say — is read live,
-so a seasonal change of the limit shows at once.
+so a seasonal change of the limit shows at once. Leave `charge_to` at 100
+only if the inverter really charges to 100%, and if it hovers at ±50–150 W near
+its cap, set the "Battery idle power" option above that hover so
+the card does not flip between "At limit" and "Discharging".
 
 The time uses the battery's **measured** usable capacity, the same figure as
 on the Health tab, pooled over the last 60 days — never the nameplate

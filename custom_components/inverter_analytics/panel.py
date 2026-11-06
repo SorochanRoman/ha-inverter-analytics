@@ -30,8 +30,8 @@ def _bundle_fingerprint(dist: Path, name: str) -> str | None:
     """A short digest of a bundle's contents.
 
     The URL has to change when the file does, or a browser holding the old copy
-    keeps running the previous panel after an upgrade — silently, with no error
-    and no hint that a reload would help.
+    keeps running the previous bundle, the panel's or the card's, after an
+    upgrade — silently, with no error and no hint that a reload would help.
 
     Content rather than the manifest version: the version only moves between
     releases, so it does nothing for anyone tracking a branch, and nothing
@@ -43,7 +43,7 @@ def _bundle_fingerprint(dist: Path, name: str) -> str | None:
         return hashlib.sha256(bundle.read_bytes()).hexdigest()[:12]
     except OSError:
         # A missing or unreadable bundle is the static handler's problem to
-        # report; serving the panel unversioned beats not serving it.
+        # report; serving a bundle unversioned beats not serving it.
         return None
 
 
