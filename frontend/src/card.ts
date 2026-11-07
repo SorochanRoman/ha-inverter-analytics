@@ -8,8 +8,9 @@
 import { LitElement, css, html, nothing, svg } from "lit";
 import { state } from "lit/decorators.js";
 import { mergeEditorConfig, type CardConfig } from "./battery-time";
-import { BatteryTimeController, messages, type CardHass } from "./battery-time-controller";
+import { BatteryTimeController, type CardHass } from "./battery-time-controller";
 import {
+  barLine,
   batteryIcon,
   cardSize,
   editorSchema,
@@ -21,11 +22,13 @@ import {
   ringGeometry,
   socText,
   targetLine,
+  tileLine,
   tilePrimary,
   type BatteryTimeView,
   type EditorField,
   type Layout,
 } from "./battery-time-looks";
+import { messages } from "./i18n/card-i18n";
 
 const CARD_TYPE = "inverter-analytics-battery-time";
 const EDITOR_TYPE = "inverter-analytics-battery-time-editor";
@@ -127,7 +130,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
         y2=${c - outer * Math.cos(a)}
       ></line>`;
     };
-    const line = view.eta ? targetLine(view, "approx") : null;
+    const line = view.eta ? targetLine(view) : null;
     return html`<div class="ring-box">
         <svg
           class="ring"
@@ -181,7 +184,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
     return html`<div class="top">
         <span class="time">${view.eta ? view.eta.duration : view.word}</span>${this.pill(view)}
       </div>
-      <div class="status">${view.status}</div>
+      <div class="status">${barLine(view)}</div>
       <div class="battery" role="img" aria-label=${faceSentence(view)}>
         <div class="level" style="width: calc((100% - 6px) * ${share / 100})"></div>
         ${marks.map((m) => html`<div class="mark ${m.kind}" style=${pos(m.at)}></div>`)}
@@ -197,10 +200,9 @@ class InverterAnalyticsBatteryTime extends LitElement {
 
   private tile(view: BatteryTimeView) {
     const share = view.soc === null ? 0 : clampPct(view.soc);
-    const line = targetLine(view, "at");
-    const pill = powerPill(view);
-    const power = pill
-      ? html`${pill.icon ? html`<ha-icon class="arrow" .icon=${pill.icon}></ha-icon>` : nothing}${pill.text}`
+    const line = tileLine(view);
+    const power = line.power
+      ? html`${line.icon ? html`<ha-icon class="arrow" .icon=${line.icon}></ha-icon>` : nothing}${line.power}`
       : nothing;
     return html`<div class="row">
         <div class="icon">
@@ -208,7 +210,9 @@ class InverterAnalyticsBatteryTime extends LitElement {
         </div>
         <div class="lines">
           <div class="primary">${tilePrimary(view)}</div>
-          <div class="secondary">${line ?? nothing}${line && pill ? " · " : nothing}${power}</div>
+          <div class="secondary">
+            ${line.text ?? nothing}${line.text && line.power ? " · " : nothing}${power}
+          </div>
         </div>
       </div>
       <div class="thin" aria-hidden="true">
@@ -256,10 +260,16 @@ class InverterAnalyticsBatteryTime extends LitElement {
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    /* The bar's and the tile's height budgets hold one line of note. */
+    /* The ring has room for a third line of note. */
+    .ring .note {
+      -webkit-line-clamp: 3;
+    }
+    /* The bar's and the tile's height budgets hold two smaller lines of
+       note: 4 + 2 × 14 px fits what each has left inside ha-card's border. */
     .bar .note,
     .tile .note {
-      -webkit-line-clamp: 1;
+      font-size: 12px;
+      line-height: 14px;
     }
     .pill {
       display: inline-flex;
@@ -397,6 +407,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
         font-size: 20px;
       }
       .bar .pill {
+        gap: 2px;
         padding: 0 8px;
       }
     }
@@ -412,7 +423,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
       position: relative;
       height: 40px;
       box-sizing: border-box;
-      margin: 12px 10px 0 0;
+      margin: 10px 10px 0 0;
       border: 2px solid var(--secondary-text-color);
       border-color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent);
       border-radius: 10px;

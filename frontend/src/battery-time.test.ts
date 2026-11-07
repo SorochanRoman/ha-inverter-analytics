@@ -153,6 +153,7 @@ describe("the card's state, in order", () => {
     const b = basis({ capacity_kwh: null, capacity_reason: "too_few_clean_hours", clean_hours: 12 });
     expect(cardState(input({ basis: b, capacityKwh: null }))).toEqual({
       kind: "no_capacity",
+      direction: "charging",
       reason: "too_few_clean_hours",
       clean_hours: 12,
       clean_hours_min: 20,
@@ -167,13 +168,23 @@ describe("the card's state, in order", () => {
       missing_roles: ["battery_charge_total"],
       clean_hours: 0,
     });
-    expect(cardState(input({ basis: b, capacityKwh: null }))).toEqual({
+    expect(cardState(input({ basis: b, capacityKwh: null, powerW: -1550 }))).toEqual({
       kind: "no_capacity",
+      direction: "discharging",
       reason: "missing_roles",
       clean_hours: 0,
       clean_hours_min: 20,
       missing_roles: ["battery_charge_total"],
     });
+  });
+
+  it("6. no capacity decides the direction once, even with no idle band at rest", () => {
+    const b = basis({ capacity_kwh: null, capacity_reason: "too_few_clean_hours", idle_w: 0 });
+    const at = (powerW: number) => cardState(input({ basis: b, capacityKwh: null, powerW }));
+    expect(at(1)).toMatchObject({ kind: "no_capacity", direction: "charging" });
+    expect(at(-1)).toMatchObject({ kind: "no_capacity", direction: "discharging" });
+    // Zero is not charging: the one place that decides says discharging.
+    expect(at(0)).toMatchObject({ kind: "no_capacity", direction: "discharging" });
   });
 
   it("7. charging to the target: 31 kWh × 35 / 100 / 1.55 kW = 7 h", () => {

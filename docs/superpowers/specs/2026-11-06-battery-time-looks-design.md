@@ -61,7 +61,7 @@ interface BatteryTimeView {
   powerW: number | null;       // smoothed, sign-corrected
   chargeTo: number | null;
   dischargeTo: number | null;
-  target: number | null;       // the target in the state's direction, if any
+  target: number | null;       // the target in the state's direction; none at the limit, the floor or at rest
   eta: EtaParts | null;        // null when the state has no time
   tone: Tone;                  // §5
   word: string;                // one-word state label (§6)
@@ -166,7 +166,7 @@ tested against this table.
   - "to 85% · ≈16:40" in `--secondary-text-color`, which drops the arrival
     when there is none;
   - a pill with an `mdi:arrow-up` or `mdi:arrow-down` icon in the tone and
-    the power, its text in `--primary-text-color`, and its background the
+    the power (no arrow at rest: idle, at the limit or at the floor), its text in `--primary-text-color`, and its background the
     tone at 15%;
   - `note`, if any.
 - **SVG accessibility.** The SVG carries `role="img"` and an `aria-label`
@@ -176,7 +176,10 @@ tested against this table.
 
 - **Top row.** `eta.duration` (or `word`) on the left, 28 px. The power pill
   on the right.
-- **Status.** `status` in `--secondary-text-color`.
+- **Under the time.** "to 85% · ≈16:40", as under the ring, in
+  `--secondary-text-color`; it drops the arrival when there is none. A
+  state with no time shows `status` instead. The duration is not repeated:
+  the big text already shows it.
 - **Battery.** An outline 40 px tall with a terminal nub. The fill is the
   SoC in the tone gradient, with the SoC centred in `--primary-text-color`.
 - **Marks.** Vertical marks at the discharge target (50% opacity) and the
@@ -199,8 +202,10 @@ tested against this table.
 - **Primary line.** "62% · 2 h 10 min", or "62% · idle" and the like. In
   `unmapped` / `unavailable` / `loading` it reads "— · —". Text is in
   `--primary-text-color`.
-- **Secondary line.** "to 85% at 16:40 · ↑ 1.8 kW" in
-  `--secondary-text-color`. The arrow is an `ha-icon`, not a glyph.
+- **Secondary line.** "≈16:40 · ↑ 1.8 kW" in `--secondary-text-color`.
+  The target is left out so the line fits half a section; the tick on the
+  bar shows it. The arrow is an `ha-icon`, not a glyph, and there is none
+  at rest.
 - **Bar.** A 6 px bar: the fill in the tone, with a tick at the charge
   target.
 - **Note.** `note`, if any.
@@ -271,7 +276,7 @@ duration in `full` and `ring`, and the arrival time in `time`.
 | `charging` | `charge` |
 | `discharging` | `discharge` |
 | `at_floor` | `low` |
-| `no_capacity` | by the sign of the smoothed power: `charge` above +idle, `discharge` below −idle, `rest` otherwise |
+| `no_capacity` | by the state's `direction`, which `cardState` decides once: `charge` or `discharge` |
 | `idle`, `at_limit`, `unmapped`, `unavailable`, `loading` | `rest` |
 
 `cardState` already returns `at_floor` whenever SoC ≤ floor and the power is
@@ -306,10 +311,12 @@ Colours come from theme variables only:
 New keys go in `card-en.ts` and `card-uk.ts`:
 
 - layout and style names, for the editors;
-- one-word state labels: charging, discharging, idle, at limit, at floor,
-  and "—" for unmapped, unavailable and loading;
+- one-word state labels: charging, discharging, idle, at limit, floor
+  (uk: заряд, розряд, простій, на ліміті, мінімум), and "—" for unmapped,
+  unavailable and loading. They are short, to share the bar's top row and
+  the tile's first line at 245 px;
 - "to {t}%";
-- "at {time}";
+- "≈{time}";
 - the badge's name and description;
 - the accessible sentence template.
 
@@ -329,8 +336,8 @@ raw.
   - `formatEta` still produces the same output;
   - `describeView` for every state, in both languages, including the basis
     error and loading;
-  - `tone` for every state, and for `no_capacity` in both directions and at
-    rest;
+  - `tone` for every state, and for `no_capacity` in both directions; the
+    controller's word, target and tone agree with `idle_w` 0 at zero power;
   - `batteryIcon` at 0, 4, 5, 94, 95 and 100, charging and not, and with no
     SoC;
   - `badgeText` for each style × each state, in both languages;

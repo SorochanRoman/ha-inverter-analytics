@@ -107,7 +107,6 @@ function joinRoles(roles: string[], m: CardMessages): string {
 export function describeView(input: {
   state: ViewState;
   soc: number | null;
-  powerW: number | null;
   target: number | null;
   eta: EtaParts | null;
   basisError: string | null;
@@ -142,8 +141,8 @@ export function describeView(input: {
     case "idle":
       return { word: m.words.idle, status: m.idle, note: null };
     case "no_capacity": {
-      // The direction stays visible without a time.
-      const charging = (input.powerW ?? 0) > 0;
+      // The direction stays visible without a time; cardState decided it.
+      const charging = state.direction === "charging";
       const direction = charging ? m.chargingTo : m.dischargingTo;
       const note =
         state.reason === "missing_roles"
@@ -170,26 +169,22 @@ export function describeView(input: {
 }
 
 /**
- * The colour family of the state. Without a measured capacity the power's
- * sign decides, with cardState's own band: exactly the idle power already
- * counts as moving.
+ * The direction the battery is moving in, as cardState decided it; null for
+ * every state at rest or without a reading.
  */
-export function tone(state: ViewState, powerW: number | null, idleW: number): Tone {
-  switch (state.kind) {
-    case "charging":
-      return "charge";
-    case "discharging":
-      return "discharge";
-    case "at_floor":
-      return "low";
-    case "no_capacity":
-      if (powerW === null) return "rest";
-      if (powerW >= idleW) return "charge";
-      if (powerW <= -idleW) return "discharge";
-      return "rest";
-    default:
-      return "rest";
-  }
+function directionOf(state: ViewState): "charging" | "discharging" | null {
+  if (state.kind === "charging" || state.kind === "discharging") return state.kind;
+  if (state.kind === "no_capacity") return state.direction;
+  return null;
+}
+
+/** The colour family of the state. Without a measured capacity, the state's direction. */
+export function tone(state: ViewState): Tone {
+  if (state.kind === "at_floor") return "low";
+  const direction = directionOf(state);
+  if (direction === "charging") return "charge";
+  if (direction === "discharging") return "discharge";
+  return "rest";
 }
 
 /** The Material Design battery icon for a SoC: outline below 5%, full from 95%, tens between. */
@@ -321,30 +316,58 @@ export function pctLabel(value: number, locale: string): string {
 }
 
 /**
- * The target and the arrival: "to 85% · ≈16:40" under the ring, "to 85% at
- * 16:40" in the tile. Without an arrival only the target; without a
- * target, nothing.
+ * The target and the arrival: "to 85% · ≈16:40" under the ring. Without an
+ * arrival only the target; without a target, nothing.
  */
-export function targetLine(view: BatteryTimeView, form: "approx" | "at"): string | null {
+export function targetLine(view: BatteryTimeView): string | null {
   const { m, locale } = view;
   if (view.target === null) return null;
   const to = m.toTarget({ t: pct(view.target, locale) });
   const arrival = view.eta?.arrival;
   if (!arrival) return to;
-  const time = clockTime(arrival, locale);
-  return form === "approx" ? `${to} · ${m.approx({ time })}` : `${to} ${m.atTime({ time })}`;
+  return `${to} · ${m.approx({ time: clockTime(arrival, locale) })}`;
 }
 
 /**
- * The power pill: the power without its sign, an arrow for the direction
- * (none when it rounds to nothing). No pill while loading or with no power.
+ * The line under the bar's time, which the big text already shows: the
+ * target and the arrival as under the ring; the status in a state with no
+ * time.
+ */
+export function barLine(view: BatteryTimeView): string {
+  return (view.eta ? targetLine(view) : null) ?? view.status;
+}
+
+/**
+ * The power pill: the power without its sign, and an arrow for the state's
+ * direction. At rest (idle, at the limit, at the floor) there is no arrow:
+ * a few watts either way are not a direction. No pill while loading or with
+ * no power.
  */
 export function powerPill(view: BatteryTimeView): { icon: string | null; text: string } | null {
   const { powerW } = view;
   if (view.state.kind === "loading" || powerW === null || Number.isNaN(powerW)) return null;
-  const rounded = Math.round(powerW);
-  const icon = rounded > 0 ? "mdi:arrow-up" : rounded < 0 ? "mdi:arrow-down" : null;
+  const direction = directionOf(view.state);
+  const icon =
+    direction === "charging" ? "mdi:arrow-up" : direction === "discharging" ? "mdi:arrow-down" : null;
   return { icon, text: formatCardPower(Math.abs(powerW), view.locale, view.m) };
+}
+
+/**
+ * The tile's second line: "≈16:40 · ↑ 1.8 kW". The target is left out, for
+ * the line to fit half a section; the tick on the tile's bar shows it.
+ */
+export function tileLine(view: BatteryTimeView): {
+  text: string | null;
+  icon: string | null;
+  power: string | null;
+} {
+  const arrival = view.eta?.arrival;
+  const pill = powerPill(view);
+  return {
+    text: arrival ? view.m.approx({ time: clockTime(arrival, view.locale) }) : null,
+    icon: pill?.icon ?? null,
+    power: pill?.text ?? null,
+  };
 }
 
 /** The tile's first line: "62% · 2 h 10 min"; "— · —" where nothing is known. */

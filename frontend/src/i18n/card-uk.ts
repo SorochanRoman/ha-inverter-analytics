@@ -25,10 +25,12 @@ export const cardUk: CardMessages = {
     " розряду)",
   capacityNeedsRoles: (p) => `Для ємності вкажіть ${p.roles}`,
   and: "і",
+  // Without "батареї": the card is about the battery, and the note has two
+  // lines in the bar and the tile.
   roles: {
-    battery_soc: "рівень заряду батареї",
-    battery_charge_total: "лічильник заряду батареї",
-    battery_discharge_total: "лічильник розряду батареї",
+    battery_soc: "рівень заряду",
+    battery_charge_total: "лічильник заряду",
+    battery_discharge_total: "лічильник розряду",
   },
   units: { w: "Вт", kw: "кВт" },
   words: {
@@ -36,12 +38,11 @@ export const cardUk: CardMessages = {
     discharging: "розряд",
     idle: "простій",
     atLimit: "на ліміті",
-    atFloor: "на нижній межі",
+    atFloor: "мінімум",
   },
   toTarget: (p) => `до ${p.t}%`,
-  atTime: (p) => `о ${p.time}`,
   approx: (p) => `≈${p.time}`,
-  sentence: (p) => `Батарея на ${p.soc}. ${p.status}. Потужність батареї ${p.power}.`,
+  sentence: (p) => `Заряд батареї ${p.soc}. ${p.status}. Потужність батареї ${p.power}.`,
   layouts: { ring: "Кільце", bar: "Смуга", tile: "Плитка" },
   styles: { full: "Повний", ring: "Кільце", time: "Час" },
   badge: {

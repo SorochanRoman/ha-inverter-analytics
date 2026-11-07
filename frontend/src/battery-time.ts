@@ -10,8 +10,6 @@ import {
   etaParts,
   etaText,
   formatCardPower,
-  type BadgeStyle,
-  type Layout,
 } from "./battery-time-looks";
 import type { CardMessages } from "./i18n/card-en";
 import type { BatteryEtaBasis } from "./types";
@@ -102,6 +100,8 @@ export type CardState =
   | { kind: "idle" }
   | {
       kind: "no_capacity";
+      /** The power's direction, decided here once for the word, the target and the tone. */
+      direction: "charging" | "discharging";
       reason: "too_few_clean_hours" | "missing_roles";
       clean_hours: number;
       clean_hours_min: number;
@@ -137,16 +137,18 @@ export function cardState(input: {
   if (soc >= chargeTo && p > -idle) return { kind: "at_limit", target: chargeTo };
   if (soc <= dischargeTo && p < idle) return { kind: "at_floor", target: dischargeTo };
   if (Math.abs(p) < idle) return { kind: "idle" };
+  // The one place the direction is decided; zero power is not charging.
+  const charging = p > 0;
   if (input.capacityKwh === null) {
     return {
       kind: "no_capacity",
+      direction: charging ? "charging" : "discharging",
       reason: basis.capacity_reason === "missing_roles" ? "missing_roles" : "too_few_clean_hours",
       clean_hours: basis.clean_hours,
       clean_hours_min: basis.clean_hours_min,
       missing_roles: basis.missing_roles,
     };
   }
-  const charging = p > 0;
   const target = charging ? chargeTo : dischargeTo;
   const hours = (input.capacityKwh * Math.abs(target - soc)) / 100 / (Math.abs(p) / 1000);
   return { kind: charging ? "charging" : "discharging", target, minutes: hours * 60 };
@@ -166,10 +168,10 @@ export interface CardConfig {
   entry_id?: string;
   charge_to?: number | string;
   discharge_to?: number | string;
-  /** The card's layout; read through layoutOf. */
-  layout?: Layout;
-  /** The badge's style; read through styleOf. */
-  style?: BadgeStyle;
+  /** The card's layout, as the YAML has it; read through layoutOf. */
+  layout?: string;
+  /** The badge's style, as the YAML has it; read through styleOf. */
+  style?: string;
   [key: string]: unknown;
 }
 
@@ -197,7 +199,7 @@ export function mergeEditorConfig(
     const value = configValue(values[key]);
     if (value === undefined) delete next[key];
     else if (key === "charge_to" || key === "discharge_to") next[key] = value;
-    else next[key] = String(value) as never;
+    else next[key] = String(value);
   }
   return next;
 }

@@ -41,11 +41,11 @@ export const cardEn = {
     discharging: "discharging",
     idle: "idle",
     atLimit: "at limit",
-    atFloor: "at floor",
+    // Short: it shares the bar's top row with the power and the tile's first line with the SoC.
+    atFloor: "floor",
   },
-  // "to 85%" beside the time; "at 16:40" in the tile; "≈16:40" in the ring and badge.
+  // "to 85%" beside the time; "≈16:40" in the ring, the bar, the tile and the badge.
   toTarget: (p: { t: string }) => `to ${p.t}%`,
-  atTime: (p: { time: string }) => `at ${p.time}`,
   approx: (p: { time: string }) => `≈${p.time}`,
   // What a screen reader says for the ring, the bar and the badge.
   sentence: (p: { soc: string; status: string; power: string }) =>

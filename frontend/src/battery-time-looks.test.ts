@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { CardState } from "./battery-time";
+import { cardState, type CardState } from "./battery-time";
 import {
   badgeText,
+  barLine,
   batteryIcon,
   cardSize,
   describeView,
@@ -14,6 +15,7 @@ import {
   powerPill,
   ringGeometry,
   targetLine,
+  tileLine,
   tilePrimary,
   styleOf,
   tone,
@@ -23,6 +25,7 @@ import {
 } from "./battery-time-looks";
 import { cardEn, type CardMessages } from "./i18n/card-en";
 import { cardUk } from "./i18n/card-uk";
+import type { BatteryEtaBasis } from "./types";
 
 // Local time, so the clock time does not depend on the test machine's zone.
 const now = new Date(2026, 10, 6, 14, 30);
@@ -88,6 +91,7 @@ const charging: CardState = { kind: "charging", target: 85, minutes: 128 };
 const discharging: CardState = { kind: "discharging", target: 20, minutes: 45 };
 const noCapacityHours: CardState = {
   kind: "no_capacity",
+  direction: "charging",
   reason: "too_few_clean_hours",
   clean_hours: 12,
   clean_hours_min: 20,
@@ -95,6 +99,7 @@ const noCapacityHours: CardState = {
 };
 const noCapacityRoles: CardState = {
   kind: "no_capacity",
+  direction: "discharging",
   reason: "missing_roles",
   clean_hours: 0,
   clean_hours_min: 20,
@@ -105,7 +110,7 @@ function describeIn(
   m: CardMessages,
   locale: string,
   state: ViewState,
-  fields: { powerW?: number | null; target?: number | null; basisError?: string | null } = {},
+  fields: { target?: number | null; basisError?: string | null } = {},
 ) {
   const eta =
     state.kind === "charging" || state.kind === "discharging"
@@ -114,7 +119,6 @@ function describeIn(
   return describeView({
     state,
     soc: 62,
-    powerW: fields.powerW ?? 1800,
     target: fields.target ?? null,
     eta,
     basisError: fields.basisError ?? null,
@@ -133,7 +137,7 @@ describe("the worded view, in English", () => {
       status: "Charging to 85% · 2 h 10 min (≈16:40)",
       note: null,
     });
-    expect(d(discharging, { powerW: -1800, target: 20 })).toEqual({
+    expect(d(discharging, { target: 20 })).toEqual({
       word: "discharging",
       status: "Discharging to 20% · 45 min (≈15:15)",
       note: null,
@@ -147,7 +151,7 @@ describe("the worded view, in English", () => {
       note: null,
     });
     expect(d({ kind: "at_floor", target: 20 })).toEqual({
-      word: "at floor",
+      word: "floor",
       status: "At floor 20%",
       note: null,
     });
@@ -159,12 +163,12 @@ describe("the worded view, in English", () => {
   });
 
   it("no capacity keeps the direction and names the reason", () => {
-    expect(d(noCapacityHours, { powerW: 1800, target: 85 })).toEqual({
+    expect(d(noCapacityHours, { target: 85 })).toEqual({
       word: "charging",
       status: "Charging to 85% · —",
       note: "Capacity not measured yet (12 of 20 clean discharge hours)",
     });
-    expect(d(noCapacityRoles, { powerW: -1800, target: 20 })).toEqual({
+    expect(d(noCapacityRoles, { target: 20 })).toEqual({
       word: "discharging",
       status: "Discharging to 20% · —",
       note: "Capacity needs battery SoC, battery charge total and battery discharge total mapped",
@@ -173,7 +177,7 @@ describe("the worded view, in English", () => {
 
   it("names a single missing role without a list", () => {
     const one: CardState = { ...noCapacityRoles, missing_roles: ["battery_soc"] } as CardState;
-    expect(d(one, { powerW: 1800, target: 85 }).note).toBe("Capacity needs battery SoC mapped");
+    expect(d(one, { target: 85 }).note).toBe("Capacity needs battery SoC mapped");
   });
 
   it("unmapped and unavailable have a dash and say why", () => {
@@ -210,7 +214,7 @@ describe("the worded view, in Ukrainian", () => {
       status: "Заряд до 85% · 2 год 10 хв (≈16:40)",
       note: null,
     });
-    expect(d(discharging, { powerW: -1800, target: 20 })).toEqual({
+    expect(d(discharging, { target: 20 })).toEqual({
       word: "розряд",
       status: "Розряд до 20% · 45 хв (≈15:15)",
       note: null,
@@ -221,22 +225,21 @@ describe("the worded view, in Ukrainian", () => {
       note: null,
     });
     expect(d({ kind: "at_floor", target: 20 })).toEqual({
-      word: "на нижній межі",
+      word: "мінімум",
       status: "Досягла нижньої межі 20%",
       note: null,
     });
     expect(d({ kind: "idle" })).toEqual({ word: "простій", status: "Простій", note: null });
-    expect(d(noCapacityHours, { powerW: 1800, target: 85 })).toEqual({
+    expect(d(noCapacityHours, { target: 85 })).toEqual({
       word: "заряд",
       status: "Заряд до 85% · —",
       note: "Ємність ще не виміряна (12 з 20 чистих годин розряду)",
     });
-    expect(d(noCapacityRoles, { powerW: -1800, target: 20 })).toEqual({
+    expect(d(noCapacityRoles, { target: 20 })).toEqual({
       word: "розряд",
       status: "Розряд до 20% · —",
-      note:
-        "Для ємності вкажіть рівень заряду батареї, лічильник заряду батареї і " +
-        "лічильник розряду батареї",
+      // Short role names: the note has two lines in the bar and the tile.
+      note: "Для ємності вкажіть рівень заряду, лічильник заряду і лічильник розряду",
     });
     expect(d({ kind: "unmapped" })).toEqual({
       word: "—",
@@ -258,33 +261,48 @@ describe("the worded view, in Ukrainian", () => {
 });
 
 describe("the tone", () => {
-  const idle = 50;
-
   it("follows the state's kind", () => {
-    expect(tone(charging, 1800, idle)).toBe("charge");
-    expect(tone(discharging, -1800, idle)).toBe("discharge");
-    expect(tone({ kind: "at_floor", target: 20 }, 0, idle)).toBe("low");
-    expect(tone({ kind: "at_limit", target: 85 }, 0, idle)).toBe("rest");
-    expect(tone({ kind: "idle" }, 10, idle)).toBe("rest");
-    expect(tone({ kind: "unmapped" }, null, idle)).toBe("rest");
-    expect(tone({ kind: "unavailable", entity: "sensor.soc" }, null, idle)).toBe("rest");
-    expect(tone({ kind: "loading" }, null, idle)).toBe("rest");
+    expect(tone(charging)).toBe("charge");
+    expect(tone(discharging)).toBe("discharge");
+    expect(tone({ kind: "at_floor", target: 20 })).toBe("low");
+    expect(tone({ kind: "at_limit", target: 85 })).toBe("rest");
+    expect(tone({ kind: "idle" })).toBe("rest");
+    expect(tone({ kind: "unmapped" })).toBe("rest");
+    expect(tone({ kind: "unavailable", entity: "sensor.soc" })).toBe("rest");
+    expect(tone({ kind: "loading" })).toBe("rest");
   });
 
   it("is charge for a battery charging below its floor", () => {
-    // cardState calls that charging, not at_floor: the tone follows.
-    expect(tone({ kind: "charging", target: 85, minutes: 600 }, 1800, idle)).toBe("charge");
+    const basis: BatteryEtaBasis = {
+      capacity_kwh: 10,
+      capacity_reason: null,
+      missing_roles: [],
+      clean_hours: 40,
+      clean_hours_min: 20,
+      window_days: 60,
+      computed_at: "2026-11-06T12:00:00+00:00",
+      soc_entity: "sensor.soc",
+      battery_power_entity: "sensor.battery_power",
+      battery_power_inverted: false,
+      idle_w: 50,
+      low_pct: 20,
+    };
+    const state = cardState({
+      soc: 15,
+      powerW: 1800,
+      chargeTo: 85,
+      dischargeTo: 20,
+      unavailable: null,
+      mapped: true,
+      capacityKwh: 10,
+      basis,
+    });
+    expect(tone(state)).toBe("charge");
   });
 
-  it("follows the power's sign without a measured capacity", () => {
-    expect(tone(noCapacityHours, 1800, idle)).toBe("charge");
-    expect(tone(noCapacityHours, -1800, idle)).toBe("discharge");
-    // At exactly the idle power cardState no longer calls the battery idle.
-    expect(tone(noCapacityHours, 50, idle)).toBe("charge");
-    expect(tone(noCapacityHours, -50, idle)).toBe("discharge");
-    expect(tone(noCapacityHours, 49, idle)).toBe("rest");
-    expect(tone(noCapacityHours, -49, idle)).toBe("rest");
-    expect(tone(noCapacityHours, null, idle)).toBe("rest");
+  it("follows the state's direction without a measured capacity", () => {
+    expect(tone(noCapacityHours)).toBe("charge");
+    expect(tone(noCapacityRoles)).toBe("discharge");
   });
 });
 
@@ -325,14 +343,14 @@ function view(
     state.kind === "charging" || state.kind === "discharging"
       ? etaParts(state.minutes, now, locale, m)
       : null;
-  const target =
-    state.kind === "charging" || state.kind === "discharging" ? state.target : null;
+  let target: number | null = null;
+  if (state.kind === "charging" || state.kind === "discharging") target = state.target;
+  else if (state.kind === "no_capacity") target = state.direction === "charging" ? 85 : 20;
   const soc = "soc" in fields ? (fields.soc ?? null) : 62;
   const powerW = fields.powerW ?? 1800;
   const words = describeView({
     state,
     soc,
-    powerW,
     target,
     eta,
     basisError: null,
@@ -347,7 +365,7 @@ function view(
     dischargeTo: 20,
     target,
     eta,
-    tone: tone(state, powerW, 50),
+    tone: tone(state),
     ...words,
     m,
     locale,
@@ -387,9 +405,9 @@ describe("the badge's text, in English", () => {
       time: { primary: "at limit" },
     },
     at_floor: {
-      full: { primary: "62% · at floor" },
-      ring: { primary: "62%", secondary: "at floor" },
-      time: { primary: "at floor" },
+      full: { primary: "62% · floor" },
+      ring: { primary: "62%", secondary: "floor" },
+      time: { primary: "floor" },
     },
     idle: {
       full: { primary: "62% · idle" },
@@ -398,7 +416,7 @@ describe("the badge's text, in English", () => {
     },
     no_capacity: {
       full: { primary: "62% · charging" },
-      ring: { primary: "62%", secondary: "charging" },
+      ring: { primary: "62% · to 85%", secondary: "charging" },
       time: { primary: "charging" },
     },
     unmapped: {
@@ -466,9 +484,9 @@ describe("the badge's text, in Ukrainian", () => {
       time: { primary: "на ліміті" },
     },
     at_floor: {
-      full: { primary: "62% · на нижній межі" },
-      ring: { primary: "62%", secondary: "на нижній межі" },
-      time: { primary: "на нижній межі" },
+      full: { primary: "62% · мінімум" },
+      ring: { primary: "62%", secondary: "мінімум" },
+      time: { primary: "мінімум" },
     },
     idle: {
       full: { primary: "62% · простій" },
@@ -477,7 +495,7 @@ describe("the badge's text, in Ukrainian", () => {
     },
     no_capacity: {
       full: { primary: "62% · заряд" },
-      ring: { primary: "62%", secondary: "заряд" },
+      ring: { primary: "62% · до 85%", secondary: "заряд" },
       time: { primary: "заряд" },
     },
     unmapped: {
@@ -605,18 +623,16 @@ describe("the faces' lines", () => {
   const uk = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
     view(cardUk, "uk", state, fields);
 
-  it("words the target and the arrival, two ways", () => {
-    expect(targetLine(en(charging), "approx")).toBe("to 85% · ≈16:40");
-    expect(targetLine(en(charging), "at")).toBe("to 85% at 16:40");
-    expect(targetLine(uk(charging), "approx")).toBe("до 85% · ≈16:40");
-    expect(targetLine(uk(charging), "at")).toBe("до 85% о 16:40");
+  it("words the target and the arrival", () => {
+    expect(targetLine(en(charging))).toBe("to 85% · ≈16:40");
+    expect(targetLine(uk(charging))).toBe("до 85% · ≈16:40");
   });
 
   it("drops the arrival when there is none, and the line with no target", () => {
     const far = { kind: "charging", target: 85, minutes: 50 * 60 } as const;
-    expect(targetLine(en(far), "approx")).toBe("to 85%");
-    expect(targetLine(en({ kind: "idle" }), "at")).toBeNull();
-    expect(targetLine(en(noCapacityHours, { target: 85 }), "at")).toBe("to 85%");
+    expect(targetLine(en(far))).toBe("to 85%");
+    expect(targetLine(en({ kind: "idle" }))).toBeNull();
+    expect(targetLine(en(noCapacityHours, { target: 85 }))).toBe("to 85%");
   });
 
   it("shows the power without its sign, the arrow giving the direction", () => {
@@ -628,7 +644,58 @@ describe("the faces' lines", () => {
       icon: "mdi:arrow-down",
       text: "650 Вт",
     });
-    expect(powerPill(en({ kind: "idle" }, { powerW: 0.3 }))).toEqual({ icon: null, text: "0 W" });
+    expect(powerPill(uk(noCapacityRoles, { powerW: -650 }))).toEqual({
+      icon: "mdi:arrow-down",
+      text: "650 Вт",
+    });
+  });
+
+  it("shows no arrow at rest, only the power", () => {
+    expect(powerPill(en({ kind: "idle" }, { powerW: 10 }))).toEqual({ icon: null, text: "10 W" });
+    expect(powerPill(en({ kind: "idle" }, { powerW: -0.3 }))).toEqual({ icon: null, text: "0 W" });
+    expect(powerPill(en({ kind: "at_limit", target: 85 }, { powerW: 30 }))).toEqual({
+      icon: null,
+      text: "30 W",
+    });
+    expect(powerPill(uk({ kind: "at_floor", target: 20 }, { powerW: -20 }))).toEqual({
+      icon: null,
+      text: "20 Вт",
+    });
+  });
+
+  it("puts the target and the arrival under the bar's time, or the status without one", () => {
+    expect(barLine(en(charging))).toBe("to 85% · ≈16:40");
+    expect(barLine(uk(discharging))).toBe("до 20% · ≈15:15");
+    const far = { kind: "charging", target: 85, minutes: 50 * 60 } as const;
+    expect(barLine(en(far))).toBe("to 85%");
+    expect(barLine(en({ kind: "at_floor", target: 20 }))).toBe("At floor 20%");
+    expect(barLine(uk({ kind: "idle" }))).toBe("Простій");
+    expect(barLine(en(noCapacityHours))).toBe("Charging to 85% · —");
+    expect(barLine(en({ kind: "loading" }))).toBe("—");
+  });
+
+  it("words the tile's second line: the arrival and the power, no target", () => {
+    expect(tileLine(uk(charging, { powerW: 1800 }))).toEqual({
+      text: "≈16:40",
+      icon: "mdi:arrow-up",
+      power: "1,8 кВт",
+    });
+    const far = { kind: "discharging", target: 20, minutes: 50 * 60 } as const;
+    expect(tileLine(en(far, { powerW: -1800 }))).toEqual({
+      text: null,
+      icon: "mdi:arrow-down",
+      power: "1.8 kW",
+    });
+    expect(tileLine(en({ kind: "idle" }, { powerW: 10 }))).toEqual({
+      text: null,
+      icon: null,
+      power: "10 W",
+    });
+    expect(tileLine(en({ kind: "loading" }, { powerW: null }))).toEqual({
+      text: null,
+      icon: null,
+      power: null,
+    });
   });
 
   it("shows no power pill while loading or with no power", () => {
@@ -639,6 +706,8 @@ describe("the faces' lines", () => {
   it("words the tile's first line, dashes where nothing is known", () => {
     expect(tilePrimary(en(charging))).toBe("62% · 2 h 10 min");
     expect(tilePrimary(uk({ kind: "idle" }))).toBe("62% · простій");
+    expect(tilePrimary(uk({ kind: "at_floor", target: 20 }))).toBe("62% · мінімум");
+    expect(tilePrimary(en({ kind: "at_floor", target: 20 }))).toBe("62% · floor");
     expect(tilePrimary(en({ kind: "unavailable", entity: "sensor.p" }))).toBe("— · —");
     expect(tilePrimary(en({ kind: "unmapped" }))).toBe("— · —");
     expect(tilePrimary(en({ kind: "loading" }, { soc: null }))).toBe("— · —");
@@ -651,7 +720,9 @@ describe("the faces' lines", () => {
     expect(faceSentence(en({ kind: "loading" }, { soc: null, powerW: null }))).toBe(
       "Battery at —. —. Battery power —.",
     );
-    expect(faceSentence(uk(discharging, { powerW: -650 }))).toContain("-650 Вт");
+    expect(faceSentence(uk(discharging, { powerW: -650 }))).toBe(
+      "Заряд батареї 62%. Розряд до 20% · 45 хв (≈15:15). Потужність батареї -650 Вт.",
+    );
   });
 
   it("labels a target mark with up to one decimal", () => {

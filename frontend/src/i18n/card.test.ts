@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cardEn } from "./card-en";
+import { messages } from "./card-i18n";
 import { cardUk } from "./card-uk";
+import { _resetLangForTests, setLang } from "./lang-store";
 
 type Leaf = { path: string; value: unknown };
 
@@ -93,30 +95,28 @@ describe("the card's dictionaries", () => {
       discharging: "discharging",
       idle: "idle",
       atLimit: "at limit",
-      atFloor: "at floor",
+      atFloor: "floor",
     });
     expect(cardUk.words).toEqual({
       charging: "заряд",
       discharging: "розряд",
       idle: "простій",
       atLimit: "на ліміті",
-      atFloor: "на нижній межі",
+      atFloor: "мінімум",
     });
   });
 
   it("interpolate the target, the clock time and the accessible sentence", () => {
     expect(cardEn.toTarget({ t: "85" })).toBe("to 85%");
-    expect(cardEn.atTime({ time: "16:40" })).toBe("at 16:40");
     expect(cardEn.approx({ time: "16:40" })).toBe("≈16:40");
     expect(cardUk.toTarget({ t: "85" })).toBe("до 85%");
-    expect(cardUk.atTime({ time: "16:40" })).toBe("о 16:40");
     expect(cardUk.approx({ time: "16:40" })).toBe("≈16:40");
     const sentence = { soc: "62%", status: "Charging to 85% · 2 h", power: "1.8 kW" };
     expect(cardEn.sentence(sentence)).toBe(
       "Battery at 62%. Charging to 85% · 2 h. Battery power 1.8 kW.",
     );
     expect(cardUk.sentence({ ...sentence, status: "Заряд до 85% · 2 год", power: "1,8 кВт" })).toBe(
-      "Батарея на 62%. Заряд до 85% · 2 год. Потужність батареї 1,8 кВт.",
+      "Заряд батареї 62%. Заряд до 85% · 2 год. Потужність батареї 1,8 кВт.",
     );
   });
 
@@ -129,5 +129,26 @@ describe("the card's dictionaries", () => {
     expect(cardUk.badge.description).toBe(
       "Заряд батареї й час до цілі за поточної потужності.",
     );
+  });
+});
+
+describe("the card's dictionary in the store's language", () => {
+  afterEach(() => {
+    _resetLangForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it("is English until the language is Ukrainian", () => {
+    const data: Record<string, string> = {};
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => data[key] ?? null,
+      setItem: (key: string, value: string) => {
+        data[key] = value;
+      },
+    });
+    _resetLangForTests();
+    expect(messages()).toBe(cardEn);
+    setLang("uk");
+    expect(messages()).toBe(cardUk);
   });
 });

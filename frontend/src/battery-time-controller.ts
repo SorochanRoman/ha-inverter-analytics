@@ -21,9 +21,8 @@ import {
   type PowerSample,
 } from "./battery-time";
 import { describeView, etaParts, tone, type BatteryTimeView } from "./battery-time-looks";
-import { cardEn, type CardMessages } from "./i18n/card-en";
-import { cardUk } from "./i18n/card-uk";
-import { currentLang, currentLocale, noteHaLanguage, subscribe } from "./i18n/lang-store";
+import { messages } from "./i18n/card-i18n";
+import { currentLocale, noteHaLanguage, subscribe } from "./i18n/lang-store";
 import type { BatteryEtaBasis } from "./types";
 
 // The smoothed power and the clock time move with time alone, between
@@ -40,11 +39,6 @@ export interface CardHass {
   states: Record<string, EntityState>;
   locale?: { language?: string };
   callWS<T>(message: Record<string, unknown>): Promise<T>;
-}
-
-/** The card's dictionary in the language the panel speaks. */
-export function messages(): CardMessages {
-  return currentLang() === "uk" ? cardUk : cardEn;
 }
 
 function errorText(error: unknown): string {
@@ -200,7 +194,6 @@ export class BatteryTimeController implements ReactiveController {
       const { word, status, note } = describeView({
         state,
         soc: null,
-        powerW: null,
         target: null,
         eta: null,
         basisError: this.basisError ?? null,
@@ -215,7 +208,7 @@ export class BatteryTimeController implements ReactiveController {
         dischargeTo: null,
         target: null,
         eta: null,
-        tone: tone(state, null, 0),
+        tone: "rest",
         word,
         status,
         note,
@@ -251,11 +244,12 @@ export class BatteryTimeController implements ReactiveController {
       basis,
     });
     // The target in the state's direction: a charge or discharge carries its
-    // own; without a capacity the power's sign picks one; the rest have none.
+    // own; without a capacity the state's direction picks one; at the limit,
+    // the floor or at rest there is none.
     let target: number | null = null;
     if (state.kind === "charging" || state.kind === "discharging") target = state.target;
     else if (state.kind === "no_capacity") {
-      target = (powerW ?? 0) > 0 ? chargeTo.value : dischargeTo.value;
+      target = state.direction === "charging" ? chargeTo.value : dischargeTo.value;
     }
     const eta =
       state.kind === "charging" || state.kind === "discharging"
@@ -264,7 +258,6 @@ export class BatteryTimeController implements ReactiveController {
     const { word, status, note } = describeView({
       state,
       soc,
-      powerW,
       target,
       eta,
       basisError: this.basisError ?? null,
@@ -279,7 +272,7 @@ export class BatteryTimeController implements ReactiveController {
       dischargeTo: dischargeTo.value,
       target,
       eta,
-      tone: tone(state, powerW, basis.idle_w),
+      tone: tone(state),
       word,
       status,
       note,

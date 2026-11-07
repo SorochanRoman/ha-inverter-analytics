@@ -72,7 +72,19 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+/** Node's own localStorage warns when touched without a file: the store gets this one. */
+function fakeStorage() {
+  const data: Record<string, string> = {};
+  return {
+    getItem: (key: string) => (key in data ? data[key] : null),
+    setItem: (key: string, value: string) => {
+      data[key] = value;
+    },
+  };
+}
+
 beforeEach(() => {
+  vi.stubGlobal("localStorage", fakeStorage());
   vi.useFakeTimers();
   // Local noon, so the clock times read the same in any time zone.
   vi.setSystemTime(new Date(2026, 10, 6, 12, 0));
@@ -82,6 +94,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   _resetLangForTests();
+  vi.unstubAllGlobals();
 });
 
 describe("the battery time controller", () => {
@@ -301,8 +314,20 @@ describe("the battery time controller", () => {
     controller.setHass({ ...hass, states: { ...hass.states } });
     expect(controller.view().state.kind).toBe("charging");
 
+    // Inverter a has been charging at 2 kW for a minute.
+    vi.advanceTimersByTime(60_000);
     controller.setConfig({ entry_id: "b" });
     expect(controller.view().state).toEqual({ kind: "loading" });
+
+    // Inverter b's power entity reads 400 W: had a's samples been kept, the
+    // smoothed power would lean towards 2 kW.
+    const states = { ...hass.states, "sensor.b_power": { state: "400" } };
+    controller.setHass({ ...hass, states });
+    calls[1].resolve(basis({ battery_power_entity: "sensor.b_power" }));
+    await settle();
+    controller.hostUpdate();
+    vi.advanceTimersByTime(30_000);
+    expect(controller.view().powerW).toBe(400);
   });
 
   it("corrects the sign of an inverted power sensor", async () => {
@@ -332,6 +357,28 @@ describe("the battery time controller", () => {
     expect(view.tone).toBe("charge");
     expect(view.eta).toBeNull();
     expect(view.status).toBe("Charging to 100% · —");
+  });
+
+  it("decides the direction once: word, target and tone agree with no idle band", async () => {
+    const { controller, calls, hass, states } = setup({
+      "sensor.soc": { state: "50" },
+      "sensor.battery_power": { state: "0" },
+    });
+    controller.setConfig({});
+    controller.setHass(hass);
+    calls[0].resolve(
+      basis({ capacity_kwh: null, capacity_reason: "too_few_clean_hours", idle_w: 0 }),
+    );
+    await settle();
+    controller.setHass({ ...hass, states: { ...states } });
+    controller.hostUpdate();
+    const view = controller.view();
+    expect(view.powerW).toBe(0);
+    expect(view.state).toMatchObject({ kind: "no_capacity", direction: "discharging" });
+    expect(view.word).toBe("discharging");
+    expect(view.status).toBe("Discharging to 20% · —");
+    expect(view.target).toBe(20);
+    expect(view.tone).toBe("discharge");
   });
 
   it("has no target and no time at rest", async () => {
