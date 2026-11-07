@@ -91,6 +91,8 @@ export class BatteryTimeController implements ReactiveController {
       this.samples = [];
       this.lastPower = undefined;
       this.basis = undefined;
+      // The old inverter's failure says nothing about the new one.
+      this.basisError = undefined;
       void this.fetchBasis();
     }
     this.host.requestUpdate();

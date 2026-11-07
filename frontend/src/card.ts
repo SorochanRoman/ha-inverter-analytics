@@ -7,7 +7,7 @@
  */
 import { LitElement, css, html, nothing, svg } from "lit";
 import { state } from "lit/decorators.js";
-import { mergeEditorConfig, type CardConfig } from "./battery-time";
+import { CARD_EDITOR_KEYS, mergeEditorConfig, type CardConfig } from "./battery-time";
 import { BatteryTimeController, type CardHass } from "./battery-time-controller";
 import {
   barLine,
@@ -603,7 +603,7 @@ class InverterAnalyticsBatteryTimeEditor extends LitElement {
 
   private changed(event: CustomEvent<{ value: Record<string, unknown> }>): void {
     event.stopPropagation();
-    const config = mergeEditorConfig(this.config, event.detail.value);
+    const config = mergeEditorConfig(this.config, event.detail.value, CARD_EDITOR_KEYS);
     this.config = config;
     this.dispatchEvent(
       new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),

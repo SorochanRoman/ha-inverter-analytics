@@ -190,12 +190,36 @@ function configValue(value: unknown): number | string | undefined {
  * form did not hand back counts as left empty, as before: the card's editor
  * has no style and the badge's no layout, so neither keeps the other's.
  */
+type EditorKey = "entry_id" | "charge_to" | "discharge_to" | "layout" | "style";
+
+/** The keys the card's editor owns; the badge's `style` is not among them. */
+export const CARD_EDITOR_KEYS: readonly EditorKey[] = [
+  "entry_id",
+  "charge_to",
+  "discharge_to",
+  "layout",
+];
+
+/** The keys the badge's editor owns; the card's `layout` is not among them. */
+export const BADGE_EDITOR_KEYS: readonly EditorKey[] = [
+  "entry_id",
+  "charge_to",
+  "discharge_to",
+  "style",
+];
+
+/**
+ * The config after an edit: each key the editor owns is set from the form or,
+ * when the form left it empty, removed. Keys it does not own stay as they
+ * were, so the card's editor never clears a badge's style, nor the reverse.
+ */
 export function mergeEditorConfig(
   config: CardConfig,
   values: Record<string, unknown>,
+  keys: readonly EditorKey[] = [...CARD_EDITOR_KEYS, "style"],
 ): CardConfig {
   const next: CardConfig = { ...config };
-  for (const key of ["entry_id", "charge_to", "discharge_to", "layout", "style"] as const) {
+  for (const key of keys) {
     const value = configValue(values[key]);
     if (value === undefined) delete next[key];
     else if (key === "charge_to" || key === "discharge_to") next[key] = value;

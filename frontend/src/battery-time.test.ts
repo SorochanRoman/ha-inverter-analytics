@@ -4,6 +4,8 @@ import {
   formatCardPower,
   basisIsStale,
   formatEta,
+  BADGE_EDITOR_KEYS,
+  CARD_EDITOR_KEYS,
   mergeEditorConfig,
   resolveTarget,
   smoothedPower,
@@ -331,6 +333,14 @@ describe("the editor's config", () => {
     expect(
       mergeEditorConfig({ ...config, layout: "tile", style: "ring" }, { layout: "", style: "" }),
     ).toEqual({ type: "t", grid_options: { rows: 5 } });
+  });
+});
+
+describe("each editor's own keys", () => {
+  it("leaves the keys another editor owns alone", () => {
+    const config = { type: "t", layout: "tile", style: "ring" };
+    expect(mergeEditorConfig(config, {}, CARD_EDITOR_KEYS)).toEqual({ type: "t", style: "ring" });
+    expect(mergeEditorConfig(config, {}, BADGE_EDITOR_KEYS)).toEqual({ type: "t", layout: "tile" });
   });
 });
 

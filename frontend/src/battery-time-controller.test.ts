@@ -184,6 +184,16 @@ describe("the battery time controller", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("drops an old fetch error when the inverter changes", async () => {
+    const { controller, calls, hass } = setup();
+    controller.setConfig({});
+    controller.setHass(hass);
+    calls[0].reject({ message: "Unknown entry" });
+    await settle();
+    controller.setConfig({ entry_id: "other" });
+    expect(controller.view().note).toBeNull();
+  });
+
   it("words a failed fetch under the dash", async () => {
     const { controller, calls, hass } = setup();
     controller.setConfig({});
