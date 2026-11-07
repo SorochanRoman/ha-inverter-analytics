@@ -17,11 +17,11 @@ import {
   faceSentence,
   gridOptions,
   layoutOf,
-  pctLabel,
   powerPill,
   ringGeometry,
   socText,
   targetLine,
+  targetMarks,
   tileLine,
   tilePrimary,
   type BatteryTimeView,
@@ -107,7 +107,8 @@ class InverterAnalyticsBatteryTime extends LitElement {
   private pill(view: BatteryTimeView) {
     const pill = powerPill(view);
     if (!pill) return nothing;
-    return html`<span class="pill">
+    // The ring's and the bar's aria-label already say the power.
+    return html`<span class="pill" aria-hidden="true">
       ${pill.icon ? html`<ha-icon .icon=${pill.icon}></ha-icon>` : nothing}${pill.text}
     </span>`;
   }
@@ -171,22 +172,21 @@ class InverterAnalyticsBatteryTime extends LitElement {
       </div>
       ${
         view.eta
-          ? html`<div class="time">${view.eta.duration}</div>`
-          : html`<div class="time status-big">${view.status}</div>`
+          ? html`<div class="time" aria-hidden="true">${view.eta.duration}</div>`
+          : html`<div class="time status-big" aria-hidden="true">${view.status}</div>`
       }
-      ${line ? html`<div class="sub">${line}</div>` : nothing} ${this.pill(view)}`;
+      ${line ? html`<div class="sub" aria-hidden="true">${line}</div>` : nothing} ${this.pill(view)}`;
   }
 
   private bar(view: BatteryTimeView) {
     const share = view.soc === null ? 0 : clampPct(view.soc);
-    const marks: { at: number; kind: string }[] = [];
-    if (view.dischargeTo !== null) marks.push({ at: view.dischargeTo, kind: "discharge" });
-    if (view.chargeTo !== null) marks.push({ at: view.chargeTo, kind: "charge" });
-    const pos = (at: number) => `left: calc(3px + (100% - 6px) * ${clampPct(at) / 100})`;
-    return html`<div class="top">
+    const marks = targetMarks(view);
+    const pos = (at: number) => `left: calc(3px + (100% - 6px) * ${at / 100})`;
+    // The battery's aria-label says all of the top row and the status.
+    return html`<div class="top" aria-hidden="true">
         <span class="time">${view.eta ? view.eta.duration : view.word}</span>${this.pill(view)}
       </div>
-      <div class="status">${barLine(view)}</div>
+      <div class="status" aria-hidden="true">${barLine(view)}</div>
       <div class="battery" role="img" aria-label=${faceSentence(view)}>
         <div class="level" style="width: calc((100% - 6px) * ${share / 100})"></div>
         ${marks.map((m) => html`<div class="mark ${m.kind}" style=${pos(m.at)}></div>`)}
@@ -195,7 +195,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
       <div class="scale" aria-hidden="true">
         ${marks.map(
           (m) =>
-            html`<span class="${m.kind}" style=${pos(m.at)}>${pctLabel(m.at, view.locale)}</span>`,
+            html`<span class="${m.kind} ${m.anchor}" style=${pos(m.at)}>${m.label}</span>`,
         )}
       </div>`;
   }
@@ -219,7 +219,7 @@ class InverterAnalyticsBatteryTime extends LitElement {
       </div>
       <div class="thin" aria-hidden="true">
         <i style="width: ${share}%"></i>
-        ${view.chargeTo !== null ? html`<b style="left: ${clampPct(view.chargeTo)}%"></b>` : nothing}
+        ${targetMarks(view).map((m) => html`<b class=${m.kind} style="left: ${m.at}%"></b>`)}
       </div>`;
   }
 
@@ -483,7 +483,15 @@ class InverterAnalyticsBatteryTime extends LitElement {
     .scale span {
       position: absolute;
       top: 2px;
+      white-space: nowrap;
       transform: translateX(-50%);
+    }
+    /* Near an edge the label begins or ends at its mark, inside the bar. */
+    .scale span.start {
+      transform: translateX(-1px);
+    }
+    .scale span.end {
+      transform: translateX(calc(-100% + 1px));
     }
 
     /* tile */
@@ -553,6 +561,9 @@ class InverterAnalyticsBatteryTime extends LitElement {
       height: 12px;
       margin-left: -1px;
       background: var(--primary-text-color);
+    }
+    .thin b.discharge {
+      opacity: 0.5;
     }
   `;
 }

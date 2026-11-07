@@ -170,12 +170,15 @@ tested against this table.
     tone at 15%;
   - `note`, if any.
 - **SVG accessibility.** The SVG carries `role="img"` and an `aria-label`
-  with the full sentence: SoC, status and power.
+  with the full sentence: SoC, status and power. The time, the line under
+  it and the pill repeat it, so they are `aria-hidden`; `note` stays
+  readable.
 
 ### bar
 
-- **Top row.** `eta.duration` (or `word`) on the left, 28 px. The power pill
-  on the right.
+- **Top row.** `eta.duration` (or `word`) on the left: 28 px; 20 px below
+  a 260 px container (the default 6-column width). The power pill on the
+  right.
 - **Under the time.** "to 85% · ≈16:40", as under the ring, in
   `--secondary-text-color`; it drops the arrival when there is none. A
   state with no time shows `status` instead. The duration is not repeated:
@@ -183,9 +186,12 @@ tested against this table.
 - **Battery.** An outline 40 px tall with a terminal nub. The fill is the
   SoC in the tone gradient, with the SoC centred in `--primary-text-color`.
 - **Marks.** Vertical marks at the discharge target (50% opacity) and the
-  charge target, with their percentages below.
+  charge target, with their percentages below. `targetMarks(view)` places
+  them: a target past 0–100% sits at the edge, and near an edge its label
+  begins or ends at the mark, so "100.5%" stays inside the bar.
 - **Note and accessibility.** `note`, if any. `role="img"` and an
-  `aria-label`, as in ring.
+  `aria-label`, as in ring. The top row and the line under the time repeat
+  the label, so they are `aria-hidden`.
 
 ### tile
 
@@ -203,11 +209,12 @@ tested against this table.
   `unmapped` / `unavailable` / `loading` it reads "— · —". Text is in
   `--primary-text-color`.
 - **Secondary line.** "≈16:40 · ↑ 1.8 kW" in `--secondary-text-color`.
-  The target is left out so the line fits half a section; the tick on the
-  bar shows it. The arrow is an `ha-icon`, not a glyph, and there is none
+  The target is left out so the line fits half a section; the ticks on the
+  bar show the targets. The arrow is an `ha-icon`, not a glyph, and there is none
   at rest.
-- **Bar.** A 6 px bar: the fill in the tone, with a tick at the charge
-  target.
+- **Bar.** A 6 px bar: the fill in the tone, with ticks at both targets
+  from `targetMarks`, the charge target in full and the discharge target at
+  50% opacity, whichever way the battery moves.
 - **Note.** `note`, if any.
 
 ## 4. The badge

@@ -15,6 +15,7 @@ import {
   layoutOf,
   pctLabel,
   powerPill,
+  targetMarks,
   ringGeometry,
   targetLine,
   tileLine,
@@ -731,6 +732,36 @@ describe("the faces' lines", () => {
     expect(pctLabel(20, "en")).toBe("20%");
     expect(pctLabel(85.25, "en")).toBe("85.3%");
     expect(pctLabel(85.5, "uk")).toBe("85,5%");
+  });
+
+  it("marks both targets, the discharge one first, whatever the direction", () => {
+    const marks = [
+      { at: 20, kind: "discharge", label: "20%", anchor: "middle" },
+      { at: 85, kind: "charge", label: "85%", anchor: "middle" },
+    ];
+    expect(targetMarks(en(charging))).toEqual(marks);
+    expect(targetMarks(en(discharging, { powerW: -1800 }))).toEqual(marks);
+    expect(targetMarks(en({ kind: "at_floor", target: 20 }))).toEqual(marks);
+  });
+
+  it("keeps a mark and its label inside the bar", () => {
+    expect(targetMarks(uk(charging, { chargeTo: 100.5, dischargeTo: 5 }))).toEqual([
+      { at: 5, kind: "discharge", label: "5%", anchor: "start" },
+      { at: 100, kind: "charge", label: "100,5%", anchor: "end" },
+    ]);
+    expect(targetMarks(en(charging, { chargeTo: 90, dischargeTo: 10 }))).toEqual([
+      { at: 10, kind: "discharge", label: "10%", anchor: "start" },
+      { at: 90, kind: "charge", label: "90%", anchor: "end" },
+    ]);
+  });
+
+  it("leaves out a target that is not known", () => {
+    expect(targetMarks(en({ kind: "loading" }, { chargeTo: null, dischargeTo: null }))).toEqual(
+      [],
+    );
+    expect(targetMarks(en(charging, { dischargeTo: null }))).toEqual([
+      { at: 85, kind: "charge", label: "85%", anchor: "middle" },
+    ]);
   });
 });
 

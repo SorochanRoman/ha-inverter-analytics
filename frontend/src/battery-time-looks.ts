@@ -367,9 +367,41 @@ export function powerPill(view: BatteryTimeView): { icon: string | null; text: s
   return { icon, text: formatCardPower(Math.abs(powerW), view.locale, view.m) };
 }
 
+/** A target's mark on the bar or the tile: where, which, and how its label sits. */
+export interface TargetMark {
+  /** Percent along the bar, clamped to 0–100. */
+  at: number;
+  kind: "charge" | "discharge";
+  /** "85%", up to one decimal; the target as set, before clamping. */
+  label: string;
+  /**
+   * How the label sits on the mark: centred, or beginning or ending at it
+   * near an edge, so "100.5%" stays inside the bar.
+   */
+  anchor: "start" | "middle" | "end";
+}
+
+/**
+ * Both targets' marks, the discharge one first: whichever way the battery
+ * moves, the tile and the bar show where it stops either way.
+ */
+export function targetMarks(view: BatteryTimeView): TargetMark[] {
+  const marks: TargetMark[] = [];
+  const mark = (target: number | null, kind: TargetMark["kind"]) => {
+    if (target === null) return;
+    const at = clampPct(target);
+    const anchor = at <= 10 ? "start" : at >= 90 ? "end" : "middle";
+    marks.push({ at, kind, label: pctLabel(target, view.locale), anchor });
+  };
+  mark(view.dischargeTo, "discharge");
+  mark(view.chargeTo, "charge");
+  return marks;
+}
+
 /**
  * The tile's second line: "≈16:40 · ↑ 1.8 kW". The target is left out, for
- * the line to fit half a section; the tick on the tile's bar shows it.
+ * the line to fit half a section; the ticks on the tile's bar show the
+ * targets, as targetMarks places them.
  */
 export function tileLine(view: BatteryTimeView): {
   text: string | null;

@@ -125,6 +125,7 @@ quoted from the user's installation, and `code` fragments are not translated.
 | unavailable (entity) | недоступна |
 | charging / discharging / idle (one-word card label) | заряд / розряд / простій |
 | at limit / floor (one-word card label) | на ліміті / мінімум |
+| battery SoC / battery charge total / battery discharge total (card's capacity note) | рівень заряду / лічильник заряду / лічильник розряду (without "батареї": the card is about the battery, and the note has two lines) |
 | Layout (card editor): Ring / Bar / Tile | Вигляд: Кільце / Смуга / Плитка |
 | Style (badge editor): Full / Ring / Time | Стиль: Повний / Кільце / Час |
 | to 85% / ≈16:40 (target, arrival) | до 85% / ≈16:40 |
