@@ -151,10 +151,9 @@ only, whatever the switch says.
 
 ### Battery time card
 
-A dashboard card, in the style of a portable power station's display: a ring
-with the battery's state of charge, one line saying how long until the battery
-reaches its charge target or its discharge floor at the current power —
-"Charging to 85% · 2 h 10 min (≈16:40)" — and the battery power, smoothed
+A dashboard card that shows the battery's state of charge, how long until the
+battery reaches its charge target or its discharge floor at the current power
+— "Charging to 85% · 2 h 10 min (≈16:40)" — and the battery power, smoothed
 over the last two minutes. At the target it says "At limit" or "At floor",
 and inside the battery's idle band "Idle". It ships with the integration and
 appears in the dashboard's card picker as **Battery time**, with a visual
@@ -162,10 +161,46 @@ editor:
 
 ```yaml
 type: custom:inverter-analytics-battery-time
+layout: ring             # ring | bar | tile; default ring
 entry_id: ...            # optional; needed only with more than one inverter
 charge_to: 85            # number (%) or an entity id; default 100
 discharge_to: sensor.x   # number (%) or an entity id; default: the low battery charge
 ```
+
+It comes in three layouts, each half a section wide (6 of 12 columns):
+
+- **ring** (5 rows): a ring filled to the state of charge, with ticks at the
+  two targets; under it the time, "to 85% · ≈16:40", and the power;
+- **bar** (3 rows): the time and the power on top, then a battery outline
+  filled to the state of charge, with marks at the two targets;
+- **tile** (2 rows): a battery icon, "62% · 2 h 10 min", the arrival time
+  and the power, and a thin bar.
+
+The colour follows the state: green while charging, orange while
+discharging, red at the floor, grey at rest, all taken from your theme.
+
+#### Battery time badge
+
+The same figures as a badge, for the dashboard's badge row. It appears in
+the badge picker as **Battery time**, and a tap opens the state of charge's
+more-info dialog.
+
+```yaml
+type: custom:inverter-analytics-battery-badge
+style: full              # full | ring | time; default full
+entry_id: ...            # as on the card
+charge_to: 85
+discharge_to: 20
+```
+
+- **full**: a battery icon, then "62% · 2 h 10 min";
+- **ring**: a small ring filled to the state of charge, with "62% · to 85%"
+  above the time;
+- **time**: only the arrival, "≈16:40", beside a bolt while charging or an
+  arrow while discharging.
+
+At rest, and wherever there is no time, the badge shows the state's word
+("idle", "at limit", "floor") in place of the time.
 
 The low battery charge is the one set in the integration's options. A target given as an
 entity — a `number.*` charge limit the inverter exposes, say — is read live,

@@ -265,6 +265,21 @@ export function badgeText(
   }
 }
 
+/**
+ * The badge's icon. Full: the battery at its level. Time: a bolt while
+ * charging, an arrow while discharging, the battery otherwise. Ring: none,
+ * since the mini ring takes its place.
+ */
+export function badgeIcon(view: BatteryTimeView, style: BadgeStyle): string | null {
+  if (style === "ring") return null;
+  const direction = directionOf(view.state);
+  if (style === "time") {
+    if (direction === "charging") return "mdi:lightning-bolt";
+    if (direction === "discharging") return "mdi:arrow-down";
+  }
+  return batteryIcon(view.soc, direction === "charging");
+}
+
 // Sections rows are 56 px with an 8 px gap; see the spec's height budgets.
 const GRID: Record<Layout, { rows: number; columns: number; min_rows: number; size: number }> = {
   ring: { rows: 5, columns: 6, min_rows: 5, size: 6 },
@@ -406,6 +421,32 @@ export function editorSchema(m: CardMessages): EditorField[] {
         select: {
           mode: "dropdown",
           options: LAYOUTS.map((value) => ({ value, label: m.layouts[value] })),
+        },
+      },
+    },
+    { name: "entry_id", selector: { text: {} } },
+    { name: "charge_to", selector: { text: {} } },
+    { name: "discharge_to", selector: { text: {} } },
+  ];
+}
+
+/** One field of the badge editor's ha-form. */
+export type BadgeEditorField =
+  | {
+      name: "style";
+      selector: { select: { mode: "dropdown"; options: { value: BadgeStyle; label: string }[] } };
+    }
+  | { name: "entry_id" | "charge_to" | "discharge_to"; selector: { text: Record<string, never> } };
+
+/** The badge editor's form, worded in the language: the style, then the three targets. */
+export function badgeEditorSchema(m: CardMessages): BadgeEditorField[] {
+  return [
+    {
+      name: "style",
+      selector: {
+        select: {
+          mode: "dropdown",
+          options: STYLES.map((value) => ({ value, label: m.styles[value] })),
         },
       },
     },

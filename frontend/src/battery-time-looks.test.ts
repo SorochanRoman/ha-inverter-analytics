@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cardState, type CardState } from "./battery-time";
 import {
+  badgeEditorSchema,
+  badgeIcon,
   badgeText,
   barLine,
   batteryIcon,
@@ -729,5 +731,85 @@ describe("the faces' lines", () => {
     expect(pctLabel(20, "en")).toBe("20%");
     expect(pctLabel(85.25, "en")).toBe("85.3%");
     expect(pctLabel(85.5, "uk")).toBe("85,5%");
+  });
+});
+
+describe("the badge's text, in the cases the table leaves out", () => {
+  const en = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardEn, "en", state, fields);
+
+  it("names the discharge target without a measured capacity", () => {
+    const state: ViewState = { ...noCapacityHours, direction: "discharging" } as CardState;
+    expect(badgeText(en(state), "ring")).toEqual({
+      primary: "62% · to 20%",
+      secondary: "discharging",
+    });
+    expect(badgeText(en(state), "time")).toEqual({ primary: "discharging" });
+  });
+
+  it("gives an arrival under an hour in the time style", () => {
+    const vw = en({ kind: "charging", target: 85, minutes: 7 });
+    expect(badgeText(vw, "time")).toEqual({ primary: "≈14:37" });
+    expect(badgeText(vw, "full")).toEqual({ primary: "62% · 7 min" });
+  });
+});
+
+describe("the badge's icon", () => {
+  const en = (state: ViewState, fields?: Partial<BatteryTimeView>) =>
+    view(cardEn, "en", state, fields);
+
+  it("is the battery at its level in the full style, charging or not", () => {
+    expect(badgeIcon(en(charging), "full")).toBe("mdi:battery-charging-60");
+    expect(badgeIcon(en(discharging), "full")).toBe("mdi:battery-60");
+    expect(badgeIcon(en({ kind: "idle" }), "full")).toBe("mdi:battery-60");
+    expect(badgeIcon(en({ kind: "loading" }, { soc: null }), "full")).toBe("mdi:battery-unknown");
+  });
+
+  it("is a bolt while charging and an arrow while discharging in the time style", () => {
+    expect(badgeIcon(en(charging), "time")).toBe("mdi:lightning-bolt");
+    expect(badgeIcon(en(discharging), "time")).toBe("mdi:arrow-down");
+    expect(badgeIcon(en(noCapacityHours), "time")).toBe("mdi:lightning-bolt");
+    const down: ViewState = { ...noCapacityHours, direction: "discharging" } as CardState;
+    expect(badgeIcon(en(down), "time")).toBe("mdi:arrow-down");
+  });
+
+  it("is the battery in the time style at rest or at the floor", () => {
+    expect(badgeIcon(en({ kind: "at_floor", target: 20 }), "time")).toBe("mdi:battery-60");
+    expect(badgeIcon(en({ kind: "at_limit", target: 85 }), "time")).toBe("mdi:battery-60");
+    expect(badgeIcon(en({ kind: "unmapped" }, { soc: null }), "time")).toBe(
+      "mdi:battery-unknown",
+    );
+  });
+
+  it("is none in the ring style, which draws a ring instead", () => {
+    expect(badgeIcon(en(charging), "ring")).toBeNull();
+  });
+});
+
+describe("the badge editor's schema", () => {
+  it("offers the three styles first, worded in the language", () => {
+    for (const m of [cardEn, cardUk]) {
+      const schema = badgeEditorSchema(m);
+      expect(schema.map((field) => field.name)).toEqual([
+        "style",
+        "entry_id",
+        "charge_to",
+        "discharge_to",
+      ]);
+      expect(schema[0].selector).toEqual({
+        select: {
+          mode: "dropdown",
+          options: [
+            { value: "full", label: m.styles.full },
+            { value: "ring", label: m.styles.ring },
+            { value: "time", label: m.styles.time },
+          ],
+        },
+      });
+      for (const field of schema.slice(1)) expect(field.selector).toEqual({ text: {} });
+    }
+    expect(badgeEditorSchema(cardUk)[0].selector).not.toEqual(
+      badgeEditorSchema(cardEn)[0].selector,
+    );
   });
 });

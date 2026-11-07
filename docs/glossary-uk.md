@@ -124,8 +124,9 @@ quoted from the user's installation, and `code` fragments are not translated.
 | over 2 days | понад 2 доби |
 | unavailable (entity) | недоступна |
 | charging / discharging / idle (one-word card label) | заряд / розряд / простій |
-| at limit / at floor (one-word card label) | на ліміті / на нижній межі |
+| at limit / floor (one-word card label) | на ліміті / мінімум |
 | Layout (card editor): Ring / Bar / Tile | Вигляд: Кільце / Смуга / Плитка |
 | Style (badge editor): Full / Ring / Time | Стиль: Повний / Кільце / Час |
-| to 85% / at 16:40 (target, arrival) | до 85% / о 16:40 |
+| to 85% / ≈16:40 (target, arrival) | до 85% / ≈16:40 |
+| Battery time (badge) | Час батареї |
 | target (charge or discharge) | ціль |

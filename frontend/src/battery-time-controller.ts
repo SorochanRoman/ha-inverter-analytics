@@ -72,6 +72,11 @@ export class BatteryTimeController implements ReactiveController {
     return this._hass;
   }
 
+  /** The SoC entity, which a tap opens in more info; none before the basis. */
+  get socEntity(): string | undefined {
+    return this.basis?.soc_entity ?? undefined;
+  }
+
   setConfig(config: CardConfig): void {
     const next: CardConfig = {
       entry_id: config.entry_id || undefined,

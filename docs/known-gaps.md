@@ -487,3 +487,12 @@ it; the last three are limits of what the counters themselves can tell:
 - **`charge_to` defaults to 100.** Leave it there only if the inverter really
   charges to 100%; otherwise set it to the cap, or to the entity that holds
   it, or the card counts down to a charge that never comes.
+- **The card and the badge each fetch the basis.** A card and a badge on the
+  same dashboard each ask the backend for the measured capacity, and each
+  refresh it hourly. The backend's six-hour cache answers the second, so it
+  costs a lookup, not a recomputation.
+- **The layouts and the badge have not been checked by eye in a live Home
+  Assistant.** They were checked in headless Chrome against a stand-in
+  `hass` and HA's theme colours, at half a section's width; a real
+  dashboard, its fonts and its badge row may still show something that
+  check did not.

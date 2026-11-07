@@ -394,4 +394,15 @@ describe("the battery time controller", () => {
     expect(view.eta).toBeNull();
     expect(view.tone).toBe("rest");
   });
+
+  it("names the SoC entity for more info once the basis is in", async () => {
+    const { controller, calls, hass } = setup();
+    expect(controller.socEntity).toBeUndefined();
+    controller.setConfig({});
+    controller.setHass(hass);
+    expect(controller.socEntity).toBeUndefined();
+    calls[0].resolve(basis({ soc_entity: "sensor.inverter_soc" }));
+    await settle();
+    expect(controller.socEntity).toBe("sensor.inverter_soc");
+  });
 });

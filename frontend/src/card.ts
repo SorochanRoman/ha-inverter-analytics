@@ -29,6 +29,8 @@ import {
   type Layout,
 } from "./battery-time-looks";
 import { messages } from "./i18n/card-i18n";
+// The badge ships in this bundle and registers itself on import.
+import "./badge";
 
 const CARD_TYPE = "inverter-analytics-battery-time";
 const EDITOR_TYPE = "inverter-analytics-battery-time-editor";
